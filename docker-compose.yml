@@ -1,0 +1,39 @@
+services:
+  serioussportsync:
+    container_name: serioussportsync
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Defaults — env_file overrides these. Listed here so the schema is
+      # discoverable without opening .env.example.
+      PORT: "7000"
+      ADDON_TYPE: "${ADDON_TYPE:-movie}"
+      TSDB_API_KEY: "${TSDB_API_KEY:-3}"
+      TSDB_SEASONS: "${TSDB_SEASONS:-auto}"
+      REFRESH_INTERVAL_HOURS: "${REFRESH_INTERVAL_HOURS:-6}"
+      # Optional debrid stream resolvers (any combination)
+      PROWLARR_URL: "${PROWLARR_URL:-}"
+      PROWLARR_API_KEY: "${PROWLARR_API_KEY:-}"
+      REAL_DEBRID_API_TOKEN: "${REAL_DEBRID_API_TOKEN:-}"
+      TORBOX_API_TOKEN: "${TORBOX_API_TOKEN:-}"
+      PREMIUMIZE_API_KEY: "${PREMIUMIZE_API_KEY:-}"
+      # Optional access control
+      ACCESS_TOKENS: "${ACCESS_TOKENS:-}"
+      ADMIN_USER: "${ADMIN_USER:-}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
+    volumes:
+      - serioussportsync_data:/app/data
+    ports:
+      - "7000:7000"
+
+volumes:
+  serioussportsync_data:
+
+# To attach to an existing reverse-proxy / *arr stack network instead of the
+# default compose-created one, uncomment and replace the name below.
+# networks:
+#   default:
+#     external: true
+#     name: my-existing-network

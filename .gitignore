@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Local secrets — NEVER commit
+.env
+.env.local
+.env.*.local
+
+# Runtime data (users, events, settings, stream cache — local/regenerated)
+data/
+
+# Release archives (built locally, not source)
+*.tar.gz
+
+# Optional, drop-in HTML indexer client — local-only, never committed.
+# See lib/streams.js for the interface (multiSearch(queries, opts)).
+lib/sources/extra.js
+lib/sources/local.js
+
+# Stray dev/test artifacts (any underscore-prefixed JS in repo root is dev scratch)
+_*.js
+*.log
+
+# Editor / OS noise
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db

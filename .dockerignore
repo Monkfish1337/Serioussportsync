@@ -1,0 +1,17 @@
+.git
+.gitignore
+.dockerignore
+Dockerfile
+docker-compose.yml
+docker-compose.*.yml
+README.md
+node_modules
+data
+*.log
+.env
+.vscode
+.idea
+.DS_Store
+
+# Stray test seed left in the workspace during initial build verification.
+_seed.js
