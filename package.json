@@ -1,6 +1,6 @@
 {
   "name": "serioussportsync",
-  "version": "0.22.1",
+  "version": "0.22.2",
   "description": "Self-hosted Stremio addon: multi-user sports metadata + per-user multi-debrid (RD/TorBox/Premiumize) stream resolution. Covers UFC, ONE Championship, WWE, AEW.",
   "main": "server.js",
   "scripts": {

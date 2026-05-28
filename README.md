@@ -4,7 +4,7 @@
 >
 > 🎯 **Primarily designed for [Nuvio](https://github.com/zaarrak/Nuvio)** (a Stremio-compatible client tuned for sports/live content). Also works with **Stremio** and other compatible clients.
 
-[![Version](https://img.shields.io/badge/version-0.22.1-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-0.22.2-blue.svg)](#)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Nuvio](https://img.shields.io/badge/Nuvio-compatible-orange.svg)](#)
 [![Stremio Add-on](https://img.shields.io/badge/Stremio-compatible-7b5bf5.svg)](https://www.stremio.com/)
@@ -90,8 +90,9 @@ Everything is env-driven with sensible defaults (see [`.env.example`](./.env.exa
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `SESSION_SECRET` | _(required in prod)_ | Signs login cookies — set a long random value (`openssl rand -hex 32`) |
+| `SESSION_SECRET` | _(required, ≥32 chars)_ | Signs login cookies — generate with `openssl rand -hex 32`. The server refuses to boot if unset or too short. Dev escape hatch: `ALLOW_INSECURE_SECRET=1`. |
 | `ADMIN_USER` | — | Username auto-promoted to admin on first signup |
+| `LOGIN_MAX_FAILS` / `LOGIN_WINDOW_MS` / `LOGIN_LOCKOUT_MS` | `5` / `900000` / `900000` | Per-IP login rate-limit: lock out after N failed sign-ins within window-ms, for lockout-ms |
 | `PUBLIC_URL` | _(auto)_ | Public origin for install URLs (honours `X-Forwarded-*`) |
 | `ADDON_TYPE` | `movie` | Client item type (`tv`/`series` for some clients) |
 | `PROWLARR_URL` / `PROWLARR_API_KEY` | — | Prowlarr indexer source (or set in GUI) |

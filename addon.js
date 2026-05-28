@@ -31,6 +31,58 @@ function publicOriginFromReq(req) {
   return '';
 }
 
+// Login rate-limiter (0.22.2). In-memory per-client-IP counter of failed login
+// attempts. Locks out an IP after LOGIN_MAX_FAILS within LOGIN_WINDOW_MS, for
+// LOGIN_LOCKOUT_MS. State resets on server restart — acceptable for a self-
+// hosted, low-traffic deployment. Successful login clears the counter for that
+// IP. Pruning happens lazily on each check so the map can't grow unbounded.
+const LOGIN_MAX_FAILS = parseInt(process.env.LOGIN_MAX_FAILS || '5', 10);
+const LOGIN_WINDOW_MS = parseInt(process.env.LOGIN_WINDOW_MS || (15 * 60 * 1000), 10);
+const LOGIN_LOCKOUT_MS = parseInt(process.env.LOGIN_LOCKOUT_MS || (15 * 60 * 1000), 10);
+const loginFails = new Map(); // ip -> { fails, firstFailAt, lockUntil }
+
+function clientIp(req) {
+  // Cloudflare Tunnel forwards the real IP in CF-Connecting-IP. Fall through
+  // to the standard proxy chain header, then the socket address.
+  const cf = req.headers['cf-connecting-ip'];
+  if (cf) return String(cf).trim();
+  const xff = req.headers['x-forwarded-for'];
+  if (xff) return String(xff).split(',')[0].trim();
+  return (req.socket && req.socket.remoteAddress) || 'unknown';
+}
+
+function loginLockedOut(ip) {
+  const e = loginFails.get(ip);
+  if (!e) return 0;
+  if (e.lockUntil && e.lockUntil > Date.now()) {
+    return Math.ceil((e.lockUntil - Date.now()) / 1000);
+  }
+  return 0;
+}
+
+function recordLoginFail(ip) {
+  const now = Date.now();
+  let e = loginFails.get(ip);
+  if (!e || now - e.firstFailAt > LOGIN_WINDOW_MS) {
+    e = { fails: 0, firstFailAt: now, lockUntil: 0 };
+  }
+  e.fails += 1;
+  if (e.fails >= LOGIN_MAX_FAILS) {
+    e.lockUntil = now + LOGIN_LOCKOUT_MS;
+  }
+  loginFails.set(ip, e);
+  // Lazy prune — drop entries whose window AND lockout have both expired.
+  if (loginFails.size > 1000) {
+    for (const [k, v] of loginFails) {
+      if (now - v.firstFailAt > LOGIN_WINDOW_MS && (!v.lockUntil || v.lockUntil < now)) {
+        loginFails.delete(k);
+      }
+    }
+  }
+}
+
+function clearLoginFails(ip) { loginFails.delete(ip); }
+
 function createApp() {
   const app = express();
   app.disable('x-powered-by');
@@ -130,7 +182,7 @@ function createApp() {
     const password = String(req.body.password || '');
     try {
       const u = await users.createUser({ username, password, role: 'admin' });
-      sessions.setCookie(res, u.id);
+      sessions.setCookie(res, u.id, req);
       res.redirect('/account');
     } catch (err) {
       res.status(400).send(authPage('Setup failed',
@@ -156,9 +208,28 @@ function createApp() {
   app.post('/login', async (req, res) => {
     const username = String(req.body.username || '').trim();
     const password = String(req.body.password || '');
+    const ip = clientIp(req);
+
+    // Rate-limit check (0.22.2). If this IP is locked out, refuse without
+    // touching bcrypt — keeps the brute-force window cheap on the server.
+    const lockedFor = loginLockedOut(ip);
+    if (lockedFor > 0) {
+      const mins = Math.ceil(lockedFor / 60);
+      res.setHeader('Retry-After', String(lockedFor));
+      return res.status(429).send(authPage('Sign in',
+        '<p style="color:var(--accent);margin:0 0 12px;">Too many failed sign-in attempts. '
+        + 'Try again in about ' + mins + ' minute' + (mins === 1 ? '' : 's') + '.</p>'
+      ));
+    }
+
     const u = users.findByUsername(username);
-    const ok = u ? await users.verifyPassword(password, u.passwordHash) : false;
+    // Always run bcrypt — verifyDummy for unknown users — so response time
+    // doesn't reveal whether the username exists.
+    const ok = u
+      ? await users.verifyPassword(password, u.passwordHash)
+      : (await users.verifyDummy(password), false);
     if (!ok) {
+      recordLoginFail(ip);
       await new Promise((r) => setTimeout(r, 250 + Math.floor(Math.random() * 250)));
       return res.status(401).send(authPage('Sign in',
         '<p style="color:var(--accent);margin:0 0 12px;">Invalid username or password.</p>'
@@ -171,13 +242,14 @@ function createApp() {
         + '</form>'
       ));
     }
-    sessions.setCookie(res, u.id);
+    clearLoginFails(ip);
+    sessions.setCookie(res, u.id, req);
     users.touchLastSeen(u.id);
     res.redirect('/account');
   });
 
-  app.post('/logout', (req, res) => { sessions.clearCookie(res); res.redirect('/login'); });
-  app.get('/logout',  (req, res) => { sessions.clearCookie(res); res.redirect('/login'); });
+  app.post('/logout', (req, res) => { sessions.clearCookie(res, req); res.redirect('/login'); });
+  app.get('/logout',  (req, res) => { sessions.clearCookie(res, req); res.redirect('/login'); });
 
   app.get('/account', requireLogin, (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -459,7 +531,7 @@ function createApp() {
     const password = String(req.body.password || '');
     try {
       const u = await users.consumeInvite(req.params.token, password);
-      sessions.setCookie(res, u.id);
+      sessions.setCookie(res, u.id, req);
       res.redirect('/account?flash=' + encodeURIComponent('Welcome! Your account has been created.'));
     } catch (err) {
       res.status(400).send(authPage('Invite accept failed',

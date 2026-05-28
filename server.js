@@ -4,6 +4,26 @@ const { createApp } = require('./addon');
 const store = require('./lib/store');
 const { runRefresh } = require('./scripts/refresh');
 
+// SESSION_SECRET hard-fail (0.22.2). If unset or too short, sessions fall back
+// to a derived secret that can be guessed across default-config instances,
+// which is unsafe for any deployment that lets other people log in. Refuse to
+// boot instead of silently using the weak fallback. Dev-only escape hatch:
+// ALLOW_INSECURE_SECRET=1 (use only when iterating locally).
+(function enforceSessionSecret() {
+  const secret = process.env.SESSION_SECRET || '';
+  const allowInsecure = process.env.ALLOW_INSECURE_SECRET === '1';
+  if (secret.length >= 32) return;
+  if (allowInsecure) {
+    console.warn('[serioussportsync] WARNING: weak/missing SESSION_SECRET allowed via ALLOW_INSECURE_SECRET=1 — dev only, never use in production.');
+    return;
+  }
+  console.error('[serioussportsync] FATAL: SESSION_SECRET must be set to a random string of at least 32 characters.');
+  console.error('  Generate one with:  openssl rand -hex 32');
+  console.error('  Then set it in your .env (or docker-compose env block) and restart.');
+  console.error('  (Set ALLOW_INSECURE_SECRET=1 to bypass this check for local development ONLY.)');
+  process.exit(1);
+})();
+
 const app = createApp();
 
 // Warm the cache on boot so the first request is fast.
