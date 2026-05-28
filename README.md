@@ -4,7 +4,7 @@
 >
 > 🎯 **Primarily designed for [Nuvio](https://github.com/zaarrak/Nuvio)** (a Stremio-compatible client tuned for sports/live content). Also works with **Stremio** and other compatible clients.
 
-[![Version](https://img.shields.io/badge/version-0.22.2-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-0.22.3-blue.svg)](#)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Nuvio](https://img.shields.io/badge/Nuvio-compatible-orange.svg)](#)
 [![Stremio Add-on](https://img.shields.io/badge/Stremio-compatible-7b5bf5.svg)](https://www.stremio.com/)
@@ -103,7 +103,8 @@ Everything is env-driven with sensible defaults (see [`.env.example`](./.env.exa
 | `STREAM_CACHE_TTL_HOURS` | `6` | Candidate-cache freshness |
 | `STREAM_CACHE_REFRESH` / `_HOURS` | `on` / `3` | Proactive candidate warmer |
 | `RD_BLOCKED_KEYWORDS` | `AMZN,NF,CR,YTS,RARBG,WEBRip` | Skip rows whose title contains a tag a provider is known to keyword-filter — see [Provider keyword filtering](#-provider-keyword-filtering) |
-| `RD_DENYLIST_TTL_DAYS` | `30` | How long a flagged hash stays out of advertised rows |
+| `RD_DENYLIST_TTL_DAYS` | `30` | How long a 451-flagged hash (hard) stays out of advertised rows |
+| `RD_SOFT_DENYLIST_HOURS` | `24` | How long a non-451 "not cached / unresolvable" RD hash stays out of advertised rows (may come back if it later gets cached) |
 | `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY` | — | Route public indexer traffic via a VPN (keep internal services in `NO_PROXY`) |
 
 🔐 Debrid provider keys are **never** env vars — they're per-user, entered on each user's own account page. Admins can rotate tokens but cannot see install URLs or provider keys.

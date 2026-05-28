@@ -130,7 +130,12 @@ module.exports = {
   //       haven't pre-filtered. See lib/rd-denylist.js.
   rdDenylist: {
     file: process.env.RD_DENYLIST_FILE || './data/rd-denylist.json',
+    // Hard TTL — 451 / DMCA blocks. RD doesn't reverse these quickly.
     ttlDays: parseFloat(process.env.RD_DENYLIST_TTL_DAYS || '30'),
+    // Soft TTL (0.22.3) — non-451 "not cached / unresolvable" RD outcomes.
+    // The hash may become cached later if another user adds it, so the entry
+    // expires fast enough to give it another chance.
+    softTtlHours: parseFloat(process.env.RD_SOFT_DENYLIST_HOURS || '24'),
     blockedKeywords: (process.env.RD_BLOCKED_KEYWORDS || 'AMZN,NF,CR,YTS,RARBG,WEBRip')
       .split(',').map((s) => s.trim()).filter(Boolean),
   },
