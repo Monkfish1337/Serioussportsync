@@ -321,7 +321,7 @@ function createApp() {
     });
 
     r.get('/manifest.json', (req, res) => {
-      send(res, buildManifest({ user: req.userAccount }));
+      send(res, buildManifest({ user: req.userAccount, origin: publicOriginFromReq(req) }));
     });
 
     r.get('/catalog/:type/:id.json', (req, res) => {

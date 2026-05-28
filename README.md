@@ -1,10 +1,14 @@
+<p align="center">
+  <img src="public/logo-banner.png" alt="SeriousSportSync" width="820">
+</p>
+
 # 📅 SeriousSportSync — Sports Metadata & Calendar Add-on
 
 > A self-hosted add-on that turns combat sports, pro-wrestling, motorsport and more into proper meta items — with a built-in calendar of upcoming events and optional resolve-on-play of cached links via your own indexers and debrid accounts.
 >
 > 🎯 **Primarily designed for [Nuvio](https://github.com/zaarrak/Nuvio)** (a Stremio-compatible client tuned for sports/live content). Also works with **Stremio** and other compatible clients.
 
-[![Version](https://img.shields.io/badge/version-0.22.3-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-0.23.0-blue.svg)](#)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Nuvio](https://img.shields.io/badge/Nuvio-compatible-orange.svg)](#)
 [![Stremio Add-on](https://img.shields.io/badge/Stremio-compatible-7b5bf5.svg)](https://www.stremio.com/)
@@ -40,6 +44,7 @@ SeriousSportSync is, first and foremost, a **sports metadata add-on and event ca
 | 🎤 **WWE** | PLEs, named NXT events, Saturday Night's Main Event | Recent + Upcoming |
 | 🤼 **AEW** | PPVs + Zero Hour pre-shows | Recent + Upcoming |
 | 🏎️ **Formula 1** | Per-session items per Grand Prix weekend (Practice / Qualifying / Sprint / Sprint Qualifying / Race) | Per-session rows + Upcoming Races |
+| 🥊 **Boxing** | PPV cards from all major promoters (Top Rank, PBC, Matchroom, MVPW, etc.) | Recent + Upcoming |
 
 Adding another sport or promotion is a single self-contained entry in `lib/promotions.js` — see [Adding a promotion](#-adding-a-promotion). Designed to be extended to any sport that has structured event data (football, basketball, boxing, MotoGP, you name it).
 
