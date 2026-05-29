@@ -139,4 +139,31 @@ module.exports = {
     blockedKeywords: (process.env.RD_BLOCKED_KEYWORDS || 'AMZN,NF,CR,YTS,RARBG,WEBRip')
       .split(',').map((s) => s.trim()).filter(Boolean),
   },
+  // Per-provider failure denylists (0.23.1). Same dual-TTL model as
+  // rdDenylist — see lib/provider-denylist.js. Each provider gets its own
+  // file under data/ so a TB "not cached" doesn't pin RD or PM rows out.
+  tbDenylist: {
+    file: process.env.TB_DENYLIST_FILE || './data/tb-denylist.json',
+    ttlDays: parseFloat(process.env.TB_DENYLIST_TTL_DAYS || '30'),
+    softTtlHours: parseFloat(process.env.TB_SOFT_DENYLIST_HOURS || '24'),
+  },
+  pmDenylist: {
+    file: process.env.PM_DENYLIST_FILE || './data/pm-denylist.json',
+    ttlDays: parseFloat(process.env.PM_DENYLIST_TTL_DAYS || '30'),
+    softTtlHours: parseFloat(process.env.PM_SOFT_DENYLIST_HOURS || '24'),
+  },
+  // Warmer-time cache verification (0.23.1). When the proactive warmer runs
+  // every STREAM_CACHE_REFRESH_HOURS, it batches every candidate hash against
+  // TB/PM's non-destructive cache-check APIs and persists the result into the
+  // candidate cache. streams.js then advertises TB/PM rows only when verified
+  // cached, drastically reducing dead clicks. Both APIs are non-destructive
+  // and quota-free — these are lookups, not adds. RD has no equivalent API
+  // (instantAvailability was removed in 2024) so RD remains optimistic +
+  // denylist. Provide either provider's key here to enable that provider's
+  // verification; both empty disables warmer verification (falls back to
+  // optimistic + denylist for everyone).
+  warmer: {
+    tbToken:  process.env.WARMER_TB_TOKEN || '',
+    pmApiKey: process.env.WARMER_PM_KEY   || '',
+  },
 };
