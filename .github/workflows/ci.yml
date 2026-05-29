@@ -1,0 +1,106 @@
+# SeriousSportSync CI (0.25.0).
+#
+# Runs on every push to main and every PR. Catches the kind of issue the
+# sandbox-mount-staleness has been hiding during local development:
+#  - JS syntax errors that would crash the container on boot
+#  - Module load failures (missing imports, bad requires)
+#  - Docker build breakage (missing files in COPY, invalid Dockerfile)
+#  - The promotion registry loads cleanly with every entry well-formed
+#
+# Free on GitHub-hosted runners. Total wall time ~1-2 minutes per push.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  syntax:
+    name: JS syntax + module load
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: node --check every committed .js file
+        run: |
+          set -e
+          fail=0
+          while IFS= read -r f; do
+            if ! node --check "$f"; then
+              echo "::error file=$f::syntax error"
+              fail=1
+            fi
+          done < <(git ls-files '*.js')
+          exit $fail
+
+      - name: Module load smoke (require + promotion registry sanity)
+        env:
+          # Encryption module + signed URLs need SESSION_SECRET present.
+          SESSION_SECRET: ${{ secrets.CI_SESSION_SECRET || 'ci-only-do-not-use-in-prod-0000000000000000000000000000000000' }}
+        run: |
+          node -e "
+            const mods = [
+              './config',
+              './lib/promotions',
+              './lib/manifest',
+              './lib/streams',
+              './lib/catalog',
+              './lib/meta',
+              './lib/transform',
+              './lib/store',
+              './lib/streamcache',
+              './lib/rd-denylist',
+              './lib/tb-denylist',
+              './lib/pm-denylist',
+              './lib/provider-denylist',
+              './lib/positive-cache',
+              './lib/url-sign',
+              './lib/crypto-keys',
+              './lib/users',
+              './lib/sessions',
+              './lib/settings',
+              './lib/redact',
+              './lib/sources/thesportsdb',
+              './lib/sources/prowlarr',
+              './lib/sources/zilean',
+              './lib/sources/realdebrid',
+              './lib/sources/torbox',
+              './lib/sources/premiumize',
+            ];
+            for (const m of mods) {
+              try { require(m); }
+              catch (e) { console.error('FAIL', m, ':', e.message); process.exit(1); }
+            }
+            const p = require('./lib/promotions');
+            if (!Array.isArray(p.enabled) || p.enabled.length === 0) {
+              console.error('promotions.enabled is empty');
+              process.exit(1);
+            }
+            for (const prom of p.enabled) {
+              for (const k of ['id','name','idPrefix','enabled','source','catalogs',
+                               'classify','buildAliases','isRelevantStreamTitle','genres']) {
+                if (prom[k] === undefined) {
+                  console.error('promotion', prom.id, 'missing', k); process.exit(1);
+                }
+              }
+            }
+            console.log('OK — all modules load, promotion registry well-formed (' + p.enabled.length + ' enabled).');
+          "
+
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image (no push)
+        run: docker build -t serioussportsync:ci .

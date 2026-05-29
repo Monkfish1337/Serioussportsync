@@ -364,8 +364,26 @@ function createApp() {
     // the ONLY place a torrent is ever added to a user's debrid — a search can
     // no longer pollute their account. ':eventId' is URL-encoded (it contains a
     // colon, e.g. ufc:2449567) and Express decodes it for us.
+    //
+    // 0.25.0: every resolve URL carries ?exp=&sig= built by lib/url-sign.js
+    // and is rejected if expired or signature-mismatched. The path-level
+    // apiToken alone is no longer sufficient — it gets you through the router
+    // middleware, but the resolve action requires a live signature too.
+    const urlSign = require('./lib/url-sign');
     r.get('/resolve/:provider/:eventId/:infoHash', async (req, res) => {
       const { provider, eventId, infoHash } = req.params;
+      const v = urlSign.verifyResolve({
+        userId: req.params.userId,
+        provider, eventId, infoHash,
+        exp: req.query.exp, sig: req.query.sig,
+      });
+      if (!v.ok) {
+        console.warn('[resolve] signature rejected (' + v.reason + ') for '
+          + req.userAccount.username + ' ' + eventId + ' ' + infoHash);
+        return res.status(403)
+          .set('Cache-Control', 'no-store')
+          .send('Resolve link ' + v.reason + '. Close and re-open the event in your client.');
+      }
       try {
         const out = await resolvePlay({
           providerCode: provider,
