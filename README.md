@@ -8,7 +8,7 @@
 >
 > 🎯 **Primarily designed for [Nuvio](https://github.com/zaarrak/Nuvio)** (a Stremio-compatible client tuned for sports/live content). Also works with **Stremio** and other compatible clients.
 
-[![Version](https://img.shields.io/badge/version-0.23.1-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-0.24.0-blue.svg)](#)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Nuvio](https://img.shields.io/badge/Nuvio-compatible-orange.svg)](#)
 [![Stremio Add-on](https://img.shields.io/badge/Stremio-compatible-7b5bf5.svg)](https://www.stremio.com/)
@@ -212,15 +212,20 @@ docker compose exec serioussportsync npm run refresh
 # Warm the stream-candidate cache now (or use Admin → "Warm stream cache now")
 docker compose exec serioussportsync npm run refresh-streams
 
-# Health probe
+# Health probe (machine-readable)
 curl http://localhost:7000/health
 
 # Debug a stream resolve (shows rejection reasons) — needs a user's token
 curl "http://localhost:7000/u/<userId>/<token>/stream/movie/ufc:NNNNN.json?debug=1" | jq
 
-# Inspect the provider-filter denylist
-cat data/rd-denylist.json
+# Inspect the provider-filter denylists / positive cache
+cat data/rd-denylist.json data/tb-denylist.json data/pm-denylist.json data/positive-cache.json
 ```
+
+Most of the above is available in the **admin dashboards** without dropping to SSH:
+
+- 📊 **Admin → Health** (`/admin/health`) — denylist sizes per provider (RD/TB/PM) with wipe buttons, positive-cache stats, last warmer run + per-provider verification counts, candidate-cache stats, and the backup download button.
+- ⬇️ **Admin → Backup** (`/admin/backup`) — streams a timestamped `tar.gz` of `data/` (events, users, denylists, positive cache, stream cache, warmer status) as a download. Run periodically; restore by extracting back into the named Docker volume.
 
 ---
 

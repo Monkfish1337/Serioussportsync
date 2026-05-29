@@ -10,12 +10,31 @@
 // Run manually:  npm run refresh-streams
 // Or on a timer: server.js schedules it every STREAM_CACHE_REFRESH_HOURS.
 
+const fs = require('fs');
+const path = require('path');
 const config = require('../config');
 const store = require('../lib/store');
 const streamcache = require('../lib/streamcache');
 const { searchCandidates } = require('../lib/streams');
 const tb = require('../lib/sources/torbox');
 const pm = require('../lib/sources/premiumize');
+
+// Tiny status file (0.24.0) so the admin /health page can display the last
+// warmer run's stats without having to grep stdout.
+const STATUS_FILE = './data/warmer-status.json';
+function writeStatus(obj) {
+  try {
+    const dir = path.dirname(STATUS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(STATUS_FILE, JSON.stringify(obj, null, 2));
+  } catch (e) { /* non-fatal */ }
+}
+function readStatus() {
+  try {
+    if (!fs.existsSync(STATUS_FILE)) return null;
+    return JSON.parse(fs.readFileSync(STATUS_FILE, 'utf8'));
+  } catch { return null; }
+}
 
 function withinRefreshWindow(ev) {
   if (!ev || !ev.date) return false;
@@ -116,6 +135,17 @@ async function runStreamRefresh(options) {
       ? ' | TB: ' + tbHits + ' cached / ' + tbMisses + ' not'
         + ' | PM: ' + pmHits + ' cached / ' + pmMisses + ' not'
       : ''));
+  // Persist run summary for the admin /health page.
+  writeStatus({
+    lastRunStart: new Date(start).toISOString(),
+    lastRunEnd: new Date().toISOString(),
+    durationSeconds: parseFloat(dur),
+    warmed, failed, totalCands,
+    verifyEnabled,
+    tbHits, tbMisses, pmHits, pmMisses,
+    windowDaysBack: config.streamCache.windowDaysBack,
+    windowDaysAhead: config.streamCache.windowDaysAhead,
+  });
   return { ok: true, warmed, failed, totalCands, tbHits, tbMisses, pmHits, pmMisses };
 }
 
@@ -124,4 +154,4 @@ if (require.main === module) {
     .catch((err) => { console.error('[stream-refresh] fatal:', err.message); process.exit(1); });
 }
 
-module.exports = { runStreamRefresh };
+module.exports = { runStreamRefresh, readStatus };

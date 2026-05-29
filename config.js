@@ -152,6 +152,15 @@ module.exports = {
     ttlDays: parseFloat(process.env.PM_DENYLIST_TTL_DAYS || '30'),
     softTtlHours: parseFloat(process.env.PM_SOFT_DENYLIST_HOURS || '24'),
   },
+  // Positive resolve cache (0.24.0). Records every successful play-time
+  // resolve as (hash, provider) and surfaces them as authoritative-cached on
+  // the next /stream request. Particularly valuable for RD where the API
+  // doesn't permit non-destructive cache checks. See lib/positive-cache.js.
+  positiveCache: {
+    file: process.env.POSITIVE_CACHE_FILE || './data/positive-cache.json',
+    ttlDays: parseFloat(process.env.POSITIVE_CACHE_TTL_DAYS || '7'),
+  },
+
   // Warmer-time cache verification (0.23.1). When the proactive warmer runs
   // every STREAM_CACHE_REFRESH_HOURS, it batches every candidate hash against
   // TB/PM's non-destructive cache-check APIs and persists the result into the

@@ -8,10 +8,15 @@ const { handleStream, resolvePlay } = require('./lib/streams');
 const store = require('./lib/store');
 const streamcache = require('./lib/streamcache');
 const settings = require('./lib/settings');
-const { runStreamRefresh } = require('./scripts/refresh-streams');
+const { runStreamRefresh, readStatus: readWarmerStatus } = require('./scripts/refresh-streams');
 const promotions = require('./lib/promotions');
 const users = require('./lib/users');
 const sessions = require('./lib/sessions');
+// 0.24.0: per-provider state modules for the admin /health page.
+const rdDenylist = require('./lib/rd-denylist');
+const tbDenylist = require('./lib/tb-denylist');
+const pmDenylist = require('./lib/pm-denylist');
+const positiveCache = require('./lib/positive-cache');
 const APP_VERSION = require('./package.json').version || '?';
 
 
@@ -467,6 +472,57 @@ function createApp() {
     res.redirect('/admin?flash=' + encodeURIComponent('Stream-cache warm started in the background — check server logs for progress.'));
   });
 
+  // 0.24.0: admin observability page. Surfaces denylist sizes, positive-cache
+  // hits, warmer last-run stats, and candidate cache stats — everything that
+  // used to require SSH + cat. Each card has wipe buttons for the things that
+  // are safe to nuke (denylists / positive cache; not user data).
+  app.get('/admin/health', requireAdmin, (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(renderHealthPage(req.user, { flash: req.query.flash || null }));
+  });
+
+  app.post('/admin/health/wipe/:kind', requireAdmin, (req, res) => {
+    const kind = String(req.params.kind || '').toLowerCase();
+    try {
+      let msg;
+      switch (kind) {
+        case 'rd-denylist': rdDenylist.wipe(); msg = 'RD denylist wiped.'; break;
+        case 'tb-denylist': tbDenylist.wipe(); msg = 'TB denylist wiped.'; break;
+        case 'pm-denylist': pmDenylist.wipe(); msg = 'PM denylist wiped.'; break;
+        case 'positive-cache': positiveCache.wipe(); msg = 'Positive cache wiped.'; break;
+        default: return res.redirect('/admin/health?flash=' + encodeURIComponent('Unknown wipe kind: ' + kind));
+      }
+      res.redirect('/admin/health?flash=' + encodeURIComponent(msg));
+    } catch (err) {
+      res.redirect('/admin/health?flash=' + encodeURIComponent('Wipe failed: ' + err.message));
+    }
+  });
+
+  // Backup endpoint (0.24.0). Streams a timestamped tar.gz of the data/
+  // directory to the admin as a download. Includes events.json, users.json,
+  // settings, all denylists, positive cache, stream cache, warmer status —
+  // everything that lives in the named Docker volume. Pipe-streams via the
+  // container's bundled tar binary so we don't bloat the npm tree.
+  app.get('/admin/backup', requireAdmin, (req, res) => {
+    const { spawn } = require('child_process');
+    const dataDir = path.dirname(config.dataFile); // ./data → /app/data
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const filename = 'serioussportsync-backup-' + ts + '.tar.gz';
+    res.setHeader('Content-Type', 'application/gzip');
+    res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
+    res.setHeader('Cache-Control', 'no-store');
+    const proc = spawn('tar', ['-czf', '-', '-C', dataDir, '.']);
+    proc.stdout.pipe(res);
+    proc.stderr.on('data', (d) => console.error('[backup] tar stderr: ' + d.toString().trim()));
+    proc.on('error', (err) => {
+      console.error('[backup] spawn error:', err.message);
+      if (!res.headersSent) res.status(500).end('Backup failed: ' + err.message);
+    });
+    proc.on('exit', (code) => {
+      if (code !== 0) console.error('[backup] tar exited with code ' + code);
+    });
+  });
+
   // Save the per-instance indexer source endpoints (Prowlarr + Zilean). These
   // override env and apply live (no restart) because the sources read settings
   // on each request.
@@ -690,11 +746,152 @@ function renderAdminPage(currentUser, opts) {
     + '</form>'
     + streamCacheHtml
     + '<script>document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e.target.closest(".btn-reveal"):null;if(!b)return;e.preventDefault();var i=b.parentNode.querySelector("input");if(!i)return;var sh=i.type==="password";i.type=sh?"text":"password";b.textContent=sh?"Hide":"Show";});document.addEventListener("click",function(e){var c=e.target&&e.target.closest?e.target.closest(".btn-copy"):null;if(!c)return;var u=c.getAttribute("data-copy");if(!u)return;if(navigator.clipboard)navigator.clipboard.writeText(u);var t=c.textContent;c.textContent="Copied!";setTimeout(function(){c.textContent=t;},1500);});</script>'
-    + '<div style="margin-top:24px;padding-top:18px;border-top:1px solid var(--border);">'
+    + '<div style="margin-top:24px;padding-top:18px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">'
     +   '<a href="/account" style="color:var(--accent);text-decoration:none;font-weight:500;">← Back to your account</a>'
+    +   '<div style="display:flex;gap:14px;">'
+    +     '<a href="/admin/health" style="color:var(--text);text-decoration:none;font-size:13px;">📊 Health</a>'
+    +     '<a href="/admin/backup" style="color:var(--text);text-decoration:none;font-size:13px;">⬇️ Backup</a>'
+    +   '</div>'
     + '</div>';
 
   return accountPage('Admin — SeriousSportSync', body, 'admin');
+}
+
+// 0.24.0: admin observability page. Pure render — no state mutation. All the
+// data lives in lib/{rd,tb,pm}-denylist, lib/positive-cache, lib/streamcache,
+// and scripts/refresh-streams' status file.
+function renderHealthPage(currentUser, opts) {
+  opts = opts || {};
+  let flashHtml = '';
+  if (opts.flash) {
+    flashHtml = '<div class="flash">' + escapeHtml(opts.flash) + '</div>';
+  }
+
+  // Helpers: compact stat blocks + wipe buttons.
+  function denyCard(provider, dl) {
+    let s = { total: 0, fresh: 0, stale: 0, hard: 0, soft: 0, ttlDays: 0, softTtlHours: 0 };
+    try { s = dl.stats(); } catch (e) { /* file may not exist yet */ }
+    const kind = provider.toLowerCase() + '-denylist';
+    return ''
+      + '<div class="health-card">'
+      +   '<h3>' + provider + ' denylist</h3>'
+      +   '<div class="health-row"><strong>' + s.fresh + '</strong> fresh ('
+      +     s.hard + ' hard, ' + s.soft + ' soft)</div>'
+      +   '<div class="health-row health-sub">' + s.stale + ' stale &middot; hard TTL '
+      +     s.ttlDays + 'd &middot; soft TTL ' + s.softTtlHours + 'h</div>'
+      +   '<form method="POST" action="/admin/health/wipe/' + kind + '" '
+      +     'onsubmit="return confirm(\'Wipe the ' + provider + ' denylist? '
+      +     'All ' + s.fresh + ' entries will be removed.\');" style="margin-top:8px;">'
+      +     '<button type="submit" class="btn-sm btn-danger">Wipe</button>'
+      +   '</form>'
+      + '</div>';
+  }
+
+  // Positive cache
+  let posS = { totalHashes: 0, freshEntries: 0, byProvider: {}, ttlDays: 0 };
+  try { posS = positiveCache.stats(); } catch (e) { /* */ }
+  const byProvText = ['rd', 'tb', 'pm']
+    .map((p) => p.toUpperCase() + ': ' + (posS.byProvider[p] || 0))
+    .join(' &middot; ');
+  const positiveCardHtml = ''
+    + '<div class="health-card">'
+    +   '<h3>Positive cache</h3>'
+    +   '<div class="health-row"><strong>' + posS.freshEntries + '</strong> fresh entr'
+    +     (posS.freshEntries === 1 ? 'y' : 'ies') + ' across <strong>'
+    +     posS.totalHashes + '</strong> hash' + (posS.totalHashes === 1 ? '' : 'es') + '</div>'
+    +   '<div class="health-row health-sub">' + byProvText + ' &middot; TTL ' + posS.ttlDays + 'd</div>'
+    +   '<form method="POST" action="/admin/health/wipe/positive-cache" '
+    +     'onsubmit="return confirm(\'Wipe positive cache? All known-cached '
+    +     '(hash, provider) entries will be removed.\');" style="margin-top:8px;">'
+    +     '<button type="submit" class="btn-sm btn-danger">Wipe</button>'
+    +   '</form>'
+    + '</div>';
+
+  // Stream / candidate cache
+  let scS = { total: 0, fresh: 0, stale: 0, updatedAt: null, ttlHours: 0 };
+  try { scS = streamcache.stats(); } catch (e) { /* */ }
+  const scUpdated = scS.updatedAt ? scS.updatedAt.slice(0, 16).replace('T', ' ') : 'never';
+  const streamCacheCardHtml = ''
+    + '<div class="health-card">'
+    +   '<h3>Candidate cache</h3>'
+    +   '<div class="health-row"><strong>' + scS.fresh + '</strong> fresh / <strong>'
+    +     scS.total + '</strong> total events</div>'
+    +   '<div class="health-row health-sub">TTL ' + scS.ttlHours + 'h &middot; last warmed ' + escapeHtml(scUpdated) + '</div>'
+    +   '<form method="POST" action="/admin/refresh-streams" style="margin-top:8px;">'
+    +     '<button type="submit" class="btn-sm">Warm now</button>'
+    +   '</form>'
+    + '</div>';
+
+  // Warmer last run
+  let w = null;
+  try { w = readWarmerStatus && readWarmerStatus(); } catch (e) { w = null; }
+  let warmerCardHtml;
+  if (w) {
+    const startStr = (w.lastRunStart || '').slice(0, 16).replace('T', ' ');
+    const endStr   = (w.lastRunEnd   || '').slice(0, 16).replace('T', ' ');
+    const verifyLine = w.verifyEnabled
+      ? 'TB: ' + (w.tbHits || 0) + ' cached / ' + (w.tbMisses || 0) + ' not &middot; '
+        + 'PM: ' + (w.pmHits || 0) + ' cached / ' + (w.pmMisses || 0) + ' not'
+      : 'verification disabled (set WARMER_TB_TOKEN / WARMER_PM_KEY)';
+    warmerCardHtml = ''
+      + '<div class="health-card">'
+      +   '<h3>Last warmer run</h3>'
+      +   '<div class="health-row"><strong>' + (w.warmed || 0) + '</strong> warmed, '
+      +     (w.failed || 0) + ' failed, ' + (w.totalCands || 0) + ' total candidates</div>'
+      +   '<div class="health-row health-sub">' + verifyLine + '</div>'
+      +   '<div class="health-row health-sub">window &minus;' + (w.windowDaysBack || 0)
+      +     'd / +' + (w.windowDaysAhead || 0) + 'd &middot; '
+      +     (w.durationSeconds || 0) + 's &middot; finished ' + escapeHtml(endStr) + '</div>'
+      + '</div>';
+  } else {
+    warmerCardHtml = ''
+      + '<div class="health-card">'
+      +   '<h3>Last warmer run</h3>'
+      +   '<div class="health-row health-sub">No warmer run recorded yet. The warmer runs every '
+      +     config.streamCache.refreshHours + 'h (scheduled in server.js) or trigger one with the "Warm now" button.</div>'
+      + '</div>';
+  }
+
+  // Backup card
+  const backupCardHtml = ''
+    + '<div class="health-card">'
+    +   '<h3>Backup</h3>'
+    +   '<div class="health-row health-sub">Download a timestamped tar.gz of /app/data (events, users, denylists, positive cache, stream cache, warmer status).</div>'
+    +   '<a href="/admin/backup" class="btn-sm" style="display:inline-block;margin-top:8px;text-decoration:none;">Download backup</a>'
+    + '</div>';
+
+  // Inline styles tucked into the body (kept self-contained — no need to
+  // touch the shared accountPage CSS for this one page).
+  const styles = ''
+    + '<style>'
+    +   '.health-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:8px;}'
+    +   '.health-card{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}'
+    +   '.health-card h3{margin:0 0 10px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600;}'
+    +   '.health-row{font-size:14px;line-height:1.5;}'
+    +   '.health-row.health-sub{font-size:12px;color:var(--muted);margin-top:2px;}'
+    +   '.btn-danger{background:#2a0608 !important;color:var(--accent2) !important;border:1px solid #4a1015 !important;}'
+    + '</style>';
+
+  const body = styles
+    + '<p style="color:var(--muted);font-size:13px;margin:0 0 16px;">'
+    +   'Admin observability — denylists, positive cache, warmer status, candidate cache. '
+    +   'Logged in as <code>' + escapeHtml(currentUser.username) + '</code>.'
+    + '</p>'
+    + flashHtml
+    + '<div class="health-grid">'
+    +   denyCard('RD', rdDenylist)
+    +   denyCard('TB', tbDenylist)
+    +   denyCard('PM', pmDenylist)
+    +   positiveCardHtml
+    +   streamCacheCardHtml
+    +   warmerCardHtml
+    +   backupCardHtml
+    + '</div>'
+    + '<div style="margin-top:24px;padding-top:18px;border-top:1px solid var(--border);">'
+    +   '<a href="/admin" style="color:var(--accent);text-decoration:none;font-weight:500;">← Back to admin</a>'
+    + '</div>';
+
+  return accountPage('Health — SeriousSportSync', body, 'admin');
 }
 
 // Render a credential input as a masked field with a Show/Hide toggle.
