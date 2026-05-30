@@ -994,11 +994,14 @@ function renderAccountPage(user, opts) {
     +       '<input class="inp" type="number" name="maxStreams" min="0" max="20" value="'
     +         escapeHtml(String(cfg.maxStreams || 0)) + '" style="max-width:120px;">'
 
-    +       '<h3 class="sec">Auto-warm cache on miss</h3>'
-    +       '<p class="hint">When an event has zero verified-cached streams, automatically queue the top torrent on the providers you tick below. Uses your debrid storage quota — only ticked providers are touched. Stremio shows a 🔥 Warming placeholder; come back in 30–60 s for the cached row.</p>'
-    +       '<label class="cat"><input type="checkbox" name="autoCacheRD"' + (ac.rd ? ' checked' : '') + '> Auto-warm on Real-Debrid</label>'
-    +       '<label class="cat"><input type="checkbox" name="autoCacheTB"' + (ac.tb ? ' checked' : '') + '> Auto-warm on TorBox</label>'
-    +       '<label class="cat"><input type="checkbox" name="autoCachePM"' + (ac.pm ? ' checked' : '') + '> Auto-warm on Premiumize</label>'
+    // 0.26.2: user-facing auto-warm checkboxes removed. Repeated /stream
+    // calls on the same hash were causing TB createTorrent 429 storms that
+    // wrongly soft-denylisted already-cached working links. Use the admin
+    // per-event warm tool instead (coming in a future release). Hidden inputs
+    // preserve the saved values so the schema stays intact server-side.
+    +       '<input type="hidden" name="autoCacheRD" value="' + (ac.rd ? '1' : '') + '">'
+    +       '<input type="hidden" name="autoCacheTB" value="' + (ac.tb ? '1' : '') + '">'
+    +       '<input type="hidden" name="autoCachePM" value="' + (ac.pm ? '1' : '') + '">'
     +     '</div>'
 
     +     '<div class="tab-panel" data-tab="catalogs">'
