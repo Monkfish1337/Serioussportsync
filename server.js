@@ -1,5 +1,12 @@
 // Stremio UFC Metadata Addon — entry point
 const config = require('./config');
+
+// 0.27.0: capture every console line into an in-memory ring buffer so the
+// admin /logs page can render recent activity without SSH. Wrap BEFORE other
+// modules load so their boot-time logs are captured too.
+const logBuffer = require('./lib/log-buffer');
+logBuffer.wrapConsole(console);
+
 const { createApp } = require('./addon');
 const store = require('./lib/store');
 const { runRefresh } = require('./scripts/refresh');

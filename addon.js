@@ -17,6 +17,10 @@ const rdDenylist = require('./lib/rd-denylist');
 const tbDenylist = require('./lib/tb-denylist');
 const pmDenylist = require('./lib/pm-denylist');
 const positiveCache = require('./lib/positive-cache');
+// 0.27.0: in-memory log buffer for /admin/logs.
+const logBuffer = require('./lib/log-buffer');
+// 0.28.0: per-event admin power tool.
+const powerTool = require('./lib/power-tool');
 const APP_VERSION = require('./package.json').version || '?';
 
 
@@ -490,6 +494,80 @@ function createApp() {
     res.redirect('/admin?flash=' + encodeURIComponent('Stream-cache warm started in the background — check server logs for progress.'));
   });
 
+  // 0.28.0: admin per-event power tool. Pick an event, re-search its
+  // indexers, pick specific torrents, warm them on the admin's TB/PM keys,
+  // and re-verify the candidate cache — all without touching the global
+  // 3-hour warmer cycle. Replaces the user-facing auto-warm that was
+  // disabled in 0.26.2 because of TB 429 cascades.
+  app.get('/admin/power-tool', requireAdmin, (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(renderPowerToolPage(req.user, req.query));
+  });
+  app.post('/admin/power-tool/search', requireAdmin, async (req, res) => {
+    const eventId = String(req.body.event || '').trim();
+    if (!eventId) return res.redirect('/admin/power-tool?flash=' + encodeURIComponent('No event selected.'));
+    try {
+      const r = await powerTool.searchEvent(eventId, (m) => console.log(m));
+      const msg = r.ok ? ('Search complete — ' + r.count + ' candidate(s) cached.')
+                       : ('Search failed: ' + r.reason);
+      res.redirect('/admin/power-tool?event=' + encodeURIComponent(eventId) + '&flash=' + encodeURIComponent(msg));
+    } catch (e) {
+      res.redirect('/admin/power-tool?event=' + encodeURIComponent(eventId) + '&flash=' + encodeURIComponent('Search error: ' + e.message));
+    }
+  });
+  app.post('/admin/power-tool/warm', requireAdmin, async (req, res) => {
+    const eventId = String(req.body.event || '').trim();
+    const provider = String(req.body.provider || '').toLowerCase();
+    const hashesRaw = req.body.hashes;
+    const hashes = Array.isArray(hashesRaw) ? hashesRaw : (hashesRaw ? [hashesRaw] : []);
+    if (!eventId || !provider || hashes.length === 0) {
+      return res.redirect('/admin/power-tool?event=' + encodeURIComponent(eventId) + '&flash=' + encodeURIComponent('Pick at least one candidate + a provider.'));
+    }
+    try {
+      const r = await powerTool.warmHashes(eventId, hashes, provider, (m) => console.log(m));
+      const msg = r.ok ? ('Warmed ' + r.results.filter((x) => x.ok).length + '/' + r.results.length + ' on ' + provider.toUpperCase() + '. Click "Re-verify" in ~60s to confirm cache.')
+                       : ('Warm failed: ' + r.reason);
+      res.redirect('/admin/power-tool?event=' + encodeURIComponent(eventId) + '&flash=' + encodeURIComponent(msg));
+    } catch (e) {
+      res.redirect('/admin/power-tool?event=' + encodeURIComponent(eventId) + '&flash=' + encodeURIComponent('Warm error: ' + e.message));
+    }
+  });
+  app.post('/admin/power-tool/reverify', requireAdmin, async (req, res) => {
+    const eventId = String(req.body.event || '').trim();
+    if (!eventId) return res.redirect('/admin/power-tool?flash=' + encodeURIComponent('No event selected.'));
+    try {
+      const r = await powerTool.reverifyEvent(eventId, (m) => console.log(m));
+      const msg = r.ok
+        ? ('Re-verified — TB: ' + r.tbHits + ' cached / ' + r.tbMisses + ' not, PM: ' + r.pmHits + ' cached / ' + r.pmMisses + ' not.')
+        : ('Re-verify failed: ' + r.reason);
+      res.redirect('/admin/power-tool?event=' + encodeURIComponent(eventId) + '&flash=' + encodeURIComponent(msg));
+    } catch (e) {
+      res.redirect('/admin/power-tool?event=' + encodeURIComponent(eventId) + '&flash=' + encodeURIComponent('Re-verify error: ' + e.message));
+    }
+  });
+
+  // 0.27.0: in-GUI log viewer. /admin/logs renders the page with filter
+  // inputs + the latest matching rows; /admin/logs.json is a JSON endpoint
+  // for the tail-mode auto-refresh (polled every 3s by the page's inline JS).
+  app.get('/admin/logs', requireAdmin, (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(renderLogsPage(req.user, req.query));
+  });
+  app.get('/admin/logs.json', requireAdmin, (req, res) => {
+    const rows = logBuffer.filtered({
+      category: req.query.category,
+      user: req.query.user,
+      substring: req.query.substring,
+      level: req.query.level,
+      limit: parseInt(req.query.limit, 10) || 1000,
+    });
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.send(JSON.stringify({ rows, stats: logBuffer.counts() }));
+  });
+
   // 0.24.0: admin observability page. Surfaces denylist sizes, positive-cache
   // hits, warmer last-run stats, and candidate cache stats — everything that
   // used to require SSH + cat. Each card has wipe buttons for the things that
@@ -768,6 +846,8 @@ function renderAdminPage(currentUser, opts) {
     +   '<a href="/account" style="color:var(--accent);text-decoration:none;font-weight:500;">← Back to your account</a>'
     +   '<div style="display:flex;gap:14px;">'
     +     '<a href="/admin/health" style="color:var(--text);text-decoration:none;font-size:13px;">📊 Health</a>'
+    +     '<a href="/admin/logs" style="color:var(--text);text-decoration:none;font-size:13px;">📜 Logs</a>'
+    +     '<a href="/admin/power-tool" style="color:var(--text);text-decoration:none;font-size:13px;">🛠️ Power Tool</a>'
     +     '<a href="/admin/backup" style="color:var(--text);text-decoration:none;font-size:13px;">⬇️ Backup</a>'
     +   '</div>'
     + '</div>';
@@ -910,6 +990,293 @@ function renderHealthPage(currentUser, opts) {
     + '</div>';
 
   return accountPage('Health — SeriousSportSync', body, 'admin');
+}
+
+// 0.27.0: in-GUI log viewer. Filters (category / user / substring / level)
+// run server-side via logBuffer.filtered(). Tail mode is a small inline JS
+// that polls /admin/logs.json every 3s and re-renders just the table body.
+function renderLogsPage(currentUser, q) {
+  q = q || {};
+  const category   = String(q.category   || 'all');
+  const userFilter = String(q.user       || '');
+  const substring  = String(q.substring  || '');
+  const level      = String(q.level      || 'all');
+  const limit      = Math.max(50, Math.min(5000, parseInt(q.limit, 10) || 500));
+  const tail       = q.tail === 'on';
+
+  const stats = logBuffer.counts();
+  const rows = logBuffer.filtered({ category, user: userFilter, substring, level, limit });
+
+  // Discoverable category list — start with known + any seen in stats.
+  const knownCats = ['stream','resolve','warm','refresh','admin','server','denylist','positive-cache','dead-indexer','onefc','crypto-keys','streamcache','users','other'];
+  const seenCats = new Set(Object.keys(stats.byCategory || {}));
+  knownCats.forEach((c) => seenCats.add(c));
+  const cats = ['all', ...Array.from(seenCats).sort()];
+
+  const opt = (val, sel) => '<option value="' + escapeHtml(val) + '"' + (val === sel ? ' selected' : '') + '>' + escapeHtml(val) + '</option>';
+  const rowHtml = (e) => {
+    const time = new Date(e.ts).toISOString().replace('T', ' ').slice(0, 19);
+    const lvlClass = e.level === 'error' ? 'log-error' : e.level === 'warn' ? 'log-warn' : 'log-log';
+    return '<tr class="' + lvlClass + '">'
+      +   '<td class="log-ts">' + escapeHtml(time) + '</td>'
+      +   '<td class="log-cat"><span class="cat-tag">' + escapeHtml(e.category) + '</span></td>'
+      +   '<td class="log-usr">' + escapeHtml(e.user || '') + '</td>'
+      +   '<td class="log-lvl">' + escapeHtml(e.level) + '</td>'
+      +   '<td class="log-line">' + escapeHtml(e.line) + '</td>'
+      + '</tr>';
+  };
+  const rowsHtml = rows.length === 0
+    ? '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px;">No log lines match these filters.</td></tr>'
+    : rows.map(rowHtml).join('');
+
+  const styles = ''
+    + '<style>'
+    +   '.log-form{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin:0 0 12px;padding:12px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:10px;}'
+    +   '.log-form > div{display:flex;flex-direction:column;gap:4px;}'
+    +   '.log-form label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}'
+    +   '.log-form .inp, .log-form select{min-width:120px;}'
+    +   '.log-stats{font-size:12px;color:var(--muted);margin-bottom:8px;}'
+    +   '.log-table{width:100%;border-collapse:collapse;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;table-layout:fixed;}'
+    +   '.log-table th{text-align:left;padding:6px 8px;background:rgba(255,255,255,0.03);color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);position:sticky;top:0;}'
+    +   '.log-table td{padding:5px 8px;vertical-align:top;border-bottom:1px solid rgba(255,255,255,0.04);word-break:break-word;white-space:pre-wrap;}'
+    +   '.log-table th.log-ts, .log-table td.log-ts{width:160px;color:var(--muted);}'
+    +   '.log-table th.log-cat, .log-table td.log-cat{width:110px;}'
+    +   '.log-table th.log-usr, .log-table td.log-usr{width:110px;color:var(--muted);}'
+    +   '.log-table th.log-lvl, .log-table td.log-lvl{width:50px;color:var(--muted);text-transform:uppercase;}'
+    +   '.log-table tr.log-warn td.log-lvl{color:#e0b020;}'
+    +   '.log-table tr.log-error{background:rgba(220,40,40,0.06);}'
+    +   '.log-table tr.log-error td.log-lvl{color:var(--accent2);font-weight:600;}'
+    +   '.cat-tag{display:inline-block;padding:1px 7px;border-radius:4px;background:rgba(255,255,255,0.06);font-size:11px;}'
+    +   '.tail-indicator{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:6px;animation:tail-pulse 1.5s infinite;}'
+    +   '@keyframes tail-pulse{0%,100%{opacity:1;}50%{opacity:.3;}}'
+    + '</style>';
+
+  const tailJs = tail
+    ? '<script>(function(){function fmt(rows){if(!rows.length)return ' + JSON.stringify('<tr><td colspan="5" style="text-align:center;color:#888;padding:20px;">No log lines match these filters.</td></tr>') + ';return rows.map(function(e){var t=new Date(e.ts).toISOString().replace("T"," ").slice(0,19);var cls=e.level==="error"?"log-error":e.level==="warn"?"log-warn":"log-log";var esc=function(s){return String(s||"").replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"}[c];});};return "<tr class=\\""+cls+"\\">"+"<td class=\\"log-ts\\">"+esc(t)+"</td>"+"<td class=\\"log-cat\\"><span class=\\"cat-tag\\">"+esc(e.category)+"</span></td>"+"<td class=\\"log-usr\\">"+esc(e.user||"")+"</td>"+"<td class=\\"log-lvl\\">"+esc(e.level)+"</td>"+"<td class=\\"log-line\\">"+esc(e.line)+"</td>"+"</tr>";}).join("");}function poll(){fetch("/admin/logs.json"+location.search,{cache:"no-store"}).then(function(r){return r.json();}).then(function(d){var b=document.getElementById("log-rows");if(b)b.innerHTML=fmt(d.rows||[]);}).catch(function(){});}setInterval(poll,3000);})();</script>'
+    : '';
+
+  const summaryByCat = Object.entries(stats.byCategory || {})
+    .sort((a, b) => b[1] - a[1])
+    .map(([c, n]) => escapeHtml(c) + ':' + n)
+    .join(' · ');
+
+  const body = styles
+    + '<p style="color:var(--muted);font-size:13px;margin:0 0 12px;">'
+    +   'Live server logs (in-memory ring buffer, last ' + stats.max + ' lines). '
+    +   'Logged in as <code>' + escapeHtml(currentUser.username) + '</code>.'
+    + '</p>'
+    + '<form class="log-form" method="GET" action="/admin/logs">'
+    +   '<div><label>Category</label><select class="inp" name="category">'
+    +     cats.map((c) => opt(c, category)).join('')
+    +   '</select></div>'
+    +   '<div><label>User</label><input class="inp" name="user" value="' + escapeHtml(userFilter) + '" placeholder="any" style="width:140px;"></div>'
+    +   '<div><label>Search</label><input class="inp" name="substring" value="' + escapeHtml(substring) + '" placeholder="text…" style="width:200px;"></div>'
+    +   '<div><label>Level</label><select class="inp" name="level">'
+    +     ['all','log','warn','error'].map((l) => opt(l, level)).join('')
+    +   '</select></div>'
+    +   '<div><label>Limit</label><select class="inp" name="limit">'
+    +     ['100','500','1000','2500','5000'].map((n) => opt(n, String(limit))).join('')
+    +   '</select></div>'
+    +   '<div><label>Tail</label><label style="display:flex;align-items:center;gap:6px;font-size:13px;height:38px;">'
+    +     '<input type="checkbox" name="tail" value="on"' + (tail ? ' checked' : '') + '> 3s refresh'
+    +   '</label></div>'
+    +   '<div><label>&nbsp;</label><button type="submit" class="btn-install" style="margin:0;padding:10px 18px;width:auto;">Apply</button></div>'
+    + '</form>'
+    + '<div class="log-stats">'
+    +   (tail ? '<span class="tail-indicator"></span>' : '')
+    +   '<strong>' + stats.total + '</strong> / ' + stats.max + ' lines buffered &middot; '
+    +   summaryByCat + ' &middot; '
+    +   'errors: ' + (stats.byLevel.error || 0) + ' &middot; '
+    +   'warns: ' + (stats.byLevel.warn || 0) + ' &middot; '
+    +   'showing ' + rows.length
+    + '</div>'
+    + '<table class="log-table">'
+    +   '<thead><tr><th class="log-ts">Time (UTC)</th><th class="log-cat">Cat</th><th class="log-usr">User</th><th class="log-lvl">Lvl</th><th class="log-line">Line</th></tr></thead>'
+    +   '<tbody id="log-rows">' + rowsHtml + '</tbody>'
+    + '</table>'
+    + tailJs
+    + '<div style="margin-top:24px;padding-top:18px;border-top:1px solid var(--border);">'
+    +   '<a href="/admin" style="color:var(--accent);text-decoration:none;font-weight:500;">← Back to admin</a>'
+    +   ' &nbsp;&middot;&nbsp; '
+    +   '<a href="/admin/health" style="color:var(--text);text-decoration:none;font-size:13px;">📊 Health</a>'
+    + '</div>';
+
+  return accountPage('Logs — SeriousSportSync', body, 'admin');
+}
+
+// 0.28.0: admin per-event power tool. Page state lives in the URL —
+// ?event=<id> selects a specific event. Server-side renders event details
+// and the candidate list (if any). Form posts to /admin/power-tool/* drive
+// the actions (search / warm / re-verify). Tiny JS for select-all + count.
+function renderPowerToolPage(currentUser, q) {
+  q = q || {};
+  const eventId = String(q.event || '');
+  const flash = String(q.flash || '');
+
+  const tbKeySet = !!(config.warmer && config.warmer.tbToken);
+  const pmKeySet = !!(config.warmer && config.warmer.pmApiKey);
+
+  // Event picker datalist — all events sorted most-recent first.
+  const allEvents = powerTool.listEvents();
+  const datalistOpts = allEvents.map((e) =>
+    '<option value="' + escapeHtml(e.id) + '">'
+    + escapeHtml(e.date || '????-??-??') + ' — ' + escapeHtml(e.name)
+    + (e.isPast ? ' (past)' : '')
+    + '</option>'
+  ).join('');
+
+  const ev = eventId ? powerTool.getEvent(eventId) : null;
+  const candidates = ev ? powerTool.listCandidates(ev.id) : null;
+
+  // Selected-event card.
+  let eventCard = '';
+  if (eventId && !ev) {
+    eventCard = '<div class="health-card" style="border-color:var(--accent);">'
+      + '<h3>Event not found</h3>'
+      + '<div class="health-row">No event with id <code>' + escapeHtml(eventId) + '</code> in the metadata store.</div>'
+      + '</div>';
+  } else if (ev) {
+    const brief = powerTool.eventBrief(ev);
+    eventCard = '<div class="health-card">'
+      + '<h3>Selected event</h3>'
+      + '<div class="health-row"><strong>' + escapeHtml(brief.name) + '</strong></div>'
+      + '<div class="health-row health-sub">'
+      +   'id <code>' + escapeHtml(brief.id) + '</code>'
+      +   ' &middot; date ' + escapeHtml(brief.date || '?')
+      +   ' &middot; promotion ' + escapeHtml(brief.promotion || '?')
+      + '</div>'
+      + (brief.aliases.length > 0
+          ? '<div class="health-row health-sub" style="margin-top:6px;">aliases: '
+            + brief.aliases.map((a) => '<code style="font-size:11px;">' + escapeHtml(a) + '</code>').join(' ')
+            + '</div>'
+          : '')
+      + '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">'
+      +   '<form method="POST" action="/admin/power-tool/search" style="display:inline;">'
+      +     '<input type="hidden" name="event" value="' + escapeHtml(brief.id) + '">'
+      +     '<button class="btn-sm" type="submit">🔎 Search indexers (refresh cache)</button>'
+      +   '</form>'
+      +   '<form method="POST" action="/admin/power-tool/reverify" style="display:inline;">'
+      +     '<input type="hidden" name="event" value="' + escapeHtml(brief.id) + '">'
+      +     '<button class="btn-sm" type="submit"' + (tbKeySet || pmKeySet ? '' : ' disabled title="Set WARMER_TB_TOKEN / WARMER_PM_KEY in .env first"') + '>♻️ Re-verify cached state</button>'
+      +   '</form>'
+      + '</div>'
+      + '</div>';
+  }
+
+  // Candidates table (after a search has been performed).
+  let candidatesBlock = '';
+  if (ev) {
+    if (candidates === null) {
+      candidatesBlock = '<div class="health-card"><h3>Candidates</h3>'
+        + '<div class="health-row health-sub">No candidate cache for this event yet. Click "🔎 Search indexers" above to populate it.</div>'
+        + '</div>';
+    } else if (candidates.length === 0) {
+      candidatesBlock = '<div class="health-card"><h3>Candidates</h3>'
+        + '<div class="health-row health-sub">Candidate cache is empty — indexers returned 0 results. Re-run search later or check Prowlarr/Zilean directly.</div>'
+        + '</div>';
+    } else {
+      const formattedSize = (b) => {
+        if (!b || b <= 0) return '?';
+        const gb = b / 1073741824;
+        if (gb >= 1) return gb.toFixed(2) + ' GB';
+        return Math.round(b / 1048576) + ' MB';
+      };
+      const candRows = candidates.map((c) => {
+        const verif = c.cachedProviders || {};
+        const tbBadge = verif.tb === true ? '<span class="cv-cached">TB✓</span>'
+                      : verif.tb === false ? '<span class="cv-not">TB✗</span>'
+                      : '<span class="cv-unk">TB?</span>';
+        const pmBadge = verif.pm === true ? '<span class="cv-cached">PM✓</span>'
+                      : verif.pm === false ? '<span class="cv-not">PM✗</span>'
+                      : '<span class="cv-unk">PM?</span>';
+        return '<tr>'
+          +   '<td><input type="checkbox" name="hashes" value="' + escapeHtml(c.infoHash) + '" form="warm-form"></td>'
+          +   '<td class="cand-title">' + escapeHtml((c.title || '').slice(0, 110)) + '</td>'
+          +   '<td class="cand-size">' + escapeHtml(formattedSize(c.size)) + '</td>'
+          +   '<td class="cand-seeds">' + (c.seeders || 0) + '</td>'
+          +   '<td class="cand-src">' + escapeHtml(c.indexer || '?') + '</td>'
+          +   '<td class="cand-verif">' + tbBadge + ' ' + pmBadge + '</td>'
+          +   '<td class="cand-hash"><code>' + escapeHtml(String(c.infoHash || '').slice(0, 10)) + '…</code></td>'
+          + '</tr>';
+      }).join('');
+      candidatesBlock = '<div class="health-card" style="margin-top:14px;">'
+        + '<h3>Candidates (' + candidates.length + ')</h3>'
+        + '<div class="health-row health-sub" style="margin-bottom:8px;">'
+        +   'TB/PM badges: ✓ = cached on this provider, ✗ = not cached, ? = unknown (warmer hasn\'t checked or returned no verdict).'
+        + '</div>'
+        + '<form method="POST" action="/admin/power-tool/warm" id="warm-form" style="display:inline;">'
+        +   '<input type="hidden" name="event" value="' + escapeHtml(ev.id) + '">'
+        +   '<table class="cand-table">'
+        +     '<thead><tr><th><input type="checkbox" id="check-all"></th><th>Title</th><th>Size</th><th>Seeds</th><th>Source</th><th>Verified</th><th>Hash</th></tr></thead>'
+        +     '<tbody>' + candRows + '</tbody>'
+        +   '</table>'
+        +   '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+        +     '<span id="picked-count" style="color:var(--muted);font-size:12px;">0 selected</span>'
+        +     '<button type="submit" name="provider" value="tb" class="btn-install" style="margin:0;padding:9px 16px;width:auto;"' + (tbKeySet ? '' : ' disabled title="WARMER_TB_TOKEN not set in .env"') + '>🔥 Warm selected on TB</button>'
+        +     '<button type="submit" name="provider" value="pm" class="btn-install" style="margin:0;padding:9px 16px;width:auto;"' + (pmKeySet ? '' : ' disabled title="WARMER_PM_KEY not set in .env"') + '>🔥 Warm selected on PM</button>'
+        +   '</div>'
+        + '</form>'
+        + '</div>';
+    }
+  }
+
+  const styles = ''
+    + '<style>'
+    +   '.pt-picker{display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:14px;padding:12px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:10px;}'
+    +   '.pt-picker .inp{min-width:420px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;}'
+    +   '.cand-table{width:100%;border-collapse:collapse;font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}'
+    +   '.cand-table th{text-align:left;padding:6px 8px;background:rgba(255,255,255,0.03);color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);}'
+    +   '.cand-table td{padding:5px 8px;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top;}'
+    +   '.cand-table td.cand-title{max-width:380px;word-break:break-word;}'
+    +   '.cand-table td.cand-size, .cand-table td.cand-seeds, .cand-table td.cand-src{white-space:nowrap;}'
+    +   '.cv-cached{display:inline-block;padding:1px 5px;border-radius:3px;background:rgba(60,180,80,0.18);color:#7fd089;font-size:11px;}'
+    +   '.cv-not{display:inline-block;padding:1px 5px;border-radius:3px;background:rgba(220,40,40,0.12);color:#e07070;font-size:11px;}'
+    +   '.cv-unk{display:inline-block;padding:1px 5px;border-radius:3px;background:rgba(255,255,255,0.06);color:var(--muted);font-size:11px;}'
+    +   '.btn-install:disabled{opacity:0.4;cursor:not-allowed;}'
+    + '</style>';
+
+  const inlineJs = '<script>(function(){'
+    + 'var ca=document.getElementById("check-all");'
+    + 'var pc=document.getElementById("picked-count");'
+    + 'function update(){if(!pc)return;var n=document.querySelectorAll("input[name=hashes]:checked").length;pc.textContent=n+" selected";}'
+    + 'if(ca){ca.addEventListener("change",function(){var boxes=document.querySelectorAll("input[name=hashes]");boxes.forEach(function(b){b.checked=ca.checked;});update();});}'
+    + 'document.addEventListener("change",function(e){if(e.target&&e.target.name==="hashes")update();});'
+    + 'update();'
+    + '})();</script>';
+
+  const keyStatusBar = ''
+    + '<div style="font-size:12px;color:var(--muted);margin-bottom:14px;">'
+    +   'Admin warm keys: '
+    +   'TB ' + (tbKeySet ? '<span style="color:#7fd089;">configured</span>' : '<span style="color:var(--accent2);">not set</span> (WARMER_TB_TOKEN)')
+    +   ' &middot; PM ' + (pmKeySet ? '<span style="color:#7fd089;">configured</span>' : '<span style="color:var(--accent2);">not set</span> (WARMER_PM_KEY)')
+    + '</div>';
+
+  const body = styles
+    + '<p style="color:var(--muted);font-size:13px;margin:0 0 10px;">'
+    +   'Per-event admin tool — re-search indexers for a specific event, warm chosen candidates onto the admin\'s TB/PM libraries, and re-verify the cache so the rows appear in users\' /stream immediately. Bypasses the global 3-hour warm cycle.'
+    + '</p>'
+    + keyStatusBar
+    + (flash ? '<div class="flash">' + escapeHtml(flash) + '</div>' : '')
+    + '<form class="pt-picker" method="GET" action="/admin/power-tool">'
+    +   '<div style="display:flex;flex-direction:column;gap:4px;flex:1;">'
+    +     '<label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Event (type to filter — list ' + allEvents.length + ' events)</label>'
+    +     '<input class="inp" name="event" list="event-list" value="' + escapeHtml(eventId) + '" placeholder="e.g. ufc:2391889 or paste id" autocomplete="off">'
+    +     '<datalist id="event-list">' + datalistOpts + '</datalist>'
+    +   '</div>'
+    +   '<button type="submit" class="btn-install" style="margin:0;padding:10px 18px;width:auto;">Select</button>'
+    + '</form>'
+    + eventCard
+    + candidatesBlock
+    + inlineJs
+    + '<div style="margin-top:24px;padding-top:18px;border-top:1px solid var(--border);">'
+    +   '<a href="/admin" style="color:var(--accent);text-decoration:none;font-weight:500;">← Back to admin</a>'
+    +   ' &nbsp;&middot;&nbsp; '
+    +   '<a href="/admin/health" style="color:var(--text);text-decoration:none;font-size:13px;">📊 Health</a>'
+    +   ' &nbsp;&middot;&nbsp; '
+    +   '<a href="/admin/logs" style="color:var(--text);text-decoration:none;font-size:13px;">📜 Logs</a>'
+    + '</div>';
+
+  return accountPage('Power Tool — SeriousSportSync', body, 'admin');
 }
 
 // Render a credential input as a masked field with a Show/Hide toggle.

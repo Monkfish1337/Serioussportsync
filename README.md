@@ -8,7 +8,7 @@
 >
 > 🎯 **Primarily designed for [Nuvio](https://github.com/zaarrak/Nuvio)** (a Stremio-compatible client tuned for sports/live content). Also works with **Stremio** and other compatible clients.
 
-[![Version](https://img.shields.io/badge/version-0.26.2-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-0.28.0-blue.svg)](#)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Nuvio](https://img.shields.io/badge/Nuvio-compatible-orange.svg)](#)
 [![Stremio Add-on](https://img.shields.io/badge/Stremio-compatible-7b5bf5.svg)](https://www.stremio.com/)
