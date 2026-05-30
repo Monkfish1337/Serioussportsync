@@ -995,7 +995,7 @@ function renderAccountPage(user, opts) {
     +         escapeHtml(String(cfg.maxStreams || 0)) + '" style="max-width:120px;">'
 
     +       '<h3 class="sec">Auto-warm cache on miss</h3>'
-    +       '<p class="hint">When no cached streams exist, automatically queue the top candidate on the providers below. Uses your debrid storage quota. Server-wide AUTO_CACHE_ON_MISS must also be enabled by the admin.</p>'
+    +       '<p class="hint">When an event has zero verified-cached streams, automatically queue the top torrent on the providers you tick below. Uses your debrid storage quota — only ticked providers are touched. Stremio shows a 🔥 Warming placeholder; come back in 30–60 s for the cached row.</p>'
     +       '<label class="cat"><input type="checkbox" name="autoCacheRD"' + (ac.rd ? ' checked' : '') + '> Auto-warm on Real-Debrid</label>'
     +       '<label class="cat"><input type="checkbox" name="autoCacheTB"' + (ac.tb ? ' checked' : '') + '> Auto-warm on TorBox</label>'
     +       '<label class="cat"><input type="checkbox" name="autoCachePM"' + (ac.pm ? ' checked' : '') + '> Auto-warm on Premiumize</label>'
