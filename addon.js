@@ -1104,14 +1104,22 @@ function renderLogsPage(currentUser, q) {
   return accountPage('Logs — SeriousSportSync', body, 'admin');
 }
 
-// 0.28.0: admin per-event power tool. Page state lives in the URL —
-// ?event=<id> selects a specific event. Server-side renders event details
-// and the candidate list (if any). Form posts to /admin/power-tool/* drive
-// the actions (search / warm / re-verify). Tiny JS for select-all + count.
+// 0.28.0/0.28.1: admin per-event power tool. Page state in URL —
+//   ?event=<id>       — selected event
+//   ?page=<N>          — pagination (1-indexed, 10/page)
+//   ?showAll=on        — include candidates the promotion's relevance check
+//                        rejected (default off — only relevant rows shown).
+//   ?indexer=<name>    — filter to one indexer source (default 'all').
+// Server-side renders event details + paginated candidate list. Forms drive
+// the actions. Tiny JS for select-all + count.
 function renderPowerToolPage(currentUser, q) {
   q = q || {};
   const eventId = String(q.event || '');
   const flash = String(q.flash || '');
+  const showAll = q.showAll === 'on';
+  const indexer = String(q.indexer || 'all');
+  const page = Math.max(1, parseInt(q.page, 10) || 1);
+  const PAGE_SIZE = 10;
 
   const tbKeySet = !!(config.warmer && config.warmer.tbToken);
   const pmKeySet = !!(config.warmer && config.warmer.pmApiKey);
@@ -1126,112 +1134,197 @@ function renderPowerToolPage(currentUser, q) {
   ).join('');
 
   const ev = eventId ? powerTool.getEvent(eventId) : null;
-  const candidates = ev ? powerTool.listCandidates(ev.id) : null;
+  const evaluated = ev ? powerTool.evaluateCandidates(ev.id) : null;
 
   // Selected-event card.
   let eventCard = '';
   if (eventId && !ev) {
-    eventCard = '<div class="health-card" style="border-color:var(--accent);">'
+    eventCard = '<div class="pt-card pt-card-error">'
       + '<h3>Event not found</h3>'
-      + '<div class="health-row">No event with id <code>' + escapeHtml(eventId) + '</code> in the metadata store.</div>'
+      + '<div class="pt-row">No event with id <code>' + escapeHtml(eventId) + '</code> in the metadata store.</div>'
       + '</div>';
   } else if (ev) {
     const brief = powerTool.eventBrief(ev);
-    eventCard = '<div class="health-card">'
-      + '<h3>Selected event</h3>'
-      + '<div class="health-row"><strong>' + escapeHtml(brief.name) + '</strong></div>'
-      + '<div class="health-row health-sub">'
+    eventCard = '<div class="pt-card">'
+      + '<div class="pt-card-head">'
+      +   '<h3>Selected event</h3>'
+      +   '<div class="pt-card-actions">'
+      +     '<form method="POST" action="/admin/power-tool/search" style="display:inline;">'
+      +       '<input type="hidden" name="event" value="' + escapeHtml(brief.id) + '">'
+      +       '<button class="btn-sm" type="submit">🔎 Search indexers</button>'
+      +     '</form>'
+      +     '<form method="POST" action="/admin/power-tool/reverify" style="display:inline;">'
+      +       '<input type="hidden" name="event" value="' + escapeHtml(brief.id) + '">'
+      +       '<button class="btn-sm" type="submit"' + (tbKeySet || pmKeySet ? '' : ' disabled title="Set WARMER_TB_TOKEN / WARMER_PM_KEY in .env first"') + '>♻️ Re-verify cache</button>'
+      +     '</form>'
+      +   '</div>'
+      + '</div>'
+      + '<div class="pt-row pt-name">' + escapeHtml(brief.name) + '</div>'
+      + '<div class="pt-row pt-sub">'
       +   'id <code>' + escapeHtml(brief.id) + '</code>'
       +   ' &middot; date ' + escapeHtml(brief.date || '?')
       +   ' &middot; promotion ' + escapeHtml(brief.promotion || '?')
       + '</div>'
       + (brief.aliases.length > 0
-          ? '<div class="health-row health-sub" style="margin-top:6px;">aliases: '
+          ? '<div class="pt-row pt-sub" style="margin-top:6px;">aliases: '
             + brief.aliases.map((a) => '<code style="font-size:11px;">' + escapeHtml(a) + '</code>').join(' ')
             + '</div>'
           : '')
-      + '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">'
-      +   '<form method="POST" action="/admin/power-tool/search" style="display:inline;">'
-      +     '<input type="hidden" name="event" value="' + escapeHtml(brief.id) + '">'
-      +     '<button class="btn-sm" type="submit">🔎 Search indexers (refresh cache)</button>'
-      +   '</form>'
-      +   '<form method="POST" action="/admin/power-tool/reverify" style="display:inline;">'
-      +     '<input type="hidden" name="event" value="' + escapeHtml(brief.id) + '">'
-      +     '<button class="btn-sm" type="submit"' + (tbKeySet || pmKeySet ? '' : ' disabled title="Set WARMER_TB_TOKEN / WARMER_PM_KEY in .env first"') + '>♻️ Re-verify cached state</button>'
-      +   '</form>'
-      + '</div>'
       + '</div>';
   }
 
-  // Candidates table (after a search has been performed).
+  // Candidates section — apply filters, paginate.
   let candidatesBlock = '';
   if (ev) {
-    if (candidates === null) {
-      candidatesBlock = '<div class="health-card"><h3>Candidates</h3>'
-        + '<div class="health-row health-sub">No candidate cache for this event yet. Click "🔎 Search indexers" above to populate it.</div>'
+    if (evaluated === null) {
+      candidatesBlock = '<div class="pt-card"><h3>Candidates</h3>'
+        + '<div class="pt-row pt-sub">No candidate cache for this event yet. Click "🔎 Search indexers" above to populate it.</div>'
         + '</div>';
-    } else if (candidates.length === 0) {
-      candidatesBlock = '<div class="health-card"><h3>Candidates</h3>'
-        + '<div class="health-row health-sub">Candidate cache is empty — indexers returned 0 results. Re-run search later or check Prowlarr/Zilean directly.</div>'
+    } else if (evaluated.total === 0) {
+      candidatesBlock = '<div class="pt-card"><h3>Candidates</h3>'
+        + '<div class="pt-row pt-sub">Candidate cache is empty — indexers returned 0 results. Re-run search later or check Prowlarr/Zilean directly.</div>'
         + '</div>';
     } else {
+      // Filter chain: indexer first, then relevance.
+      let filtered = evaluated.candidates;
+      if (indexer !== 'all') filtered = filtered.filter((c) => (c.indexer || '') === indexer);
+      if (!showAll) filtered = filtered.filter((c) => c.relevant);
+      const totalAfterFilter = filtered.length;
+      const totalPages = Math.max(1, Math.ceil(totalAfterFilter / PAGE_SIZE));
+      const safePage = Math.min(page, totalPages);
+      const pageStart = (safePage - 1) * PAGE_SIZE;
+      const pageEnd = Math.min(pageStart + PAGE_SIZE, totalAfterFilter);
+      const pageRows = filtered.slice(pageStart, pageEnd);
+
       const formattedSize = (b) => {
         if (!b || b <= 0) return '?';
         const gb = b / 1073741824;
         if (gb >= 1) return gb.toFixed(2) + ' GB';
         return Math.round(b / 1048576) + ' MB';
       };
-      const candRows = candidates.map((c) => {
-        const verif = c.cachedProviders || {};
-        const tbBadge = verif.tb === true ? '<span class="cv-cached">TB✓</span>'
-                      : verif.tb === false ? '<span class="cv-not">TB✗</span>'
-                      : '<span class="cv-unk">TB?</span>';
-        const pmBadge = verif.pm === true ? '<span class="cv-cached">PM✓</span>'
-                      : verif.pm === false ? '<span class="cv-not">PM✗</span>'
-                      : '<span class="cv-unk">PM?</span>';
-        return '<tr>'
-          +   '<td><input type="checkbox" name="hashes" value="' + escapeHtml(c.infoHash) + '" form="warm-form"></td>'
-          +   '<td class="cand-title">' + escapeHtml((c.title || '').slice(0, 110)) + '</td>'
-          +   '<td class="cand-size">' + escapeHtml(formattedSize(c.size)) + '</td>'
-          +   '<td class="cand-seeds">' + (c.seeders || 0) + '</td>'
-          +   '<td class="cand-src">' + escapeHtml(c.indexer || '?') + '</td>'
-          +   '<td class="cand-verif">' + tbBadge + ' ' + pmBadge + '</td>'
-          +   '<td class="cand-hash"><code>' + escapeHtml(String(c.infoHash || '').slice(0, 10)) + '…</code></td>'
-          + '</tr>';
-      }).join('');
-      candidatesBlock = '<div class="health-card" style="margin-top:14px;">'
-        + '<h3>Candidates (' + candidates.length + ')</h3>'
-        + '<div class="health-row health-sub" style="margin-bottom:8px;">'
-        +   'TB/PM badges: ✓ = cached on this provider, ✗ = not cached, ? = unknown (warmer hasn\'t checked or returned no verdict).'
+      const candRowsHtml = pageRows.length === 0
+        ? '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px;">No candidates match these filters.</td></tr>'
+        : pageRows.map((c) => {
+            const verif = c.cachedProviders || {};
+            const tbBadge = verif.tb === true ? '<span class="cv-cached">TB✓</span>'
+                          : verif.tb === false ? '<span class="cv-not">TB✗</span>'
+                          : '<span class="cv-unk">TB?</span>';
+            const pmBadge = verif.pm === true ? '<span class="cv-cached">PM✓</span>'
+                          : verif.pm === false ? '<span class="cv-not">PM✗</span>'
+                          : '<span class="cv-unk">PM?</span>';
+            const relBadge = c.relevant
+              ? '<span class="rel-yes" title="passes relevance">✓</span>'
+              : '<span class="rel-no" title="rejected: ' + escapeHtml(c.rejectionReason || 'rejected') + '">✗</span>';
+            return '<tr class="' + (c.relevant ? '' : 'cand-rejected') + '">'
+              +   '<td><input type="checkbox" name="hashes" value="' + escapeHtml(c.infoHash) + '" form="warm-form"></td>'
+              +   '<td class="cand-rel">' + relBadge + '</td>'
+              +   '<td class="cand-title">' + escapeHtml((c.title || '').slice(0, 110)) + '</td>'
+              +   '<td class="cand-size">' + escapeHtml(formattedSize(c.size)) + '</td>'
+              +   '<td class="cand-seeds">' + (c.seeders || 0) + '</td>'
+              +   '<td class="cand-src">' + escapeHtml(c.indexer || '?') + '</td>'
+              +   '<td class="cand-verif">' + tbBadge + ' ' + pmBadge + '</td>'
+              +   '<td class="cand-hash"><code>' + escapeHtml(String(c.infoHash || '').slice(0, 10)) + '…</code></td>'
+              + '</tr>';
+          }).join('');
+
+      // Filter form — preserves event in query string, GET so it bookmarks.
+      const filterForm = '<form method="GET" action="/admin/power-tool" class="pt-filters">'
+        + '<input type="hidden" name="event" value="' + escapeHtml(ev.id) + '">'
+        + '<div><label>Indexer</label><select name="indexer" class="inp">'
+        +   ['all'].concat(evaluated.indexers).map((ix) =>
+              '<option value="' + escapeHtml(ix) + '"' + (ix === indexer ? ' selected' : '') + '>' + escapeHtml(ix) + '</option>'
+            ).join('')
+        + '</select></div>'
+        + '<div><label>Relevance</label><label style="display:flex;align-items:center;gap:6px;height:38px;font-size:13px;">'
+        +   '<input type="checkbox" name="showAll" value="on"' + (showAll ? ' checked' : '') + '> Show rejected too'
+        + '</label></div>'
+        + '<div><label>&nbsp;</label><button type="submit" class="btn-sm">Apply</button></div>'
+        + '</form>';
+
+      // Pagination links — preserve filters.
+      const baseParams = 'event=' + encodeURIComponent(ev.id)
+        + (indexer !== 'all' ? '&indexer=' + encodeURIComponent(indexer) : '')
+        + (showAll ? '&showAll=on' : '');
+      const pageLink = (p, label) =>
+        (p >= 1 && p <= totalPages && p !== safePage)
+          ? '<a href="/admin/power-tool?' + baseParams + '&page=' + p + '" class="pg-link">' + label + '</a>'
+          : '<span class="pg-link pg-disabled">' + label + '</span>';
+      const pagination = totalAfterFilter > PAGE_SIZE
+        ? '<div class="pt-pagination">'
+          + pageLink(1, '« First')
+          + pageLink(safePage - 1, '‹ Prev')
+          + '<span class="pg-info">Page ' + safePage + ' of ' + totalPages + '</span>'
+          + pageLink(safePage + 1, 'Next ›')
+          + pageLink(totalPages, 'Last »')
+          + '</div>'
+        : '';
+
+      const summaryLine = ''
+        + '<strong>' + evaluated.total + '</strong> total candidates &middot; '
+        + '<strong style="color:#7fd089;">' + evaluated.relevant + '</strong> pass relevance &middot; '
+        + 'showing ' + (totalAfterFilter === 0 ? 0 : pageStart + 1) + '–' + pageEnd + ' of ' + totalAfterFilter + ' filtered';
+
+      candidatesBlock = '<div class="pt-card pt-results">'
+        + '<div class="pt-card-head">'
+        +   '<h3>Candidates</h3>'
+        +   filterForm
         + '</div>'
+        + '<div class="pt-row pt-sub" style="margin-bottom:10px;">' + summaryLine + '</div>'
         + '<form method="POST" action="/admin/power-tool/warm" id="warm-form" style="display:inline;">'
         +   '<input type="hidden" name="event" value="' + escapeHtml(ev.id) + '">'
         +   '<table class="cand-table">'
-        +     '<thead><tr><th><input type="checkbox" id="check-all"></th><th>Title</th><th>Size</th><th>Seeds</th><th>Source</th><th>Verified</th><th>Hash</th></tr></thead>'
-        +     '<tbody>' + candRows + '</tbody>'
+        +     '<thead><tr><th><input type="checkbox" id="check-all"></th><th class="cand-rel">OK</th><th>Title</th><th class="cand-size">Size</th><th class="cand-seeds">Seeds</th><th class="cand-src">Source</th><th>Verified</th><th>Hash</th></tr></thead>'
+        +     '<tbody>' + candRowsHtml + '</tbody>'
         +   '</table>'
-        +   '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+        +   pagination
+        +   '<div style="margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--border);">'
         +     '<span id="picked-count" style="color:var(--muted);font-size:12px;">0 selected</span>'
         +     '<button type="submit" name="provider" value="tb" class="btn-install" style="margin:0;padding:9px 16px;width:auto;"' + (tbKeySet ? '' : ' disabled title="WARMER_TB_TOKEN not set in .env"') + '>🔥 Warm selected on TB</button>'
         +     '<button type="submit" name="provider" value="pm" class="btn-install" style="margin:0;padding:9px 16px;width:auto;"' + (pmKeySet ? '' : ' disabled title="WARMER_PM_KEY not set in .env"') + '>🔥 Warm selected on PM</button>'
         +   '</div>'
         + '</form>'
+        + '<div class="pt-row pt-sub" style="margin-top:10px;font-size:11px;">'
+        +   'Verified badges: ✓ cached on this provider · ✗ not cached · ? unknown. Relevance ✓ = passes the promotion\'s isRelevantStreamTitle filter; ✗ = rejected (hover for reason).'
+        + '</div>'
         + '</div>';
     }
   }
 
+  // Inline styles — kept here so the page is self-contained.
   const styles = ''
     + '<style>'
-    +   '.pt-picker{display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:14px;padding:12px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:10px;}'
-    +   '.pt-picker .inp{min-width:420px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;}'
-    +   '.cand-table{width:100%;border-collapse:collapse;font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}'
-    +   '.cand-table th{text-align:left;padding:6px 8px;background:rgba(255,255,255,0.03);color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);}'
-    +   '.cand-table td{padding:5px 8px;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top;}'
-    +   '.cand-table td.cand-title{max-width:380px;word-break:break-word;}'
-    +   '.cand-table td.cand-size, .cand-table td.cand-seeds, .cand-table td.cand-src{white-space:nowrap;}'
+    +   '.pt-picker{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:16px;padding:16px;background:linear-gradient(135deg,rgba(210,10,17,0.04),rgba(255,255,255,0.02));border:1px solid var(--border);border-radius:12px;}'
+    +   '.pt-picker .inp{min-width:440px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;}'
+    +   '.pt-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:14px;}'
+    +   '.pt-card-error{border-color:var(--accent);}'
+    +   '.pt-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px;}'
+    +   '.pt-card h3{margin:0;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600;}'
+    +   '.pt-card-actions{display:flex;gap:6px;flex-wrap:wrap;}'
+    +   '.pt-row{font-size:14px;line-height:1.5;}'
+    +   '.pt-row.pt-name{font-size:16px;font-weight:600;color:var(--text);margin-bottom:4px;}'
+    +   '.pt-row.pt-sub{font-size:12px;color:var(--muted);}'
+    +   '.pt-results{padding-bottom:14px;}'
+    +   '.pt-filters{display:flex;gap:8px;align-items:end;}'
+    +   '.pt-filters > div{display:flex;flex-direction:column;gap:3px;}'
+    +   '.pt-filters label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}'
+    +   '.pt-filters .inp{min-width:120px;font-size:13px;}'
+    +   '.cand-table{width:100%;border-collapse:collapse;font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;table-layout:auto;}'
+    +   '.cand-table th{text-align:left;padding:7px 8px;background:rgba(255,255,255,0.03);color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);}'
+    +   '.cand-table td{padding:7px 8px;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top;}'
+    +   '.cand-table tr.cand-rejected{opacity:.55;}'
+    +   '.cand-table td.cand-title{max-width:520px;word-break:break-word;}'
+    +   '.cand-table th.cand-size, .cand-table td.cand-size, .cand-table th.cand-seeds, .cand-table td.cand-seeds, .cand-table th.cand-src, .cand-table td.cand-src, .cand-table th.cand-rel, .cand-table td.cand-rel{white-space:nowrap;}'
+    +   '.cand-table td.cand-rel{text-align:center;}'
     +   '.cv-cached{display:inline-block;padding:1px 5px;border-radius:3px;background:rgba(60,180,80,0.18);color:#7fd089;font-size:11px;}'
     +   '.cv-not{display:inline-block;padding:1px 5px;border-radius:3px;background:rgba(220,40,40,0.12);color:#e07070;font-size:11px;}'
     +   '.cv-unk{display:inline-block;padding:1px 5px;border-radius:3px;background:rgba(255,255,255,0.06);color:var(--muted);font-size:11px;}'
+    +   '.rel-yes{color:#7fd089;font-weight:bold;}'
+    +   '.rel-no{color:#e07070;font-weight:bold;cursor:help;}'
+    +   '.pt-pagination{display:flex;gap:6px;align-items:center;justify-content:center;margin-top:12px;font-size:12px;}'
+    +   '.pg-link{padding:5px 10px;border-radius:5px;background:rgba(255,255,255,0.04);text-decoration:none;color:var(--text);}'
+    +   '.pg-link:hover:not(.pg-disabled){background:rgba(210,10,17,0.18);}'
+    +   '.pg-disabled{opacity:.35;cursor:not-allowed;}'
+    +   '.pg-info{padding:5px 12px;color:var(--muted);}'
     +   '.btn-install:disabled{opacity:0.4;cursor:not-allowed;}'
     + '</style>';
 
@@ -1253,17 +1346,17 @@ function renderPowerToolPage(currentUser, q) {
 
   const body = styles
     + '<p style="color:var(--muted);font-size:13px;margin:0 0 10px;">'
-    +   'Per-event admin tool — re-search indexers for a specific event, warm chosen candidates onto the admin\'s TB/PM libraries, and re-verify the cache so the rows appear in users\' /stream immediately. Bypasses the global 3-hour warm cycle.'
+    +   'Per-event admin tool — re-search indexers, warm chosen candidates onto the admin\'s TB/PM libraries, and re-verify the cache so rows appear in users\' /stream immediately. Bypasses the global 3-hour warm cycle.'
     + '</p>'
     + keyStatusBar
     + (flash ? '<div class="flash">' + escapeHtml(flash) + '</div>' : '')
     + '<form class="pt-picker" method="GET" action="/admin/power-tool">'
     +   '<div style="display:flex;flex-direction:column;gap:4px;flex:1;">'
-    +     '<label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Event (type to filter — list ' + allEvents.length + ' events)</label>'
-    +     '<input class="inp" name="event" list="event-list" value="' + escapeHtml(eventId) + '" placeholder="e.g. ufc:2391889 or paste id" autocomplete="off">'
+    +     '<label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Event (type to filter — ' + allEvents.length + ' available)</label>'
+    +     '<input class="inp" name="event" list="event-list" value="' + escapeHtml(eventId) + '" placeholder="e.g. ufc:2391889 or start typing a name" autocomplete="off">'
     +     '<datalist id="event-list">' + datalistOpts + '</datalist>'
     +   '</div>'
-    +   '<button type="submit" class="btn-install" style="margin:0;padding:10px 18px;width:auto;">Select</button>'
+    +   '<button type="submit" class="btn-install" style="margin:0;padding:10px 20px;width:auto;">Select</button>'
     + '</form>'
     + eventCard
     + candidatesBlock
