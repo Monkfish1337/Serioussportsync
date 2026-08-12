@@ -1,7 +1,7 @@
 services:
   serioussportsync:
     container_name: serioussportsync
-    build: .
+    image: ghcr.io/monkfish1337/serioussportsync:latest
     restart: unless-stopped
     env_file:
       - .env

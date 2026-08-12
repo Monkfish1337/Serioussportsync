@@ -64,7 +64,8 @@ git clone https://github.com/Monkfish1337/Serioussportsync.git
 cd serioussportsync
 cp .env.example .env
 # Minimum: SESSION_SECRET (openssl rand -hex 32) and ADMIN_USER.
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
 The container listens on `:7000`.
@@ -79,12 +80,22 @@ copying application files:
 
 ```bash
 git pull
-docker compose up -d --build --remove-orphans
+docker compose pull
+docker compose up -d --remove-orphans
 ```
 
-Compose rebuilds and replaces the application container while keeping accounts,
+Compose pulls and replaces the application container while keeping accounts,
 event data, and settings in the `serioussportsync_data` volume. Check the
 rollout with `docker compose ps` and `docker compose logs -f serioussportsync`.
+
+### Local source builds
+
+Developers can build the checked-out source by layering the development
+override over the normal deployment file:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+```
 
 ---
 
