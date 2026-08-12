@@ -13,6 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 const config = require('../config');
+const settings = require('../lib/settings');
 const store = require('../lib/store');
 const streamcache = require('../lib/streamcache');
 const { searchCandidates } = require('../lib/streams');
@@ -53,6 +54,25 @@ async function runStreamRefresh(options) {
   const baseLog = opts.log || ((m) => console.log(m));
   const log = (m) => baseLog(redact(String(m)));
   const start = Date.now();
+
+  // Direct Prowlarr is strictly request-only. The proactive warmer is a
+  // companion-scraper feature and must not fan out searches across every
+  // event when only direct Prowlarr is configured.
+  if (!settings.getCompanion().url) {
+    log('[stream-refresh] skipped — companion scraper is not configured; direct Prowlarr is searched per event request only');
+    const status = {
+      lastRunStart: new Date(start).toISOString(),
+      lastRunEnd: new Date().toISOString(),
+      durationSeconds: 0,
+      warmed: 0,
+      failed: 0,
+      totalCands: 0,
+      skipped: true,
+      reason: 'companion-not-configured',
+    };
+    writeStatus(status);
+    return { ok: true, ...status };
+  }
 
   const events = (store.loadFromDisk().events || []).filter(withinRefreshWindow);
   log('[stream-refresh] warming ' + events.length + ' event(s) in window (-'

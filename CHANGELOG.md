@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.42.16
+
+### Direct Prowlarr request boundary
+
+- Fixed direct Prowlarr being queried by the scheduled stream-cache warmer.
+- Direct Prowlarr now runs only for user event stream requests and explicit
+  admin live searches.
+- The warmer exits immediately when no companion scraper is configured,
+  preventing event-window fan-out and empty cache rewrites.
+
 ## 0.42.15
 
 ### Direct Prowlarr

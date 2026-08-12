@@ -1162,7 +1162,7 @@ function renderAdminPage(currentUser, opts) {
 
     +       '<hr class="my-4">'
     +       '<h4 class="mb-2">Direct Prowlarr (optional)</h4>'
-    +       '<p class="text-secondary small mb-3">Query Prowlarr directly from SeriousSportSync as an alternative or supplement to the companion scraper. Results are filtered and checked against each user\'s TorBox account; raw torrent rows are never returned. The URL must be reachable from this container. For a separate Dockge stack, use a shared Docker network or the server address; <code>localhost</code> refers to this container.</p>'
+    +       '<p class="text-secondary small mb-3">Query Prowlarr directly when a user opens an event. Direct Prowlarr is never used by the scheduled cache warmer. Results are filtered and checked against each user\'s TorBox account; raw torrent rows are never returned. The URL must be reachable from this container. For a separate Dockge stack, use a shared Docker network or the server address; <code>localhost</code> refers to this container.</p>'
     +       '<div class="mb-3">'
     +         '<label class="form-label">Prowlarr URL</label>'
     +         '<input class="form-control text-mono" type="url" name="prowlarrUrl" value="' + escapeHtml(_prowlarr.url) + '" placeholder="http://prowlarr:9696" autocomplete="off">'
