@@ -72,6 +72,20 @@ The container listens on `:7000`.
 1. 🔑 Open `http://<your-server>:7000/` — login / first-run signup page. Create an account; if its username matches `ADMIN_USER`, it's auto-promoted to admin.
 2. ✅ Copy your install URL from the account page and add it to your Stremio-compatible client (Add-ons → paste URL → Install).
 
+### Updating a Docker deployment
+
+Once the repository is cloned on the server, future updates do not require
+copying application files:
+
+```bash
+git pull
+docker compose up -d --build --remove-orphans
+```
+
+Compose rebuilds and replaces the application container while keeping accounts,
+event data, and settings in the `serioussportsync_data` volume. Check the
+rollout with `docker compose ps` and `docker compose logs -f serioussportsync`.
+
 ---
 
 ## ⚙️ Configuration
