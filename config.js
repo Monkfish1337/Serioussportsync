@@ -24,7 +24,7 @@ module.exports = {
   addonId: 'community.serioussportsync',
   addonName: 'SeriousSportSync',
   addonDescription:
-    'Self-hosted sports event metadata for Stremio with built-in multi-debrid stream resolution (Real-Debrid, TorBox, Premiumize). Covers UFC, ONE Championship, WWE, AEW, and Formula 1.',
+    'Self-hosted sports event metadata and calendar for Stremio/Nuvio, with optional TorBox, Usenet Ultimate, and Easynews playback pipelines.',
 
   idPrefix: 'ufc',
 

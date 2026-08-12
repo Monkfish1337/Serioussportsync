@@ -4,7 +4,7 @@
 
 # 📅 SeriousSportSync — Sports Metadata & Calendar Add-on
 
-> A self-hosted Stremio/Nuvio add-on that turns combat sports, pro-wrestling and motorsport into proper meta items — with a built-in calendar of upcoming events.
+> A self-hosted Stremio/Nuvio sports calendar with rich event metadata and optional, user-configured playback through TorBox, Usenet Ultimate, and Easynews.
 >
 > 🎯 **Primarily designed for [Nuvio](https://github.com/zaarrak/Nuvio)** (a Stremio-compatible client). Also works with **Stremio** and other compatible clients.
 
@@ -17,21 +17,27 @@
 
 ## ⚠️ Disclaimer
 
-> This project is a **metadata catalog**, published strictly for **educational** purposes.
+> This project is a **sports metadata catalog and stream orchestrator**, published strictly for **educational** purposes.
 >
-> SeriousSportSync **hosts no content**, ships **no indexers, no credentials, no playback layer**, and has **no affiliation** with any sport, league, broadcaster, or service. The operator brings their own configuration and is solely responsible for ensuring their use complies with applicable laws and any third-party terms of service.
+> SeriousSportSync **hosts no content**, bundles **no service credentials or indexer accounts**, and has **no affiliation** with any sport, league, broadcaster, or service. Playback connectors are optional and use accounts supplied by each user. The operator is solely responsible for ensuring their use complies with applicable laws and third-party terms.
 
 ---
 
 ## ✨ What it does
 
-SeriousSportSync is a **sports metadata add-on and event calendar** for Stremio-compatible clients.
+SeriousSportSync is a **sports metadata add-on, event calendar, and optional stream orchestrator** for Stremio-compatible clients.
 
 - 📅 **Calendar of upcoming events** for every supported sport — see what's airing this week or next month, browsable in Discover.
 - 🏷️ **Proper meta items** for sports events that mainstream meta providers (IMDb / TMDb) don't index — so they actually appear as first-class entries rather than being unfindable.
 - 🔎 **Smart per-event search aliases** built into each promotion (number, year, matchup, session).
+- 🧩 **Custom promotions and match overrides** managed from the admin UI without editing code.
+- 👤 **Per-user playback credentials** for shared deployments.
 
-The add-on only emits metadata and catalog data. Stream playback is the responsibility of the user's separately-configured Stremio environment.
+### Current playback architecture
+
+The add-on can expose streams through a companion scraper with per-user TorBox credentials, direct Newznab search with per-user Usenet Ultimate credentials, and per-user Easynews search.
+
+Prowlarr, Zilean, and similar indexers are configured inside the optional companion scraper (`_scraper`), not in the metadata add-on's root `.env` file. Wikipedia is only an optional artwork fallback for selected promotions; it is never a stream source.
 
 ---
 
@@ -54,7 +60,7 @@ Adding another sport is a single self-contained entry in `lib/promotions.js`.
 ## 🚀 Quick start (Docker)
 
 ```bash
-git clone https://github.com/<your-user>/serioussportsync.git
+git clone https://github.com/Monkfish1337/Serioussportsync.git
 cd serioussportsync
 cp .env.example .env
 # Minimum: SESSION_SECRET (openssl rand -hex 32) and ADMIN_USER.
@@ -79,9 +85,16 @@ Env-driven with sensible defaults. See [`.env.example`](./.env.example) for the 
 | `LOGIN_MAX_FAILS` / `LOGIN_WINDOW_MS` / `LOGIN_LOCKOUT_MS` | `5` / `900000` / `900000` | Per-IP login rate-limit. |
 | `EVENT_WINDOW_START_DATE` | `2025-01-01` | Earliest date included in the catalog window. |
 | `REFRESH_INTERVAL_HOURS` | `6` | How often the metadata cache is refreshed from upstream sources. |
-| `STREAM_MAX_ROWS` | `20` | Cap on rows returned per `/stream` request. |
-| `WIKIPEDIA_ENRICH` | `on` | Backfill per-event posters from Wikipedia when the primary source has none. Set `off` for fastest refresh if you don't need per-event posters. |
-| `STREAM_CACHE_REFRESH` | `off` | Legacy background warmer flag — should stay `off`. |
+| `TSDB_API_KEY` | `3` | TheSportsDB metadata key. |
+| `FOOTBALL_DATA_API_KEY` | — | Optional football-data.org source for custom promotions. |
+| `TMDB_API_KEY` | — | Optional TMDB source for custom promotions. |
+| `COMPANION_URL` | — | Optional companion scraper endpoint for TorBox playback. |
+| `NEWSNAB_URL` / `NEWSNAB_API_KEY` | — | Optional direct Newznab endpoint for Usenet Ultimate playback. |
+| `STREAM_MAX_ROWS` | `20` | Maximum stream rows returned per request. |
+| `WIKIPEDIA_ENRICH` | `on` | Optional poster fallback for selected promotions only. |
+| `STREAM_CACHE_REFRESH` | `on` | Refresh cached stream results in the background. |
+
+Users add their own TorBox, Usenet Ultimate, and Easynews credentials from their account page. Prowlarr/Zilean settings for the bundled scraper belong in `_scraper/.env`, not the root environment.
 
 ---
 

@@ -158,12 +158,15 @@ function createApp() {
     const events = store.getEvents();
     const meta = store.loadFromDisk() || {};
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const companion = settings.getCompanion();
+    const newsnab = settings.getNewsnab();
     res.send(JSON.stringify({
       ok: true,
       events: events.length,
       updatedAt: meta.updatedAt || null,
-      prowlarrConfigured: !!(config.prowlarr.url && config.prowlarr.apiKey),
-      adminProtected: !!(config.admin.user && config.admin.password),
+      companionConfigured: !!(companion && companion.url),
+      newsnabConfigured: !!(newsnab && newsnab.url && newsnab.apiKey),
+      accountsEnabled: true,
       promotions: promotions.enabled.map((p) => p.id),
       userCount: users.userCount(),
     }));

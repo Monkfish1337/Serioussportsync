@@ -1,7 +1,7 @@
 {
     "name":  "serioussportsync",
     "version": "0.42.14",
-    "description":  "Self-hosted Stremio addon: sports metadata catalog. Delegates content discovery to a separately-deployed companion scraper and resolves results through the user's own TorBox key. Covers UFC, ONE Championship, WWE, AEW, F1, Boxing, MotoGP.",
+    "description":  "Self-hosted Stremio/Nuvio sports metadata calendar with optional per-user TorBox, Usenet Ultimate, and Easynews playback pipelines.",
     "main":  "server.js",
     "scripts":  {
                     "start":  "node server.js",
@@ -18,10 +18,10 @@
                      "mma",
                      "wwe",
                      "aew",
-                     "real-debrid",
                      "torbox",
-                     "premiumize",
-                     "prowlarr",
+                     "usenet",
+                     "newznab",
+                     "easynews",
                      "metadata"
                  ],
     "license":  "MIT",

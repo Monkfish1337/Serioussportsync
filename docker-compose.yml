@@ -13,16 +13,16 @@ services:
       TSDB_API_KEY: "${TSDB_API_KEY:-3}"
       TSDB_SEASONS: "${TSDB_SEASONS:-auto}"
       REFRESH_INTERVAL_HOURS: "${REFRESH_INTERVAL_HOURS:-6}"
-      # Optional debrid stream resolvers (any combination)
-      PROWLARR_URL: "${PROWLARR_URL:-}"
-      PROWLARR_API_KEY: "${PROWLARR_API_KEY:-}"
-      REAL_DEBRID_API_TOKEN: "${REAL_DEBRID_API_TOKEN:-}"
-      TORBOX_API_TOKEN: "${TORBOX_API_TOKEN:-}"
-      PREMIUMIZE_API_KEY: "${PREMIUMIZE_API_KEY:-}"
-      # Optional access control
-      ACCESS_TOKENS: "${ACCESS_TOKENS:-}"
+      # Content discovery. Configure Prowlarr/Zilean/etc in the companion
+      # scraper, not in this metadata-addon container.
+      COMPANION_URL: "${COMPANION_URL:-}"
+      COMPANION_AUTH_TOKEN: "${COMPANION_AUTH_TOKEN:-}"
+      NEWSNAB_URL: "${NEWSNAB_URL:-}"
+      NEWSNAB_API_KEY: "${NEWSNAB_API_KEY:-}"
+      NEWSNAB_CATEGORIES: "${NEWSNAB_CATEGORIES:-5000,5080,8000}"
+      # Accounts
+      SESSION_SECRET: "${SESSION_SECRET}"
       ADMIN_USER: "${ADMIN_USER:-}"
-      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
     volumes:
       - serioussportsync_data:/app/data
     ports:
