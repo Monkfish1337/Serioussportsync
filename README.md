@@ -15,6 +15,43 @@
 
 ---
 
+## 🐳 Docker Compose
+
+Create a directory for the addon and save this as `docker-compose.yml`:
+
+```yaml
+services:
+  serioussportsync:
+    image: ghcr.io/monkfish1337/serioussportsync:latest
+    container_name: serioussportsync
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "7000:7000"
+    volumes:
+      - serioussportsync_data:/app/data
+
+volumes:
+  serioussportsync_data:
+```
+
+Create the required environment file, then start the container:
+
+```bash
+printf "SESSION_SECRET=%s\nADMIN_USER=admin\n" "$(openssl rand -hex 32)" > .env
+docker compose up -d
+```
+
+Open `http://<your-server>:7000/`, create the administrator account using
+the `ADMIN_USER` name, and copy its private install URL into Nuvio or Stremio.
+
+The image is public and supports normal `docker compose pull` updates. See the
+repository's complete [`docker-compose.yml`](./docker-compose.yml) and
+[`.env.example`](./.env.example) for optional metadata and playback settings.
+
+---
+
 ## ⚠️ Disclaimer
 
 > This project is a **sports metadata catalog and stream orchestrator**, published strictly for **educational** purposes.
@@ -57,21 +94,10 @@ Adding another sport is a single self-contained entry in `lib/promotions.js`.
 
 ---
 
-## 🚀 Quick start (Docker)
+## 🚀 Deployment and updates
 
-```bash
-git clone https://github.com/Monkfish1337/Serioussportsync.git
-cd serioussportsync
-cp .env.example .env
-# Minimum: SESSION_SECRET (openssl rand -hex 32) and ADMIN_USER.
-docker compose pull
-docker compose up -d
-```
-
-The container listens on `:7000`.
-
-1. 🔑 Open `http://<your-server>:7000/` — login / first-run signup page. Create an account; if its username matches `ADMIN_USER`, it's auto-promoted to admin.
-2. ✅ Copy your install URL from the account page and add it to your Stremio-compatible client (Add-ons → paste URL → Install).
+The container listens on `:7000`. Accounts, event data, and settings persist
+in the `serioussportsync_data` volume.
 
 ### Updating a Docker deployment
 
