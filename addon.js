@@ -159,12 +159,14 @@ function createApp() {
     const meta = store.loadFromDisk() || {};
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     const companion = settings.getCompanion();
+    const prowlarr = settings.getProwlarr();
     const newsnab = settings.getNewsnab();
     res.send(JSON.stringify({
       ok: true,
       events: events.length,
       updatedAt: meta.updatedAt || null,
       companionConfigured: !!(companion && companion.url),
+      prowlarrConfigured: !!(prowlarr && prowlarr.url && prowlarr.apiKey),
       newsnabConfigured: !!(newsnab && newsnab.url && newsnab.apiKey),
       accountsEnabled: true,
       promotions: promotions.enabled.map((p) => p.id),
@@ -792,19 +794,17 @@ function createApp() {
     });
   });
 
-  // Save the companion-scraper endpoint.
-  //
-  // 0.36.0: stopped writing the legacy Prowlarr/Zilean fields from this
-  // form (they were already labelled "Unused by 0.33.0+" in the UI).
-  // Existing values in settings.json stay intact — we just no longer
-  // touch them on save. The metadata addon doesn't query Prowlarr/Zilean
-  // directly any more; the companion scraper owns indexer discovery.
+  // Save server-wide metadata and torrent discovery sources.
   app.post('/admin/sources', requireAdmin, (req, res) => {
     const b = req.body || {};
     try {
       settings.setCompanion({
         url: String(b.companionUrl || ''),
         authToken: String(b.companionAuthToken || ''),
+      });
+      settings.setProwlarr({
+        url: String(b.prowlarrUrl || ''),
+        apiKey: String(b.prowlarrApiKey || ''),
       });
       // 0.38.1: football-data.org API key — admin-saved value wins over the
       // FOOTBALL_DATA_API_KEY env var. Empty input is allowed (falls back to env).
@@ -1130,8 +1130,9 @@ function renderAdminPage(currentUser, opts) {
   try { scStats = streamcache.stats(); } catch (e) { /* file may not exist yet */ }
   const scUpdated = scStats.updatedAt ? scStats.updatedAt.slice(0, 16).replace('T', ' ') : 'never';
 
-  // 0.33.0: companion-scraper URL is the primary content config.
+  // Torrent discovery endpoints are optional and may be used together.
   const _comp = settings.getCompanion();
+  const _prowlarr = settings.getProwlarr();
   // 0.38.1: football-data.org API key field on /admin Sources so admins can
   // save/rotate the key without editing docker-compose.yml.
   const _fd = settings.getFootballData();
@@ -1149,15 +1150,24 @@ function renderAdminPage(currentUser, opts) {
 
     // Companion scraper config
     + '<div class="card mb-3">'
-    +   '<div class="card-header"><h3 class="card-title">Companion scraper</h3></div>'
+    +   '<div class="card-header"><h3 class="card-title">Torrent discovery and metadata sources</h3></div>'
     +   '<div class="card-body">'
-    +     '<p class="text-secondary small mb-3">URL of the SeriousSportScraper companion service you have deployed. The metadata addon delegates content discovery to it and resolves the returned hashes through each user\'s own TorBox key. Leave blank to disable the TorBox pipeline.</p>'
+    +     '<p class="text-secondary small mb-3">URL of the SeriousSportScraper companion service you have deployed. The metadata addon delegates content discovery to it and resolves the returned hashes through each user\'s own TorBox key. Leave blank if you only want to use direct Prowlarr.</p>'
     +     '<form method="POST" action="/admin/sources">'
     +       '<div class="mb-3">'
     +         '<label class="form-label">Companion URL</label>'
     +         '<input class="form-control text-mono" name="companionUrl" value="' + escapeHtml(_comp.url) + '" placeholder="http://scraper:8080" autocomplete="off">'
     +       '</div>'
     +       secretField('Companion auth token (optional)', 'companionAuthToken', _comp.authToken, 'shared bearer if scraper is internet-exposed')
+
+    +       '<hr class="my-4">'
+    +       '<h4 class="mb-2">Direct Prowlarr (optional)</h4>'
+    +       '<p class="text-secondary small mb-3">Query Prowlarr directly from SeriousSportSync as an alternative or supplement to the companion scraper. Results are filtered and checked against each user\'s TorBox account; raw torrent rows are never returned. The URL must be reachable from this container. For a separate Dockge stack, use a shared Docker network or the server address; <code>localhost</code> refers to this container.</p>'
+    +       '<div class="mb-3">'
+    +         '<label class="form-label">Prowlarr URL</label>'
+    +         '<input class="form-control text-mono" type="url" name="prowlarrUrl" value="' + escapeHtml(_prowlarr.url) + '" placeholder="http://prowlarr:9696" autocomplete="off">'
+    +       '</div>'
+    +       secretField('Prowlarr API key', 'prowlarrApiKey', _prowlarr.apiKey, 'Settings → General → Security')
 
     // 0.38.1: football-data.org API key block. Saved value overrides
     // FOOTBALL_DATA_API_KEY env var. Used by custom promotions whose source
@@ -1172,7 +1182,7 @@ function renderAdminPage(currentUser, opts) {
     // (qBit + SAB) at /downloaders. SSS only proxies — see /admin/search.
     +       '<hr class="my-4">'
     +       '<h4 class="mb-2">General search</h4>'
-    +       '<p class="text-secondary small mb-0">The <a href="/admin/search" class="link-primary">/admin/search</a> page proxies through to the companion scraper above. Configure Prowlarr instances on the scraper\'s <a href="' + escapeHtml(_comp.url || '#') + '/sources" target="_blank" rel="noopener" class="link-primary">Sources</a> page and qBit / SAB credentials on its <a href="' + escapeHtml(_comp.url || '#') + '/downloaders" target="_blank" rel="noopener" class="link-primary">Downloaders</a> page (scraper v0.1.4+).</p>'
+    +       '<p class="text-secondary small mb-0">The <a href="/admin/search" class="link-primary">/admin/search</a> page proxies through to the companion scraper above. The direct Prowlarr option above is also available in the event power tool. Configure companion-managed Prowlarr instances on the scraper\'s <a href="' + escapeHtml(_comp.url || '#') + '/sources" target="_blank" rel="noopener" class="link-primary">Sources</a> page and qBit / SAB credentials on its <a href="' + escapeHtml(_comp.url || '#') + '/downloaders" target="_blank" rel="noopener" class="link-primary">Downloaders</a> page (scraper v0.1.4+).</p>'
 
     +       '<hr class="my-4">'
     +       '<button class="btn btn-primary" type="submit">Save sources</button>'

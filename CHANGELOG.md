@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.42.15
+
+### Direct Prowlarr
+
+- Restored optional direct Prowlarr configuration in the SeriousSportSync
+  admin panel and through `PROWLARR_URL` / `PROWLARR_API_KEY`.
+- Direct Prowlarr and companion-scraper candidates now merge by info hash
+  before relevance filtering and per-user TorBox cache checks.
+- Restored Prowlarr hash extraction and bounded download-proxy hydration
+  without returning raw torrent rows to clients.
+- Added Prowlarr status to `/health` and stream availability detection to
+  the addon manifest.
+
 ## 0.42.14
 
 Catch-up release covering the unpublished work since GitHub version 0.33.0.

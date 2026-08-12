@@ -1,6 +1,6 @@
 {
     "name":  "serioussportsync",
-    "version": "0.42.14",
+    "version": "0.42.15",
     "description":  "Self-hosted Stremio/Nuvio sports metadata calendar with optional per-user TorBox, Usenet Ultimate, and Easynews playback pipelines.",
     "main":  "server.js",
     "scripts":  {
@@ -19,6 +19,7 @@
                      "wwe",
                      "aew",
                      "torbox",
+                     "prowlarr",
                      "usenet",
                      "newznab",
                      "easynews",

@@ -8,7 +8,7 @@
 >
 > 🎯 **Primarily designed for [Nuvio](https://github.com/zaarrak/Nuvio)** (a Stremio-compatible client). Also works with **Stremio** and other compatible clients.
 
-[![Version](https://img.shields.io/badge/version-0.42.14-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-0.42.15-blue.svg)](#)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Nuvio](https://img.shields.io/badge/Nuvio-compatible-orange.svg)](#)
 [![Stremio Add-on](https://img.shields.io/badge/Stremio-compatible-7b5bf5.svg)](https://www.stremio.com/)
@@ -72,9 +72,9 @@ SeriousSportSync is a **sports metadata add-on, event calendar, and optional str
 
 ### Current playback architecture
 
-The add-on can expose streams through a companion scraper with per-user TorBox credentials, direct Newznab search with per-user Usenet Ultimate credentials, and per-user Easynews search.
+The add-on can expose streams through the companion scraper and/or direct Prowlarr with per-user TorBox credentials, direct Newznab search with per-user Usenet Ultimate credentials, and per-user Easynews search.
 
-Prowlarr, Zilean, and similar indexers are configured inside the optional companion scraper (`_scraper`), not in the metadata add-on's root `.env` file. Wikipedia is only an optional artwork fallback for selected promotions; it is never a stream source.
+Prowlarr can be configured directly in the SeriousSportSync admin panel or inside the optional companion scraper (`_scraper`). The companion remains useful when combining Prowlarr with Zilean and other discovery sources. Wikipedia is only an optional artwork fallback for selected promotions; it is never a stream source.
 
 ---
 
@@ -140,12 +140,13 @@ Env-driven with sensible defaults. See [`.env.example`](./.env.example) for the 
 | `FOOTBALL_DATA_API_KEY` | — | Optional football-data.org source for custom promotions. |
 | `TMDB_API_KEY` | — | Optional TMDB source for custom promotions. |
 | `COMPANION_URL` | — | Optional companion scraper endpoint for TorBox playback. |
+| `PROWLARR_URL` / `PROWLARR_API_KEY` | — | Optional direct Prowlarr source; can instead be saved in the admin panel. |
 | `NEWSNAB_URL` / `NEWSNAB_API_KEY` | — | Optional direct Newznab endpoint for Usenet Ultimate playback. |
 | `STREAM_MAX_ROWS` | `20` | Maximum stream rows returned per request. |
 | `WIKIPEDIA_ENRICH` | `on` | Optional poster fallback for selected promotions only. |
 | `STREAM_CACHE_REFRESH` | `on` | Refresh cached stream results in the background. |
 
-Users add their own TorBox, Usenet Ultimate, and Easynews credentials from their account page. Prowlarr/Zilean settings for the bundled scraper belong in `_scraper/.env`, not the root environment.
+Users add their own TorBox, Usenet Ultimate, and Easynews credentials from their account page. Companion-managed Prowlarr/Zilean settings belong in `_scraper/.env`; a direct Prowlarr connection belongs in the SeriousSportSync admin panel or root environment.
 
 ---
 

@@ -13,8 +13,8 @@ services:
       TSDB_API_KEY: "${TSDB_API_KEY:-3}"
       TSDB_SEASONS: "${TSDB_SEASONS:-auto}"
       REFRESH_INTERVAL_HOURS: "${REFRESH_INTERVAL_HOURS:-6}"
-      # Content discovery. Configure Prowlarr/Zilean/etc in the companion
-      # scraper, not in this metadata-addon container.
+      # Content discovery. The companion can combine Prowlarr/Zilean/etc;
+      # a direct Prowlarr connection can also be saved in the admin panel.
       COMPANION_URL: "${COMPANION_URL:-}"
       COMPANION_AUTH_TOKEN: "${COMPANION_AUTH_TOKEN:-}"
       NEWSNAB_URL: "${NEWSNAB_URL:-}"
