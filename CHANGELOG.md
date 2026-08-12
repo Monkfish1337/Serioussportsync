@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.42.17
+
+### Broader direct Prowlarr discovery
+
+- Removed the forced Movies, TV, and Other category filters from direct Prowlarr searches.
+- Prowlarr indexers such as Bitmagnet can now return results from their full text-search index.
+- SeriousSportSync still applies its promotion relevance filtering before showing streams.
+
 ## 0.42.16
 
 ### Direct Prowlarr request boundary
