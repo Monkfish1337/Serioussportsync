@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.43.0
+
+### Content Studio
+
+- Added a promotion overview with visible, manual, and review-pending counts.
+- Added refresh-safe manual events, source-event overrides, disabling,
+  restoring, resetting, and deletion controls.
+- Added a missing-event inbox for promotion-filter rejections and possible
+  duplicates, with accept, merge, and ignore decisions.
+- Added previewed ICS, CSV, and JSON event imports.
+- Added guided matching suggestions that turn good and bad release examples
+  into per-event search aliases and exclusion patterns.
+- Added searchable TheSportsDB, football-data.org, and TMDB source discovery
+  to a simplified promotion wizard, while keeping the advanced editor.
+- Stored editorial content separately from the refreshed source cache so
+  catalog refreshes cannot overwrite manual work.
+
 ## 0.42.17
 
 ### Broader direct Prowlarr discovery

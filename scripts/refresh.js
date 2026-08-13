@@ -6,6 +6,7 @@ const transform = require('../lib/transform');
 const store = require('../lib/store');
 const promotions = require('../lib/promotions');
 const config = require('../config');
+const contentStore = require('../lib/content-store');
 
 let wiki = null;
 try { wiki = require('../lib/sources/wikipedia'); } catch (e) { wiki = null; }
@@ -262,9 +263,19 @@ async function runRefresh(options) {
       if (!norm) continue;
       // Promotion-level filter (e.g. drop WWE weekly TV, UFC Contender Series).
       if (typeof p.includeEvent === 'function' && !p.includeEvent(norm, config)) {
+        contentStore.recordInbox(norm, 'promotion-filter', 'The source returned this event but the promotion filter excluded it.');
         skipped++; continue;
       }
       if (!inScope(norm, p)) { skipped++; continue; }
+      const possibleDuplicate = Array.from(byId.values()).find((existingEvent) =>
+        existingEvent && existingEvent.id !== norm.id
+        && existingEvent.promotion === norm.promotion
+        && String(existingEvent.date || '') === String(norm.date || '')
+        && String(existingEvent.name || '').toLowerCase() === String(norm.name || '').toLowerCase()
+      );
+      if (possibleDuplicate) {
+        contentStore.recordInbox(norm, 'possible-duplicate', 'Looks like ' + possibleDuplicate.id + '. Review and merge if needed.');
+      }
       if (byId.has(norm.id)) updated++;
       else added++;
       byId.set(norm.id, norm);

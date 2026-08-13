@@ -102,7 +102,9 @@ function createApp() {
   const app = express();
   app.disable('x-powered-by');
 
-  app.use(express.urlencoded({ extended: false, limit: '16kb' }));
+  // Content Studio imports are still plain text forms, but calendar files can
+  // reasonably exceed the old settings-only 16 KB ceiling.
+  app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
   // Attach req.user from session cookie if present.
   function loadSession(req, res, next) {
@@ -973,6 +975,162 @@ function createApp() {
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 'no-store');
     res.send(JSON.stringify(out));
+  });
+
+  // --- Content Studio: refresh-safe event curation and guided setup -------
+  const contentStore = require('./lib/content-store');
+  const contentStudio = require('./lib/admin-content-studio');
+
+  function contentRedirect(tab, message, extra) {
+    const suffix = extra ? '&' + extra : '';
+    return '/admin/content?tab=' + encodeURIComponent(tab)
+      + '&flash=' + encodeURIComponent(message) + suffix;
+  }
+
+  app.get('/admin/content', requireAdmin, async (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    const view = {
+      tab: String(req.query.tab || 'overview'),
+      promo: String(req.query.promo || ''),
+      edit: String(req.query.edit || ''),
+      query: String(req.query.q || ''),
+      newEvent: req.query.new === '1',
+      flash: req.query.flash || null,
+      source: String(req.query.source || 'tsdb'),
+      sourceId: String(req.query.sourceId || ''),
+      name: String(req.query.name || ''),
+      discoveryQuery: String(req.query.query || ''),
+    };
+    if (view.tab === 'promotion' && req.query.discover === '1') {
+      try { view.discovery = await contentStudio.discoverSources(view.source, view.discoveryQuery); }
+      catch (err) { view.flash = 'Source search failed: ' + err.message; view.discovery = []; }
+    }
+    const body = contentStudio.renderBody(view);
+    res.send(tablerChrome.tablerPage('Content Studio', body, { user: req.user, currentSection: 'content' }));
+  });
+
+  app.post('/admin/content/events/create', requireAdmin, (req, res) => {
+    try {
+      const event = contentStore.upsertManual(req.body || {});
+      res.redirect(contentRedirect('events', 'Manual event added. It will survive source refreshes.', 'promo=' + encodeURIComponent(event.promotion)));
+    } catch (err) {
+      res.redirect(contentRedirect('events', 'Add failed: ' + err.message));
+    }
+  });
+
+  app.post('/admin/content/events/:id/save', requireAdmin, (req, res) => {
+    const id = String(req.params.id || '');
+    try {
+      const isManual = contentStore.load().manualEvents.some((x) => x.id === id);
+      if (isManual) contentStore.upsertManual(req.body || {}, id);
+      else contentStore.setOverride(id, req.body || {});
+      res.redirect(contentRedirect('events', isManual ? 'Manual event updated.' : 'Source event override saved. It will survive refreshes.', 'promo=' + encodeURIComponent(req.body.promotion || '')));
+    } catch (err) {
+      res.redirect(contentRedirect('events', 'Save failed: ' + err.message, 'edit=' + encodeURIComponent(id)));
+    }
+  });
+
+  app.post('/admin/content/events/:id/disable', requireAdmin, (req, res) => {
+    contentStore.setDisabled(String(req.params.id), true);
+    res.redirect(contentRedirect('events', 'Event disabled. You can restore it below the event list.'));
+  });
+  app.post('/admin/content/events/:id/enable', requireAdmin, (req, res) => {
+    contentStore.setDisabled(String(req.params.id), false);
+    res.redirect(contentRedirect('events', 'Event restored.'));
+  });
+  app.post('/admin/content/events/:id/delete', requireAdmin, (req, res) => {
+    const ok = contentStore.deleteManual(String(req.params.id));
+    res.redirect(contentRedirect('events', ok ? 'Manual event deleted.' : 'Only manual events can be deleted; source events can be disabled.'));
+  });
+  app.post('/admin/content/events/:id/reset', requireAdmin, (req, res) => {
+    contentStore.removeOverride(String(req.params.id));
+    res.redirect(contentRedirect('events', 'Source event restored to its original values.'));
+  });
+
+  app.post('/admin/content/inbox/:key/accept', requireAdmin, (req, res) => {
+    try {
+      const item = contentStore.load().inbox.find((x) => x.key === req.params.key);
+      if (!item) throw new Error('Inbox item not found.');
+      const created = contentStore.upsertManual(item.candidate);
+      contentStore.updateInbox(item.key, 'accepted', { createdEventId: created.id });
+      res.redirect(contentRedirect('inbox', 'Candidate accepted as a refresh-safe manual event.'));
+    } catch (err) { res.redirect(contentRedirect('inbox', 'Accept failed: ' + err.message)); }
+  });
+  app.post('/admin/content/inbox/:key/ignore', requireAdmin, (req, res) => {
+    try {
+      contentStore.updateInbox(String(req.params.key), 'ignored');
+      res.redirect(contentRedirect('inbox', 'Candidate ignored. It will not return on later refreshes.'));
+    } catch (err) { res.redirect(contentRedirect('inbox', 'Ignore failed: ' + err.message)); }
+  });
+  app.post('/admin/content/inbox/:key/merge', requireAdmin, (req, res) => {
+    try {
+      const targetId = String(req.body.targetId || '').trim();
+      const target = store.getEvent(targetId);
+      if (!target) throw new Error('Target event ID was not found.');
+      const item = contentStore.load().inbox.find((x) => x.key === req.params.key);
+      if (!item) throw new Error('Inbox item not found.');
+      const candidate = item.candidate || {};
+      contentStore.setOverride(targetId, {
+        searchAliases: [].concat(target.searchAliases || [], candidate.name || [], candidate.aliases || []),
+      });
+      contentStore.updateInbox(item.key, 'merged', { mergedInto: targetId });
+      res.redirect(contentRedirect('inbox', 'Candidate title merged into the existing event search aliases.'));
+    } catch (err) { res.redirect(contentRedirect('inbox', 'Merge failed: ' + err.message)); }
+  });
+
+  app.post('/admin/content/import/preview', requireAdmin, (req, res) => {
+    try {
+      const format = String(req.body.format || 'ics');
+      const content = String(req.body.content || '');
+      const promotion = String(req.body.promotion || '');
+      const records = contentStudio.parseImport(format, content);
+      const body = contentStudio.renderBody({ tab: 'import', preview: { format, content, promotion, records } });
+      res.send(tablerChrome.tablerPage('Content Studio', body, { user: req.user, currentSection: 'content' }));
+    } catch (err) { res.redirect(contentRedirect('import', 'Preview failed: ' + err.message)); }
+  });
+  app.post('/admin/content/import/apply', requireAdmin, (req, res) => {
+    try {
+      const records = contentStudio.parseImport(String(req.body.format || 'ics'), String(req.body.content || ''));
+      const result = contentStudio.applyImport(String(req.body.promotion || ''), records);
+      res.redirect(contentRedirect('events', 'Imported ' + result.added + ' event(s); skipped ' + result.skipped + ' invalid row(s).', 'promo=' + encodeURIComponent(req.body.promotion || '')));
+    } catch (err) { res.redirect(contentRedirect('import', 'Import failed: ' + err.message)); }
+  });
+
+  app.post('/admin/content/matching/suggest', requireAdmin, (req, res) => {
+    const eventId = String(req.body.eventId || '').trim();
+    if (!store.getEvent(eventId)) return res.redirect(contentRedirect('matching', 'Event ID not found.'));
+    const matchResult = {
+      eventId,
+      positive: String(req.body.positive || ''),
+      negative: String(req.body.negative || ''),
+      suggestions: contentStudio.suggestMatches(req.body.positive, req.body.negative),
+    };
+    const body = contentStudio.renderBody({ tab: 'matching', matchResult });
+    res.send(tablerChrome.tablerPage('Content Studio', body, { user: req.user, currentSection: 'content' }));
+  });
+  app.post('/admin/content/matching/apply', requireAdmin, (req, res) => {
+    try {
+      const id = String(req.body.eventId || '').trim();
+      if (!store.getEvent(id)) throw new Error('Event ID not found.');
+      contentStore.setOverride(id, { searchAliases: req.body.searchAliases, excludePatterns: req.body.excludePatterns });
+      res.redirect(contentRedirect('matching', 'Suggested rules applied to ' + id + '.'));
+    } catch (err) { res.redirect(contentRedirect('matching', 'Apply failed: ' + err.message)); }
+  });
+
+  app.post('/admin/content/promotions/create', requireAdmin, (req, res) => {
+    try {
+      const body = Object.assign({}, req.body || {});
+      const name = String(body.name || '').trim();
+      const source = String(body.source || 'tsdb');
+      body.searchTitleTemplates = String(body.searchTitleTemplates || '').trim() || '{name}\n{name} {year}';
+      body.relevanceKeywords = String(body.relevanceKeywords || '').trim() || [body.id, name].filter(Boolean).join(', ');
+      if (source === 'tsdb') body.leagueId = body.sourceId;
+      else if (source === 'football-data') body.competitionId = body.sourceId;
+      else if (source === 'tmdb') body.tvId = body.sourceId;
+      const spec = adminPromotions.saveFromForm(body);
+      res.redirect(contentRedirect('overview', 'Created ' + spec.name + '. Use Refresh on its card to fetch events.'));
+    } catch (err) { res.redirect(contentRedirect('promotion', 'Create failed: ' + err.message)); }
   });
 
   // --- Public invite redemption (no login required) ----------------
