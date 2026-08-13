@@ -13,6 +13,10 @@ const seasonsEnv = (process.env.TSDB_SEASONS || 'auto').trim();
 const explicitSeasons = (seasonsEnv === '' || seasonsEnv.toLowerCase() === 'auto')
   ? null
   : seasonsEnv.split(',').map((s) => s.trim()).filter(Boolean);
+// Migrate existing Compose environments that copied the legacy public key.
+// A real user/premium key is preserved verbatim.
+const tsdbKeyEnv = String(process.env.TSDB_API_KEY || '123').trim();
+const tsdbApiKey = tsdbKeyEnv === '3' ? '123' : tsdbKeyEnv;
 
 module.exports = {
   port: parseInt(process.env.PORT, 10) || 7000,
@@ -32,7 +36,9 @@ module.exports = {
   background: 'https://upload.wikimedia.org/wikipedia/commons/7/7a/UFC-Octagon-USMCPhoto.jpg',
 
   tsdb: {
-    apiKey: process.env.TSDB_API_KEY || '3',
+    // TheSportsDB's current documented free v1 key. Older releases used the
+    // legacy test key `3`, whose schedule endpoints have lower result caps.
+    apiKey: tsdbApiKey,
     leagueId: '4443',
     requestDelayMs: 3000,
     // null = derive from event window at refresh time. Set TSDB_SEASONS to a

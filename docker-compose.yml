@@ -10,7 +10,7 @@ services:
       # discoverable without opening .env.example.
       PORT: "7000"
       ADDON_TYPE: "${ADDON_TYPE:-movie}"
-      TSDB_API_KEY: "${TSDB_API_KEY:-3}"
+      TSDB_API_KEY: "${TSDB_API_KEY:-123}"
       TSDB_SEASONS: "${TSDB_SEASONS:-auto}"
       REFRESH_INTERVAL_HOURS: "${REFRESH_INTERVAL_HOURS:-6}"
       # Content discovery. The companion can combine Prowlarr/Zilean/etc;

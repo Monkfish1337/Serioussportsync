@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.43.1
+
+### TheSportsDB source discovery
+
+- Fixed Content Studio throwing `slice(...).map is not a function` when a
+  TheSportsDB name search returned its string error payload.
+- Replaced the unsupported v1 league-name query with the free API's exact
+  league-name team lookup and deduplicated its league results.
+- Added direct numeric league-ID lookup and clearer free-API search guidance.
+- Updated the default public v1 API key from the legacy `3` key to TheSportsDB's
+  documented `123` key, raising season results from 5 to the free limit of 15.
+- Existing deployments that still set `TSDB_API_KEY=3` are migrated to `123`
+  automatically; premium/user keys remain untouched.
+- Added automatic split-season detection so NBA/EPL-style leagues query
+  `2025-2026` and `2026-2027` rather than empty calendar-year seasons.
+- Added refresh logging when a response reaches the free 15-event schedule cap.
+
 ## 0.43.0
 
 ### Content Studio
