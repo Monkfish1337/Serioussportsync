@@ -76,6 +76,7 @@ jobs:
               './lib/sources/realdebrid',
               './lib/sources/torbox',
               './lib/sources/premiumize',
+              './lib/sources/comet',
             ];
             for (const m of mods) {
               try { require(m); }
@@ -96,6 +97,12 @@ jobs:
             }
             console.log('OK — all modules load, promotion registry well-formed (' + p.enabled.length + ' enabled).');
           "
+
+      - name: Integration contract tests
+        run: |
+          npm run test:comet
+          npm run test:search-context
+          npm run test:uu
 
   docker:
     name: Docker Compose smoke test
