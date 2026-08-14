@@ -41,6 +41,11 @@ async function main() {
     assert.strictEqual(connection.supportsSss, true);
     assert.strictEqual(connection.matchesSss, true);
 
+    const dockerConnection = await comet.testManifest(manifestUrl, {
+      expectedSssManifestUrl: 'http://serioussportsync-test:7000/u/user/token/manifest.json',
+    });
+    assert.strictEqual(dockerConnection.matchesSss, true);
+
     const rows = await comet.getStreams('movie', 'nba:2371750', parsed);
     assert.strictEqual(rows.length, 1);
     assert.strictEqual(rows[0].url, 'https://play.example/video');
