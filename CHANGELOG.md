@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Provider-owned Usenet Ultimate discovery
+
+- Replaced SSS's server-wide Newznab search with manifest-scoped direct title
+  search through each user's Usenet Ultimate instance.
+- UU now owns its indexer credentials and discovery; SSS supplies promotion-
+  aware event titles, applies sports relevance filtering, and returns NzbDAV
+  playback rows to Nuvio/Stremio.
+- Removed obsolete `NEWSNAB_*` configuration, scripts, and admin wording.
+- Renamed the per-promotion `newsnab` pipeline toggle to `uu`, with backward
+  compatibility for existing saved promotions.
+
 ## 0.43.2
 
 ### Guided promotion setup

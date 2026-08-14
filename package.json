@@ -8,7 +8,8 @@
                     "refresh":  "node scripts/refresh.js",
                     "refresh-streams":  "node scripts/refresh-streams.js",
                     "gen-token":  "node scripts/gen-token.js",
-                    "dev":  "node server.js"
+                    "dev":  "node server.js",
+                    "test:uu": "node scripts/test-uu-direct-search.js"
                 },
     "keywords":  [
                      "stremio",
@@ -21,7 +22,6 @@
                      "torbox",
                      "prowlarr",
                      "usenet",
-                     "newznab",
                      "easynews",
                      "metadata"
                  ],

@@ -162,14 +162,12 @@ function createApp() {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     const companion = settings.getCompanion();
     const prowlarr = settings.getProwlarr();
-    const newsnab = settings.getNewsnab();
     res.send(JSON.stringify({
       ok: true,
       events: events.length,
       updatedAt: meta.updatedAt || null,
       companionConfigured: !!(companion && companion.url),
       prowlarrConfigured: !!(prowlarr && prowlarr.url && prowlarr.apiKey),
-      newsnabConfigured: !!(newsnab && newsnab.url && newsnab.apiKey),
       accountsEnabled: true,
       promotions: promotions.enabled.map((p) => p.id),
       userCount: users.userCount(),

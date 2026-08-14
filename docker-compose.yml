@@ -17,9 +17,6 @@ services:
       # a direct Prowlarr connection can also be saved in the admin panel.
       COMPANION_URL: "${COMPANION_URL:-}"
       COMPANION_AUTH_TOKEN: "${COMPANION_AUTH_TOKEN:-}"
-      NEWSNAB_URL: "${NEWSNAB_URL:-}"
-      NEWSNAB_API_KEY: "${NEWSNAB_API_KEY:-}"
-      NEWSNAB_CATEGORIES: "${NEWSNAB_CATEGORIES:-5000,5080,8000}"
       # Accounts
       SESSION_SECRET: "${SESSION_SECRET}"
       ADMIN_USER: "${ADMIN_USER:-}"

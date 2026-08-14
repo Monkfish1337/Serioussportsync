@@ -93,41 +93,6 @@ module.exports = {
   zilean: {
     url: process.env.ZILEAN_URL || '',
   },
-  // 0.30.0: Newsnab-compatible NZB indexer (NZBgeek, NZBfinder, omgwtfnzbs,
-  // drunkenslug, or any Newznab/Torznab v2 endpoint). Used to search Usenet
-  // for the catalog's sports content. The base URL is the indexer's API root
-  // (e.g. https://api.nzbgeek.info), api key is the per-account key from the
-  // indexer dashboard. Categories default to TV-Sport (5080) + TV-Other
-  // (5000) + Other (8000) — broad enough to catch most sports posts.
-  newsnab: (() => {
-    // 0.42.7 — support multiple Newznab endpoints. NEWSNAB_URL and
-    // NEWSNAB_API_KEY may each be a comma-separated list; positions are
-    // paired (URL[0] ↔ KEY[0], URL[1] ↔ KEY[1], …). This lets you fan out
-    // to nzbgeek + usenet-crawler + drunkenslug + whatever else you subscribe
-    // to, since some indexers only carry certain content (e.g. current-
-    // season DARKSPORT releases show on usenet-crawler but lag on nzbgeek).
-    //
-    // Single-value form still works: `NEWSNAB_URL=https://api.nzbgeek.info`
-    // + `NEWSNAB_API_KEY=xxxx` behaves exactly as before.
-    const urlsRaw = String(process.env.NEWSNAB_URL || '').trim();
-    const keysRaw = String(process.env.NEWSNAB_API_KEY || '').trim();
-    const urls = urlsRaw.split(',').map((s) => s.trim()).filter(Boolean);
-    const keys = keysRaw.split(',').map((s) => s.trim()).filter(Boolean);
-    const endpoints = [];
-    for (let i = 0; i < urls.length; i++) {
-      if (!urls[i] || !keys[i]) continue;
-      endpoints.push({ url: urls[i], apiKey: keys[i] });
-    }
-    return {
-      // Back-compat: url + apiKey point to the first configured endpoint so
-      // any callsite that hasn't been migrated to `endpoints` still works.
-      url: (endpoints[0] && endpoints[0].url) || '',
-      apiKey: (endpoints[0] && endpoints[0].apiKey) || '',
-      endpoints,
-      categories: (process.env.NEWSNAB_CATEGORIES || '5000,5080,8000')
-        .split(',').map((s) => s.trim()).filter(Boolean),
-    };
-  })(),
   // Debrid providers — any combination of these can be configured.
   // streams.js queries each configured provider in series for every Prowlarr
   // candidate and returns one stream per provider per cache hit.
