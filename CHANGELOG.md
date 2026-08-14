@@ -9,6 +9,8 @@
 - UU now owns its indexer credentials and discovery; SSS supplies promotion-
   aware event titles, applies sports relevance filtering, and returns NzbDAV
   playback rows to Nuvio/Stremio.
+- Documented the temporary `ghcr.io/monkfish1337/usenet-ultimate:sss-direct`
+  compatibility image while the upstream UU endpoint is under review.
 - Removed obsolete `NEWSNAB_*` configuration, scripts, and admin wording.
 - Renamed the per-promotion `newsnab` pipeline toggle to `uu`, with backward
   compatibility for existing saved promotions.

@@ -57,6 +57,12 @@ returns only the rows that finish within the configured request budget.
 | Usenet Ultimate | Usenet Ultimate / NzbDAV | Sends event title variants to the user's UU instance; UU searches its configured indexers and handles playback |
 | Easynews | Easynews | Searches and plays with credentials stored on the user's account |
 
+> **Usenet Ultimate compatibility:** direct sports-title search requires the
+> endpoint proposed in [Usenet Ultimate PR #46](https://github.com/DSmart33/Usenet-Ultimate/pull/46).
+> Until it is included upstream, use
+> `ghcr.io/monkfish1337/usenet-ultimate:sss-direct` for the UU service. The
+> normal UU configuration, manifest URL, indexers, and NzbDAV setup are unchanged.
+
 Credentials are encrypted at rest where applicable and are never included in
 the stream list returned to the client. TorBox and Easynews playback use signed,
 short-lived resolve URLs.
