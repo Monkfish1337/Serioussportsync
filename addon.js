@@ -1000,11 +1000,16 @@ function createApp() {
       source: String(req.query.source || 'tsdb'),
       sourceId: String(req.query.sourceId || ''),
       name: String(req.query.name || ''),
+      guided: req.query.guided === '1',
       discoveryQuery: String(req.query.query || ''),
     };
     if (view.tab === 'promotion' && req.query.discover === '1') {
       try { view.discovery = await contentStudio.discoverSources(view.source, view.discoveryQuery); }
       catch (err) { view.flash = 'Source search failed: ' + err.message; view.discovery = []; }
+    }
+    if (view.tab === 'promotion' && view.guided && view.sourceId) {
+      try { view.sourcePreview = await contentStudio.inspectSource(view.source, view.sourceId); }
+      catch (err) { view.flash = 'Source preview warning: ' + err.message; view.sourcePreview = { samples: [] }; }
     }
     const body = contentStudio.renderBody(view);
     res.send(tablerChrome.tablerPage('Content Studio', body, { user: req.user, currentSection: 'content' }));
@@ -1123,13 +1128,21 @@ function createApp() {
       const body = Object.assign({}, req.body || {});
       const name = String(body.name || '').trim();
       const source = String(body.source || 'tsdb');
-      body.searchTitleTemplates = String(body.searchTitleTemplates || '').trim() || '{name}\n{name} {year}';
-      body.relevanceKeywords = String(body.relevanceKeywords || '').trim() || [body.id, name].filter(Boolean).join(', ');
+      const inferred = contentStudio.inferPromotionSetup(name, source);
+      body.id = String(body.id || '').trim() || inferred.id;
+      body.searchTitleTemplates = String(body.searchTitleTemplates || '').trim() || inferred.searchTitleTemplates.join('\n');
+      body.relevanceKeywords = String(body.relevanceKeywords || '').trim() || inferred.relevanceKeywords.join(', ');
+      body.teamAliasPreset = String(body.teamAliasPreset || '').trim() || inferred.teamAliasPreset;
+      body.leagueAliases = String(body.leagueAliases || '').trim() || inferred.leagueAliases.join(', ');
+      if (body.requireDateInTitle === undefined) body.requireDateInTitle = inferred.requireDateInTitle ? '1' : '0';
       if (source === 'tsdb') body.leagueId = body.sourceId;
       else if (source === 'football-data') body.competitionId = body.sourceId;
       else if (source === 'tmdb') body.tvId = body.sourceId;
       const spec = adminPromotions.saveFromForm(body);
-      res.redirect(contentRedirect('overview', 'Created ' + spec.name + '. Use Refresh on its card to fetch events.'));
+      runEventsRefresh({ promotionId: spec.id })
+        .then((result) => console.log('[content-wizard] initial import "' + spec.id + '" complete: ' + JSON.stringify(result)))
+        .catch((err) => console.error('[content-wizard] initial import "' + spec.id + '" failed: ' + err.message));
+      res.redirect(contentRedirect('overview', 'Created ' + spec.name + '. Its first event import has started automatically.'));
     } catch (err) { res.redirect(contentRedirect('promotion', 'Create failed: ' + err.message)); }
   });
 

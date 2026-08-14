@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.43.1-blue.svg" alt="Version 0.43.1"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.43.2-blue.svg" alt="Version 0.43.2"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -145,7 +145,8 @@ JSON or application code.
 - **Services:** configure direct Prowlarr, the companion scraper, and Newznab.
 - **Users:** create invites and manage shared deployments.
 - **Match editor:** add aliases or noise rules and test a release before saving.
-- **Promotions creator:** add TSDB, football-data.org, or TMDB-backed sports.
+- **Guided promotions creator:** find a TSDB, football-data.org, or TMDB source,
+  preview real events, auto-configure matching, then create and import in one step.
 - **Content Studio:** search metadata sources, review promotion coverage, add or
   edit events, and disable unwanted entries without losing changes on refresh.
 - **Missing event inbox:** accept, merge, or ignore source events rejected by

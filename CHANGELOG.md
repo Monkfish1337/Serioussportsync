@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.43.2
+
+### Guided promotion setup
+
+- Reworked Content Studio's promotion creator into a two-step source wizard.
+- Automatically infers the short ID, safe search templates, recognition terms,
+  date matching, and known football team/league alias presets.
+- Previews real recent/upcoming source events and imports available source
+  artwork before creation, making an incorrect source easy to spot.
+- Starts the promotion's first event import automatically after creation.
+
+### Matchup stream matching
+
+- Added reversed and `@` search variants for generic matchup promotions such
+  as NBA, NHL, and MLB, including exact ISO/DMY date variants.
+- Treats both canonical team names plus an exact fixture date as authoritative,
+  regardless of home/away order or overly narrow promotion keywords.
+- Added full `YYYY-YYYY` season-token support alongside `YYYY-YY`.
+- Fixed completed/skipped pipelines emitting phantom timeout logs later because
+  their timeout timers were not cancelled.
+- Stream requests now use the composed Content Studio event store, so saved
+  event aliases and overrides affect playback searches.
+
 ## 0.43.1
 
 ### TheSportsDB source discovery
