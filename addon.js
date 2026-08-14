@@ -4,6 +4,7 @@ const config = require('./config');
 const { buildManifest } = require('./lib/manifest');
 const { handleCatalog } = require('./lib/catalog');
 const { handleMeta } = require('./lib/meta');
+const { handleSearchContext } = require('./lib/search-context');
 const { handleStream, resolvePlay } = require('./lib/streams');
 const store = require('./lib/store');
 const streamcache = require('./lib/streamcache');
@@ -357,6 +358,18 @@ function createApp() {
 
     r.get('/meta/:type/:id.json', (req, res) => {
       send(res, handleMeta({ type: req.params.type, id: decodeURIComponent(req.params.id) }));
+    });
+
+    // Event-aware title resolver for aggregator integrations. This is scoped
+    // to the same tokenised user URL as the manifest, so disabling/regenerating
+    // an install token also disables the resolver URL held by an aggregator.
+    r.get('/search-context/:type/:id.json', (req, res) => {
+      const context = handleSearchContext({
+        type: req.params.type,
+        id: decodeURIComponent(req.params.id),
+      });
+      if (!context) return res.status(404).json({ error: 'event-not-found' });
+      send(res, context, { cacheControl: 'public, max-age=3600' });
     });
 
     r.get('/stream/:type/:id.json', async (req, res) => {
