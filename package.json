@@ -1,7 +1,7 @@
 {
     "name":  "serioussportsync",
     "version": "0.43.2",
-    "description":  "Self-hosted Stremio/Nuvio sports metadata calendar with optional per-user TorBox, Usenet Ultimate, and Easynews playback pipelines.",
+    "description":  "Self-hosted Stremio/Nuvio sports metadata calendar with optional per-user Comet, TorBox, Usenet Ultimate, and Easynews playback pipelines.",
     "main":  "server.js",
     "scripts":  {
                     "start":  "node server.js",
@@ -9,7 +9,9 @@
                     "refresh-streams":  "node scripts/refresh-streams.js",
                     "gen-token":  "node scripts/gen-token.js",
                     "dev":  "node server.js",
-                    "test:uu": "node scripts/test-uu-direct-search.js"
+                    "test:uu": "node scripts/test-uu-direct-search.js",
+                    "test:search-context": "node scripts/test-search-context.js",
+                    "test:comet": "node scripts/test-comet-forwarding.js"
                 },
     "keywords":  [
                      "stremio",

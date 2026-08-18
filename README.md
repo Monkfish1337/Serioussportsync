@@ -54,8 +54,25 @@ returns only the rows that finish within the configured request budget.
 | --- | --- | --- |
 | Direct Prowlarr | TorBox | Searches when an event is opened, checks the user's cache, and resolves on play |
 | Companion scraper | TorBox | Combines Prowlarr, Zilean, Torznab, and other configured companion sources |
+| Comet manifest | Comet-configured debrid | Keeps SSS installed for catalogs while forwarding event stream requests to a compatible public or self-hosted Comet instance |
 | Usenet Ultimate | Usenet Ultimate / NzbDAV | Sends event title variants to the user's UU instance; UU searches its configured indexers and handles playback |
 | Easynews | Easynews | Searches and plays with credentials stored on the user's account |
+
+### Comet integration
+
+The SSS operator first allows trusted Comet hosts with
+`COMET_ALLOWED_HOSTS` (exact `host:port`, comma-separated). Each user then:
+
+1. Copies their private SSS manifest from **Account → Services → Comet**.
+2. Configures a compatible Comet instance with that SSS manifest and their
+   debrid service.
+3. Pastes the generated Comet manifest back into their SSS account and uses
+   **Test** before saving.
+4. Installs only the SSS manifest in Nuvio or Stremio. SSS supplies the sports
+   catalogs while Comet supplies scraper results and playback.
+
+The Comet manifest is encrypted at rest. Local HTTP, LAN, and Docker service
+URLs work when their exact host and port are included in the allowlist.
 
 > **Usenet Ultimate compatibility:** direct sports-title search requires the
 > endpoint proposed in [Usenet Ultimate PR #46](https://github.com/DSmart33/Usenet-Ultimate/pull/46).

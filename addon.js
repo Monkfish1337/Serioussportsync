@@ -4,10 +4,12 @@ const config = require('./config');
 const { buildManifest } = require('./lib/manifest');
 const { handleCatalog } = require('./lib/catalog');
 const { handleMeta } = require('./lib/meta');
+const { handleSearchContext } = require('./lib/search-context');
 const { handleStream, resolvePlay } = require('./lib/streams');
 const store = require('./lib/store');
 const streamcache = require('./lib/streamcache');
 const settings = require('./lib/settings');
+const cometSource = require('./lib/sources/comet');
 const { runStreamRefresh, readStatus: readWarmerStatus } = require('./scripts/refresh-streams');
 const { runRefresh: runEventsRefresh } = require('./scripts/refresh');
 const promotions = require('./lib/promotions');
@@ -300,6 +302,8 @@ function createApp() {
       // longer touched by the UI. The schema still includes them in users.js
       // so existing records continue deserialising cleanly.
       users.updateUserConfig(req.user.id, {
+        cometManifestUrl: String(b.cometManifestUrl || '').trim(),
+        cometEnabled: b.cometEnabled === 'on' || b.cometEnabled === '1' || b.cometEnabled === 'true',
         uuManifestUrl: String(b.uuManifestUrl || '').trim(),
         torboxApiKey: String(b.torboxApiKey || '').trim(),
         easynewsUsername: String(b.easynewsUsername || '').trim(),
@@ -313,6 +317,18 @@ function createApp() {
     } catch (err) {
       res.redirect('/account?flash=' + encodeURIComponent('Save failed: ' + err.message));
     }
+  });
+
+  app.post('/account/test-comet', requireLogin, async (req, res) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const manifestUrl = String((req.body && req.body.cometManifestUrl) || '').trim();
+    const expectedSssManifestUrl = publicOriginFromReq(req) + '/u/'
+      + req.user.id + '/' + req.user.apiToken + '/manifest.json';
+    const result = await cometSource.testManifest(manifestUrl, {
+      timeoutMs: 10000,
+      expectedSssManifestUrl,
+    });
+    res.status(result.ok ? 200 : 400).send(JSON.stringify(result));
   });
 
   app.post('/account/regenerate-token', requireLogin, (req, res) => {
@@ -357,6 +373,18 @@ function createApp() {
 
     r.get('/meta/:type/:id.json', (req, res) => {
       send(res, handleMeta({ type: req.params.type, id: decodeURIComponent(req.params.id) }));
+    });
+
+    // Event-aware title resolver for aggregator integrations. This is scoped
+    // to the same tokenised user URL as the manifest, so disabling/regenerating
+    // an install token also disables the resolver URL held by an aggregator.
+    r.get('/search-context/:type/:id.json', (req, res) => {
+      const context = handleSearchContext({
+        type: req.params.type,
+        id: decodeURIComponent(req.params.id),
+      });
+      if (!context) return res.status(404).json({ error: 'event-not-found' });
+      send(res, context, { cacheControl: 'public, max-age=3600' });
     });
 
     r.get('/stream/:type/:id.json', async (req, res) => {
@@ -2006,6 +2034,34 @@ function renderAccountPage(user, opts) {
   // Services tab — credentials for each provider.
   const servicesTab = ''
     + '<div class="card mb-3">'
+    +   '<div class="card-header"><h3 class="card-title">Comet</h3><span class="badge bg-azure-lt ms-2">Hosted scrapers</span></div>'
+    +   '<div class="card-body">'
+    +     '<p class="text-secondary small mb-3">Use a compatible public or self-hosted Comet instance as a background stream provider. SeriousSportSync remains the only addon you install, so all sports catalogs stay visible in Nuvio and Stremio.</p>'
+    +     '<ol class="text-secondary small ps-3 mb-3">'
+    +       '<li>Copy your SSS manifest below and paste it into Comet\'s <strong>SeriousSportSync</strong> setting.</li>'
+    +       '<li>Configure your debrid service in Comet and generate its manifest.</li>'
+    +       '<li>Paste that Comet manifest back here, test it, then save.</li>'
+    +     '</ol>'
+    +     '<label class="form-label">Your SSS manifest for Comet</label>'
+    +     '<div class="input-group mb-3">'
+    +       '<input class="form-control text-mono" id="sss-url-for-comet" value="' + escapeHtml(installUrl) + '" readonly>'
+    +       '<button class="btn btn-outline-secondary" type="button" id="copySssForCometBtn">Copy</button>'
+    +     '</div>'
+    +     '<label class="form-label">Configured Comet manifest URL</label>'
+    +     '<div class="input-group input-group-flat mb-2">'
+    +       '<input class="form-control text-mono" type="password" id="comet-url" name="cometManifestUrl" value="' + escapeHtml(cfg.cometManifestUrl || '') + '" placeholder="https://comet.example/&lt;config&gt;/manifest.json" autocomplete="off">'
+    +       '<span class="input-group-text"><a href="#" class="link-secondary btn-reveal" tabindex="-1">Show</a></span>'
+    +       '<button class="btn btn-outline-primary" type="button" id="testCometBtn">Test</button>'
+    +     '</div>'
+    +     '<div class="small text-secondary mb-3" id="cometTestStatus">The URL contains your Comet and debrid configuration and is encrypted at rest.</div>'
+    +     '<label class="form-check form-switch mb-0">'
+    +       '<input class="form-check-input" type="checkbox" name="cometEnabled" value="on"' + ((cfg.cometEnabled !== false) ? ' checked' : '') + '>'
+    +       '<span class="form-check-label">Include Comet results</span>'
+    +     '</label>'
+    +   '</div>'
+    + '</div>'
+
+    + '<div class="card mb-3">'
     +   '<div class="card-header"><h3 class="card-title">TorBox</h3></div>'
     +   '<div class="card-body">'
     +     '<p class="text-secondary small mb-3">Used by the addon to check which scraper results are already cached on your TorBox subscription, and to return playable URLs only for cached items. Your key never leaves this addon.</p>'
@@ -2130,6 +2186,19 @@ function renderAccountPage(user, opts) {
     +     'var t = code.value;'
     +     'if (navigator.clipboard) { navigator.clipboard.writeText(t); }'
     +     'btn.textContent = "Copied!"; setTimeout(function(){ btn.textContent = "Copy"; }, 1800);'
+    +   '});'
+    + '})();'
+    + '(function(){'
+    +   'var btn=document.getElementById("copySssForCometBtn"), input=document.getElementById("sss-url-for-comet");'
+    +   'if(btn&&input)btn.addEventListener("click",function(){if(navigator.clipboard)navigator.clipboard.writeText(input.value);btn.textContent="Copied!";setTimeout(function(){btn.textContent="Copy";},1800);});'
+    +   'var testBtn=document.getElementById("testCometBtn"), url=document.getElementById("comet-url"), status=document.getElementById("cometTestStatus");'
+    +   'if(testBtn&&url&&status)testBtn.addEventListener("click",function(){'
+    +     'testBtn.disabled=true;status.className="small text-secondary mb-3";status.textContent="Testing Comet…";'
+    +     'fetch("/account/test-comet",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"cometManifestUrl="+encodeURIComponent(url.value)})'
+    +       '.then(function(r){return r.json().then(function(j){return {ok:r.ok,data:j};});})'
+    +       '.then(function(out){var d=out.data||{};if(out.ok&&d.supportsSss&&d.matchesSss!==false){status.className="small text-success mb-3";status.textContent=(d.name||"Comet")+" is ready for this SeriousSportSync account.";}else if(out.ok){status.className="small text-warning mb-3";status.textContent=d.warning||"Comet is reachable but SSS support is not configured.";}else{status.className="small text-danger mb-3";status.textContent=d.error||"Comet test failed.";}})'
+    +       '.catch(function(e){status.className="small text-danger mb-3";status.textContent="Comet test failed: "+e.message;})'
+    +       '.finally(function(){testBtn.disabled=false;});'
     +   '});'
     + '})();'
     + 'document.addEventListener("click", function(e){'

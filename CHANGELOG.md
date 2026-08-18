@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Per-user Comet stream provider
+
+- Added a Comet manifest field to each SSS account. SSS remains the installed
+  catalog addon and forwards event stream requests to the user's compatible
+  Comet instance, keeping all sports catalogs visible in Stremio and Nuvio.
+- Added connection testing, encrypted-at-rest manifest storage, an enable
+  switch, and per-promotion Comet pipeline controls.
+
 ### Provider-owned Usenet Ultimate discovery
 
 - Replaced SSS's server-wide Newznab search with manifest-scoped direct title
