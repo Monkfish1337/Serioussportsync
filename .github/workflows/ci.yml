@@ -113,7 +113,12 @@ jobs:
         run: cp .env.example .env
 
       - name: Validate Compose configuration
-        run: docker compose -f docker-compose.yml -f docker-compose.dev.yml config --quiet
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml config --quiet
+          cp deploy/dockge/.env.example deploy/dockge/.env
+          sed -i 's/^SESSION_SECRET=.*/SESSION_SECRET=ci-only-do-not-use-in-production-000000000000000000000000000000/' deploy/dockge/.env
+          sed -i 's/^SCRAPER_AUTH_TOKEN=.*/SCRAPER_AUTH_TOKEN=ci-only-scraper-token/' deploy/dockge/.env
+          docker compose -f deploy/dockge/compose.yaml config --quiet
 
       - name: Build and start through Compose
         run: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build --wait --wait-timeout 120

@@ -115,6 +115,10 @@ The repository includes ready-to-use [docker-compose.yml](./docker-compose.yml)
 and [.env.example](./.env.example) files with the complete configuration
 surface.
 
+For a Dockge deployment that runs SSS and its private companion image in their
+own stack while retaining an existing Gluetun/Prowlarr/Zilean network, use the
+[standalone Dockge stack](./deploy/dockge/README.md).
+
 ## Updating
 
 ~~~bash

@@ -1,0 +1,64 @@
+name: serioussportsync
+
+services:
+  serioussportsync:
+    image: ghcr.io/monkfish1337/serioussportsync:latest
+    pull_policy: always
+    container_name: serioussportsync
+    user: app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: "7000"
+      DATA_FILE: /app/data/events.json
+      COMPANION_URL: http://serioussportsync-scraper:8080
+      COMPANION_AUTH_TOKEN: "${SCRAPER_AUTH_TOKEN:?Set SCRAPER_AUTH_TOKEN in .env}"
+      HTTP_PROXY: "${GLUETUN_HTTP_PROXY:-http://gluetun:8888}"
+      HTTPS_PROXY: "${GLUETUN_HTTP_PROXY:-http://gluetun:8888}"
+      NO_PROXY: "${INTERNAL_NO_PROXY:-localhost,127.0.0.1,gluetun,prowlarr,zilean,serioussportsync-scraper}"
+    depends_on:
+      serioussportsync-scraper:
+        condition: service_healthy
+    ports:
+      - "${SSS_BIND_ADDRESS:-0.0.0.0}:${SSS_HOST_PORT:-7000}:7000"
+    volumes:
+      - "${SSS_DATA_PATH:-/mnt/storage/stremio-stack/serioussportsync-data}:/app/data"
+    networks:
+      - stremio-net
+    security_opt:
+      - no-new-privileges:true
+
+  serioussportsync-scraper:
+    image: ghcr.io/monkfish1337/serioussportsync-scraper:latest
+    pull_policy: always
+    container_name: serioussportsync-scraper
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8080"
+      DATA_DIR: /app/data
+      SCRAPER_AUTH_TOKEN: "${SCRAPER_AUTH_TOKEN:?Set SCRAPER_AUTH_TOKEN in .env}"
+      SOURCE_TIMEOUT_MS: "${SOURCE_TIMEOUT_MS:-10000}"
+      SCRAPE_BUDGET_MS: "${SCRAPE_BUDGET_MS:-25000}"
+      LOG_BUFFER_MAX: "${LOG_BUFFER_MAX:-4000}"
+      HISTORY_MAX: "${HISTORY_MAX:-200}"
+      HTTPS_PROXY: "${GLUETUN_HTTP_PROXY:-http://gluetun:8888}"
+      NO_PROXY: "${INTERNAL_NO_PROXY:-localhost,127.0.0.1,gluetun,prowlarr,zilean,serioussportsync}"
+    ports:
+      - "${SCRAPER_BIND_ADDRESS:-0.0.0.0}:${SCRAPER_HOST_PORT:-8180}:8080"
+    volumes:
+      - "${SCRAPER_DATA_PATH:-/mnt/storage/stremio-stack/serioussportsync-scraper/data}:/app/data"
+    networks:
+      - stremio-net
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  stremio-net:
+    external: true
+    name: "${STREMIO_NETWORK:-stremio-stack_stremio-net}"
