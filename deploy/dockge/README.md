@@ -59,7 +59,7 @@ Do not put the GitHub token in the stack `.env`.
    curl --fail http://127.0.0.1:7000/health
    curl --fail http://127.0.0.1:8180/health
    docker exec serioussportsync-scraper node -e \
-     "fetch('https://api.ipify.org').then(r=>r.text()).then(console.log)"
+     "const fetch=require('node-fetch'); const h=require('./lib/http-agent'); const u='https://api.ipify.org'; fetch(u,h.fetchOpts({},u)).then(r=>r.text()).then(console.log)"
    ```
 
    Compare the final public IP with Gluetun's public IP to confirm scraper
