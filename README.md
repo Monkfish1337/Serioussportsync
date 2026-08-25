@@ -105,8 +105,10 @@ docker compose up -d
 ~~~
 
 Open <code>http://&lt;your-server&gt;:7000/</code>, create the account matching
-<code>ADMIN_USER</code>, configure discovery services under Admin, then copy
-your private install URL from Account into Nuvio or Stremio.
+<code>ADMIN_USER</code>, configure discovery services under Admin, then use the
+single Account page to save playback services, choose catalogs, and install or
+export your private manifest. There is no second editing URL: sign in and return
+to <code>/account</code> whenever configuration needs to change.
 
 If port 7000 is occupied, change only the host side, for example
 <code>"7010:7000"</code>.
@@ -189,9 +191,11 @@ See [.env.example](./.env.example) for the annotated full list.
 | <code>STREAM_MAX_ROWS</code> | <code>20</code> | Maximum stream rows returned per request |
 | <code>STREAM_PIPELINE_TIMEOUT_MS</code> | <code>8000</code> | Maximum time allowed for each playback pipeline |
 
-Users configure their own TorBox, Usenet Ultimate, and Easynews credentials on
-the Account page. Server-wide discovery credentials belong in Admin or the root
-environment. Companion-managed sources belong in the companion's own settings.
+Users configure TorBox, Usenet Ultimate, Easynews, catalog ordering, and client
+exports together on the signed-in Account page. The private manifest URL grants
+use, not editing access, and can be rotated from that page. Server-wide discovery
+credentials belong in Admin or the root environment. Companion-managed sources
+belong in the companion's own settings.
 
 ## Development
 

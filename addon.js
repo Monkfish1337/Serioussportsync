@@ -28,7 +28,6 @@ const tablerChrome = require('./lib/tabler-chrome');
 const { cleanOrder, orderByIds } = require('./lib/catalog-order');
 const { effectiveCatalogSelection, CURRENT_DEFAULTS_VERSION } = require('./lib/catalog-selection');
 const { buildNuvioCollections } = require('./lib/nuvio-collections');
-const torboxVoyager = require('./lib/sources/torbox-voyager');
 const APP_VERSION = require('./package.json').version || '?';
 
 
@@ -275,6 +274,7 @@ function createApp() {
 
   app.get('/account', requireLogin, (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
     res.send(renderAccountPage(req.user, { flash: req.query.flash || null, origin: publicOriginFromReq(req) }));
   });
 
@@ -333,23 +333,6 @@ function createApp() {
       res.redirect('/account?flash=saved');
     } catch (err) {
       res.redirect('/account?flash=' + encodeURIComponent('Save failed: ' + err.message));
-    }
-  });
-
-  // Read-only TorBox Unified diagnostic. This does not add a torrent/NZB or
-  // alter the user's TorBox account; it only proves current Voyager and BYOI
-  // search access using the API key already encrypted in SSS.
-  app.post('/account/torbox-unified-probe', requireLogin, async (req, res) => {
-    res.setHeader('Cache-Control', 'no-store');
-    const torboxKey = String((req.user.config && req.user.config.torboxApiKey) || '').trim();
-    if (!torboxKey) return res.status(400).json({ ok: false, error: 'Save a TorBox API key first.' });
-    const query = String((req.body && req.body.query) || '').trim().slice(0, 200);
-    if (!query) return res.status(400).json({ ok: false, error: 'Enter a search query.' });
-    try {
-      const report = await torboxVoyager.probe(query, torboxKey, { resultLimit: 10 });
-      return res.json({ ok: report.searches.some((item) => item.ok), report });
-    } catch (err) {
-      return res.status(502).json({ ok: false, error: err.message });
     }
   });
 
@@ -1941,6 +1924,7 @@ function renderAccountPage(user, opts) {
   const apiToken = user.apiToken || '';
   const installPath = '/u/' + user.id + '/' + apiToken + '/manifest.json';
   const installUrl = (opts.origin || '') + installPath;
+  const stremioInstallUrl = installUrl.replace(/^https?:\/\//i, 'stremio://');
   const nuvioJson = JSON.stringify(buildNuvioCollections({ user, origin: opts.origin }), null, 2);
   const effectiveSelection = effectiveCatalogSelection(cfg);
   const selected = effectiveSelection || new Set();
@@ -1992,72 +1976,7 @@ function renderAccountPage(user, opts) {
 
   const defaultMaxStreams = parseInt(process.env.STREAM_MAX_ROWS || '20', 10);
 
-  // Services tab — credentials for each provider.
-  const servicesTab = ''
-    + '<div class="card mb-3">'
-    +   '<div class="card-header"><h3 class="card-title">TorBox</h3></div>'
-    +   '<div class="card-body">'
-    +     '<p class="text-secondary small mb-3">Used by the addon to check which scraper results are already cached on your TorBox subscription, and to return playable URLs only for cached items. Your key never leaves this addon.</p>'
-    +     secretField('TorBox API key', 'torboxApiKey', cfg.torboxApiKey, 'paste your TorBox API key')
-    +     '<hr class="my-3">'
-    +     '<p class="text-secondary small mb-2"><strong>TorBox Unified diagnostic</strong> — read-only test of Voyager torrent, Usenet, cache, ownership, and your TorBox BYOI sources. This does not add anything to your account.</p>'
-    +     '<div class="input-group mb-2">'
-    +       '<input class="form-control text-mono" type="text" id="torbox-unified-query" value="EPL 2026 08 22 Hull City Vs Manchester United" maxlength="200">'
-    +       '<button class="btn btn-outline-primary" type="button" id="torbox-unified-probe">Test unified search</button>'
-    +     '</div>'
-    +     '<pre class="bg-dark text-light rounded p-3 mb-0 text-wrap" id="torbox-unified-output" style="display:none;max-height:420px;overflow:auto;font-size:12px;"></pre>'
-    +   '</div>'
-    + '</div>'
-
-    + '<div class="card mb-3">'
-    +   '<div class="card-header"><h3 class="card-title">Easynews</h3></div>'
-    +   '<div class="card-body">'
-    +     '<p class="text-secondary small mb-3">Stream rows will play directly from members.easynews.com using your subscription. Your password is encrypted at rest and never appears in stream URLs returned to Stremio (auth is injected only at play-time via a signed redirect). Leave blank if you don\'t have an Easynews subscription.</p>'
-    +     '<div class="mb-3">'
-    +       '<label class="form-label" for="en-user">Easynews username</label>'
-    +       '<input class="form-control" type="text" id="en-user" name="easynewsUsername" value="' + escapeHtml(cfg.easynewsUsername || '') + '" placeholder="your Easynews username" autocomplete="off">'
-    +     '</div>'
-    +     secretField('Easynews password', 'easynewsPassword', cfg.easynewsPassword, 'your Easynews password')
-    +   '</div>'
-    + '</div>'
-
-    + '<div class="card mb-3">'
-    +   '<div class="card-header"><h3 class="card-title">Usenet Ultimate</h3></div>'
-    +   '<div class="card-body">'
-    +     '<p class="text-secondary small mb-3">Stream rows will play through your UU instance. Leave blank if you don\'t use UU.</p>'
-    +     '<div class="mb-3">'
-    +       '<label class="form-label" for="uu-url">UU manifest URL</label>'
-    +       '<input class="form-control text-mono" type="url" id="uu-url" name="uuManifestUrl" value="' + escapeHtml(cfg.uuManifestUrl || '') + '" placeholder="https://your-usenet-ultimate.elfhosted.com/stremio/&lt;config&gt;/manifest.json">'
-    +     '</div>'
-    +   '</div>'
-    + '</div>'
-
-    + '<div class="card mb-3">'
-    +   '<div class="card-header"><h3 class="card-title">Result count</h3></div>'
-    +   '<div class="card-body">'
-    +     '<p class="text-secondary small mb-3">Cap the number of stream rows shown per event. 0 = use server default (' + escapeHtml(String(defaultMaxStreams)) + '). Sorted by size (largest first), then by recency.</p>'
-    +     '<div class="mb-0">'
-    +       '<label class="form-label">Max streams (0 = default)</label>'
-    +       '<input class="form-control" type="number" name="maxStreams" min="0" max="50" value="' + escapeHtml(String(cfg.maxStreams || 0)) + '" style="max-width:140px;">'
-    +     '</div>'
-    +   '</div>'
-    + '</div>'
-
-    // 0.38.0: warm-to-cache toggle. Default ON so new users get the helpful
-    // 🔥 rows automatically; opt-out for users who prefer cached-only rows.
-    + '<div class="card mb-3">'
-    +   '<div class="card-header"><h3 class="card-title">Warm to TorBox</h3></div>'
-    +   '<div class="card-body">'
-    +     '<p class="text-secondary small mb-3">When a release isn\'t already cached on your TorBox, show a 🔥 row that submits it for caching when clicked. Plays a brief "added — check back in 2-5 min" placeholder; come back once it\'s cached. Turn off if you prefer to only see ready-to-play rows.</p>'
-    +     '<label class="form-check form-switch">'
-    +       '<input class="form-check-input" type="checkbox" name="showWarmRows" value="on"' + ((cfg.showWarmRows !== false) ? ' checked' : '') + '>'
-    +       '<span class="form-check-label">Show warm-to-cache rows for uncached releases</span>'
-    +     '</label>'
-    +   '</div>'
-    + '</div>';
-
-  // Catalogs tab — one vertical sequence matching client manifest display.
-  const catalogsTab = ''
+  const catalogsPanel = ''
     + '<style>'
     +   '.promotion-drag-handle,.catalog-drag-handle{cursor:grab;touch-action:none;user-select:none;font-weight:700;letter-spacing:-3px;}'
     +   '.promotion-drag-handle:active,.catalog-drag-handle:active{cursor:grabbing;}'
@@ -2067,8 +1986,7 @@ function renderAccountPage(user, opts) {
     +   '.catalog-sort-item{min-height:38px;border-radius:4px;padding:2px 0;}'
     +   '.catalog-sort-item:hover{background:rgba(255,255,255,.035);}'
     + '</style>'
-    + '<div class="card mb-3">'
-    +   '<div class="card-body">'
+    + '<div class="config-fold-body">'
     +     '<label class="form-check form-switch mb-3">'
     +       '<input class="form-check-input" type="checkbox" name="showCatalogsOnHome" value="on"' + ((cfg.showCatalogsOnHome !== false) ? ' checked' : '') + '>'
     +       '<span class="form-check-label">Ask compatible Nuvio clients to show enabled catalogs as home rows</span>'
@@ -2079,88 +1997,59 @@ function renderAccountPage(user, opts) {
     +     '<input type="hidden" name="promotionOrder" id="promotion-order" value="' + escapeHtml(orderedPromotions.map((p) => p.id).join(',')) + '">'
     +     '<input type="hidden" name="catalogOrder" id="catalog-order" value="' + escapeHtml(orderedPromotions.flatMap((p) => orderByIds(p.catalogs, cfg.catalogOrder, (c) => c.id).map((c) => c.id)).join(',')) + '">'
     +     '<div class="catalog-order-list" id="catalog-promotion-order">' + catGroupsHtml + '</div>'
-    +   '</div>'
-    + '</div>';
-
-  // Manifest tab — install URL + API token + regenerate.
-  const manifestTab = ''
-    + '<div class="card mb-3">'
-    +   '<div class="card-header"><h3 class="card-title">Install URL</h3></div>'
-    +   '<div class="card-body">'
-    +     '<p class="text-secondary small mb-3">Use this URL to install the addon in Stremio. It is tied to your account and API token.</p>'
-    +     '<div class="input-group">'
-    +       '<input class="form-control text-mono" id="murl" value="' + escapeHtml(installUrl) + '" readonly>'
-    +       '<button class="btn btn-primary" type="button" id="copyUrlBtn">Copy</button>'
-    +     '</div>'
-    +   '</div>'
-    + '</div>'
-
-    + '<div class="card mb-3">'
-    +   '<div class="card-header"><h3 class="card-title">Nuvio collection</h3></div>'
-    +   '<div class="card-body">'
-    +     '<p class="text-secondary small mb-3">Generate an import-ready SSS collection with Combat Sports, Wrestling, Football, and Motorsport folders. It uses your enabled catalogs and saved catalog order, so save settings before exporting.</p>'
-    +     '<div class="d-flex flex-wrap gap-2 align-items-center">'
-    +       '<a class="btn btn-primary" href="/account/nuvio-collections.json" download>Download JSON</a>'
-    +       '<button class="btn btn-outline-primary" type="button" id="copyNuvioJsonBtn">Copy JSON</button>'
-    +       '<span class="text-secondary small" id="copyNuvioJsonStatus" aria-live="polite"></span>'
-    +     '</div>'
-    +     '<textarea id="nuvioJsonPayload" class="d-none" tabindex="-1" aria-hidden="true" readonly>' + escapeHtml(nuvioJson) + '</textarea>'
-    +   '</div>'
-    + '</div>'
-
-    + '<div class="card mb-3">'
-    +   '<div class="card-header"><h3 class="card-title">API token</h3></div>'
-    +   '<div class="card-body">'
-    +     '<p class="text-secondary small mb-3">If your install URL leaks, regenerate this token. Your existing Stremio install stops working immediately; you\'ll need to reinstall with the new URL.</p>'
-    +     '<div class="input-group mb-3">'
-    +       '<input class="form-control text-mono" value="' + escapeHtml(apiToken) + '" readonly>'
-    +     '</div>'
-    +     '<button class="btn btn-danger" type="submit" formaction="/account/regenerate-token" formnovalidate onclick="return confirm(\'Regenerate API token? Your existing Stremio install stops working immediately.\');">'
-    +       'Regenerate token'
-    +     '</button>'
-    +   '</div>'
-    + '</div>';
+    +   '</div>';
 
   const body = ''
-    + '<div class="page-header d-print-none">'
-    +   '<div class="row align-items-center">'
-    +     '<div class="col">'
-    +       '<h2 class="page-title">Account</h2>'
-    +     '</div>'
-    +   '</div>'
+    + '<style>'
+    +   '.account-config{max-width:920px;margin:0 auto 4rem}.config-hero{padding:1rem 0 1.4rem}.config-eyebrow{color:var(--tblr-primary);font-size:.72rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase}.config-title{font-size:clamp(2rem,5vw,3.15rem);letter-spacing:-.045em;line-height:1.02;margin:.55rem 0}.config-intro{max-width:700px}.config-block,.config-fold{border:1px solid var(--tblr-border-color);border-radius:14px;background:rgba(255,255,255,.018);margin-bottom:14px;overflow:hidden}.config-block-head,.config-fold summary{padding:16px 18px;font-weight:700;font-size:1rem}.config-block-head,.config-fold[open] summary{border-bottom:1px solid var(--tblr-border-color)}.config-fold summary{cursor:pointer;list-style:none}.config-fold summary:after{content:"⌄";float:right;color:var(--tblr-secondary)}.config-block-body,.config-fold-body{padding:18px}.provider-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.provider-grid .wide{grid-column:1/-1}.save-bar{position:sticky;bottom:12px;z-index:5;display:flex;align-items:center;gap:14px;padding:13px 15px;margin:18px 0;background:rgba(20,21,24,.96);border:1px solid var(--tblr-border-color);border-radius:13px;box-shadow:0 16px 48px rgba(0,0,0,.35);backdrop-filter:blur(10px)}.save-bar .btn{min-width:180px}.product-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.product-card{border:1px solid var(--tblr-border-color);border-radius:13px;padding:18px;background:rgba(0,0,0,.14)}.product-card h3{margin:0 0 6px}.manifest-output{margin-top:14px;padding:14px;border:1px solid rgba(46,170,85,.35);background:rgba(46,170,85,.07);border-radius:11px}.session-note{border:1px solid rgba(239,68,68,.28);background:rgba(239,68,68,.07);border-radius:11px;padding:13px 14px}.config-management{display:flex;justify-content:flex-end;margin-top:12px;padding-top:12px;border-top:1px solid var(--tblr-border-color)}@media(max-width:720px){.provider-grid,.product-grid{grid-template-columns:1fr}.provider-grid .wide{grid-column:auto}.save-bar{align-items:flex-start;flex-direction:column}.save-bar .btn{width:100%}}'
+    + '</style>'
+    + '<main class="account-config">'
+    + '<div class="config-hero">'
+    +   '<div class="config-eyebrow">Signed-in configuration</div>'
+    +   '<h1 class="config-title">Configure SeriousSportSync</h1>'
+    +   '<p class="config-intro text-secondary mb-0">Add your services, choose catalogs, and install the private manifest from one account screen. Signing in is the only editing authority—there is no separate editing URL to save.</p>'
     + '</div>'
     + flashHtml
     + '<form method="POST" action="/account/save">'
-    +   '<ul class="nav nav-tabs" role="tablist">'
-    +     '<li class="nav-item"><a href="#tab-services" class="nav-link active" data-bs-toggle="tab" role="tab">Services</a></li>'
-    +     '<li class="nav-item"><a href="#tab-catalogs" class="nav-link" data-bs-toggle="tab" role="tab">Catalogs</a></li>'
-    +     '<li class="nav-item"><a href="#tab-manifest" class="nav-link" data-bs-toggle="tab" role="tab">Manifest</a></li>'
-    +   '</ul>'
-    +   '<div class="tab-content pt-3">'
-    +     '<div class="tab-pane fade show active" id="tab-services" role="tabpanel">' + servicesTab + '</div>'
-    +     '<div class="tab-pane fade" id="tab-catalogs" role="tabpanel">' + catalogsTab + '</div>'
-    +     '<div class="tab-pane fade" id="tab-manifest" role="tabpanel">' + manifestTab + '</div>'
-    +   '</div>'
-    +   '<div class="d-flex align-items-center mt-3">'
-    +     '<button class="btn btn-primary" type="submit">Save settings</button>'
-    +     '<span class="text-secondary small ms-3">Saves Services + Catalogs at the same time.</span>'
-    +   '</div>'
+    +   '<section class="config-block"><div class="config-block-head">Playback services</div><div class="config-block-body">'
+    +     '<div class="provider-grid">'
+    +       '<div class="wide"><p class="text-secondary small mb-2"><strong>TorBox</strong> — resolves companion results and returns playable URLs. The API key is encrypted at rest.</p>' + secretField('TorBox API key', 'torboxApiKey', cfg.torboxApiKey, 'paste your TorBox API key') + '</div>'
+    +       '<div><label class="form-label" for="en-user">Easynews username</label><input class="form-control" type="text" id="en-user" name="easynewsUsername" value="' + escapeHtml(cfg.easynewsUsername || '') + '" autocomplete="off"></div>'
+    +       '<div>' + secretField('Easynews password', 'easynewsPassword', cfg.easynewsPassword, 'your Easynews password') + '</div>'
+    +       '<div class="wide"><label class="form-label" for="uu-url">Usenet Ultimate manifest URL</label><input class="form-control text-mono" type="url" id="uu-url" name="uuManifestUrl" value="' + escapeHtml(cfg.uuManifestUrl || '') + '" placeholder="https://your-uu.example/stremio/&lt;config&gt;/manifest.json"></div>'
+    +     '</div>'
+    +   '</div></section>'
+    +   '<details class="config-fold"><summary>Catalogs and display order</summary>' + catalogsPanel + '</details>'
+    +   '<details class="config-fold"><summary>Advanced playback settings</summary><div class="config-fold-body">'
+    +     '<div class="provider-grid">'
+    +       '<div><label class="form-label">Maximum results per event</label><input class="form-control" type="number" name="maxStreams" min="0" max="20" value="' + escapeHtml(String(cfg.maxStreams || 0)) + '"><div class="form-hint">0 uses the server default (' + escapeHtml(String(defaultMaxStreams)) + ').</div></div>'
+    +       '<div><label class="form-check form-switch mt-4"><input class="form-check-input" type="checkbox" name="showWarmRows" value="on"' + ((cfg.showWarmRows !== false) ? ' checked' : '') + '><span class="form-check-label">Show warm-to-cache rows for uncached TorBox results</span></label></div>'
+    +     '</div>'
+    +   '</div></details>'
+    +   '<div class="save-bar"><button class="btn btn-primary" type="submit">Save configuration</button><span class="text-secondary small">Saves services, catalogs, ordering, and advanced settings together.</span></div>'
+    +   '<section class="config-block"><div class="config-block-head">Install and export</div><div class="config-block-body">'
+    +     '<div class="session-note mb-3"><strong>No second editing link.</strong> Return to <code>/account</code> and sign in whenever you want to change this configuration.</div>'
+    +     '<div class="product-grid">'
+    +       '<div class="product-card"><h3>Stremio addon</h3><p class="text-secondary small">Install the current private manifest or copy it into another compatible client.</p><div class="d-flex flex-wrap gap-2"><a class="btn btn-primary" href="' + escapeHtml(stremioInstallUrl) + '">Install Stremio</a><button class="btn btn-outline-primary" type="button" id="copyUrlBtn">Copy manifest</button></div></div>'
+    +       '<div class="product-card"><h3>Nuvio collection</h3><p class="text-secondary small">Export folders using the enabled catalogs and saved order.</p><div class="d-flex flex-wrap gap-2"><a class="btn btn-primary" href="/account/nuvio-collections.json" download>Download JSON</a><button class="btn btn-outline-primary" type="button" id="copyNuvioJsonBtn">Copy JSON</button></div><span class="text-secondary small" id="copyNuvioJsonStatus" aria-live="polite"></span></div>'
+    +     '</div>'
+    +     '<div class="manifest-output"><label class="form-label">Your private manifest URL</label><div class="input-group"><input class="form-control text-mono" id="murl" value="' + escapeHtml(installUrl) + '" readonly><button class="btn btn-outline-success" type="button" id="copyUrlOutputBtn">Copy</button></div></div>'
+    +     '<textarea id="nuvioJsonPayload" class="d-none" tabindex="-1" aria-hidden="true" readonly>' + escapeHtml(nuvioJson) + '</textarea>'
+    +     '<div class="config-management"><button class="btn btn-outline-danger" type="submit" formaction="/account/regenerate-token" formnovalidate onclick="return confirm(\'Rotate the manifest? Your current install URL stops working immediately.\');">Rotate manifest URL</button></div>'
+    +   '</div></section>'
     + '</form>'
+    + '</main>'
 
     // Inline JS: copy install URL + toggle password reveal. Same logic as
     // before, just rebound to Tabler's input-group markup.
     + '<script>'
     + '(function(){'
-    +   'var btn=document.getElementById("torbox-unified-probe"),input=document.getElementById("torbox-unified-query"),out=document.getElementById("torbox-unified-output");if(!btn||!input||!out)return;'
-    +   'btn.addEventListener("click",async function(){btn.disabled=true;out.style.display="block";out.textContent="Searching TorBox Voyager and BYOI…";try{var body=new URLSearchParams({query:input.value});var response=await fetch("/account/torbox-unified-probe",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()});var payload=await response.json();out.textContent=JSON.stringify(payload,null,2);}catch(err){out.textContent="Probe failed: "+err.message;}finally{btn.disabled=false;}});'
-    + '})();'
-    + '(function(){'
-    +   'var btn = document.getElementById("copyUrlBtn"), code = document.getElementById("murl");'
-    +   'if (btn && code) btn.addEventListener("click", function() {'
+    +   'var buttons=[document.getElementById("copyUrlBtn"),document.getElementById("copyUrlOutputBtn")], code = document.getElementById("murl");'
+    +   'buttons.forEach(function(btn){if(!btn||!code)return;btn.addEventListener("click", function() {'
     +     'var t = code.value;'
     +     'if (navigator.clipboard) { navigator.clipboard.writeText(t); }'
-    +     'btn.textContent = "Copied!"; setTimeout(function(){ btn.textContent = "Copy"; }, 1800);'
-    +   '});'
+    +     'var old=btn.textContent;btn.textContent = "Copied!"; setTimeout(function(){ btn.textContent = old; }, 1800);'
+    +   '});});'
     + '})();'
     + '(function(){'
     +   'var btn=document.getElementById("copyNuvioJsonBtn"),status=document.getElementById("copyNuvioJsonStatus"),payload=document.getElementById("nuvioJsonPayload");if(!btn||!payload)return;'

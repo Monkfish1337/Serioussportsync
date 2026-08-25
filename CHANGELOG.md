@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.45.6
+
+### One-page account configuration
+
+- Rebuilt Account as a single signed-in configuration page for TorBox,
+  Easynews, Usenet Ultimate, catalogs, playback settings, and client exports.
+- Removed the separate TorBox Unified diagnostic and its private endpoint.
+- Kept the manifest URL install-only: account login is the sole authority for
+  editing configuration, while URL rotation remains available if it is shared.
+- Added an authenticated route and persistence test that also gates container
+  publication.
+
 ## 0.45.5
 
 ### TorBox Unified discovery probe

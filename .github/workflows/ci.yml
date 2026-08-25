@@ -100,6 +100,9 @@ jobs:
       - name: Nuvio collections generator tests
         run: npm run test:nuvio
 
+      - name: Authenticated account configuration tests
+        run: npm run test:account
+
   docker:
     name: Docker Compose smoke test
     runs-on: ubuntu-latest
