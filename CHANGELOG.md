@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.46.3
+
+- Added account-level toggles for TorBox, Usenet Ultimate stream rows, and
+  Easynews so each existing playback pipeline can be isolated during testing
+  without deleting credentials.
+- Kept UU text search available to DIY NZB DAV when UU's own stream rows are
+  disabled.
+
 ## 0.46.2
 
 - Kept active NZB DAV request deadlines referenced so stalled requests reliably

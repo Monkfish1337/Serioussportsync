@@ -55,9 +55,12 @@ function listen(app) {
       'Signing in is the only editing authority',
       'No second editing link.',
       'name="torboxApiKey"',
+      'name="torboxEnabled"',
       'name="easynewsUsername"',
+      'name="easynewsEnabled"',
       'name="easynewsPassword"',
       'name="uuManifestUrl"',
+      'name="uuEnabled"',
       'DIY providers',
       'name="diyUsenetEnabled"',
       'name="nzbdavUrl"',
@@ -84,9 +87,12 @@ function listen(app) {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
+        torboxEnabled: 'on',
         torboxApiKey: 'test-torbox-key',
+        easynewsEnabled: 'on',
         easynewsUsername: 'test-easynews-user',
         easynewsPassword: 'test-easynews-password',
+        uuEnabled: 'on',
         uuManifestUrl: 'https://uu.example/private/manifest.json',
         diyUsenetEnabled: 'on',
         nzbdavUrl: 'https://dav.example',
@@ -105,10 +111,13 @@ function listen(app) {
     assert.strictEqual(save.status, 302);
     assert.strictEqual(save.headers.get('location'), '/account?flash=saved');
     const saved = users.findById(user.id).config;
+    assert.strictEqual(saved.torboxEnabled, true);
     assert.strictEqual(saved.torboxApiKey, 'test-torbox-key');
+    assert.strictEqual(saved.easynewsEnabled, true);
     assert.strictEqual(saved.easynewsUsername, 'test-easynews-user');
     assert.strictEqual(saved.easynewsPassword, 'test-easynews-password');
     assert.strictEqual(saved.uuManifestUrl, 'https://uu.example/private/manifest.json');
+    assert.strictEqual(saved.uuEnabled, true);
     assert.strictEqual(saved.diyUsenetEnabled, true);
     assert.strictEqual(saved.nzbdavUrl, 'https://dav.example');
     assert.strictEqual(saved.nzbdavApiKey, 'test-nzbdav-api-secret');
@@ -121,6 +130,36 @@ function listen(app) {
     assert.strictEqual(saved.maxStreams, 7);
     assert.strictEqual(saved.showWarmRows, true);
     assert.strictEqual(saved.showCatalogsOnHome, true);
+
+    const disableLegacy = await fetch(base + '/account/save', {
+      method: 'POST',
+      redirect: 'manual',
+      headers: {
+        Cookie: cookie,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        torboxApiKey: 'test-torbox-key',
+        easynewsUsername: 'test-easynews-user',
+        easynewsPassword: 'test-easynews-password',
+        uuManifestUrl: 'https://uu.example/private/manifest.json',
+        diyUsenetEnabled: 'on',
+        nzbdavUrl: 'https://dav.example',
+        nzbdavApiKey: 'test-nzbdav-api-secret',
+        nzbdavWebdavUrl: 'https://dav.example',
+        nzbdavWebdavUsername: 'dav-user',
+        nzbdavWebdavPassword: 'test-webdav-secret',
+      }).toString(),
+    });
+    assert.strictEqual(disableLegacy.status, 302);
+    const isolated = users.findById(user.id).config;
+    assert.strictEqual(isolated.torboxEnabled, false);
+    assert.strictEqual(isolated.uuEnabled, false);
+    assert.strictEqual(isolated.easynewsEnabled, false);
+    assert.strictEqual(isolated.diyUsenetEnabled, true);
+    assert.strictEqual(isolated.torboxApiKey, 'test-torbox-key', 'disabling preserves TorBox credentials');
+    assert.strictEqual(isolated.easynewsPassword, 'test-easynews-password', 'disabling preserves Easynews credentials');
+    assert.strictEqual(isolated.uuManifestUrl, 'https://uu.example/private/manifest.json', 'disabling preserves UU configuration');
 
     const removedProbe = await fetch(base + '/account/torbox-unified-probe', {
       method: 'POST',

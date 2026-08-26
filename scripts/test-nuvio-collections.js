@@ -120,6 +120,35 @@ assert.ok(
   'default manifest keeps every catalog eligible for Nuvio Desktop Home',
 );
 
+const allLegacyPlaybackDisabled = buildManifest({
+  user: { config: {
+    torboxEnabled: false,
+    uuEnabled: false,
+    easynewsEnabled: false,
+    diyUsenetEnabled: false,
+    uuManifestUrl: 'https://uu.example/private/manifest.json',
+    easynewsUsername: 'user',
+    easynewsPassword: 'password',
+  } },
+});
+assert.ok(
+  !allLegacyPlaybackDisabled.resources.some((resource) => resource.name === 'stream'),
+  'disabled account pipelines are not advertised in the private manifest',
+);
+const diyOnlyManifest = buildManifest({
+  user: { config: {
+    torboxEnabled: false,
+    uuEnabled: false,
+    easynewsEnabled: false,
+    diyUsenetEnabled: true,
+    uuManifestUrl: 'https://uu.example/private/manifest.json',
+  } },
+});
+assert.ok(
+  diyOnlyManifest.resources.some((resource) => resource.name === 'stream'),
+  'DIY remains advertised when UU rows are disabled but UU search is configured',
+);
+
 const collectionsOnlyManifest = buildManifest({
   user: { config: { showCatalogsOnHome: false } },
 });

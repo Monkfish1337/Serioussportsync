@@ -320,6 +320,12 @@ function createApp() {
       // longer touched by the UI. The schema still includes them in users.js
       // so existing records continue deserialising cleanly.
       users.updateUserConfig(req.user.id, {
+        torboxEnabled: b.torboxEnabled === 'on'
+          || b.torboxEnabled === '1' || b.torboxEnabled === 'true',
+        uuEnabled: b.uuEnabled === 'on'
+          || b.uuEnabled === '1' || b.uuEnabled === 'true',
+        easynewsEnabled: b.easynewsEnabled === 'on'
+          || b.easynewsEnabled === '1' || b.easynewsEnabled === 'true',
         uuManifestUrl: String(b.uuManifestUrl || '').trim(),
         torboxApiKey: String(b.torboxApiKey || '').trim(),
         easynewsUsername: String(b.easynewsUsername || '').trim(),
@@ -2045,10 +2051,11 @@ function renderAccountPage(user, opts) {
     + '<form method="POST" action="/account/save">'
     +   '<section class="config-block"><div class="config-block-head">Playback services</div><div class="config-block-body">'
     +     '<div class="provider-grid">'
-    +       '<div class="wide"><p class="text-secondary small mb-2"><strong>TorBox</strong> — resolves companion results and returns playable URLs. The API key is encrypted at rest.</p>' + secretField('TorBox API key', 'torboxApiKey', cfg.torboxApiKey, 'paste your TorBox API key') + '</div>'
+    +       '<div class="wide"><label class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" name="torboxEnabled" value="on"' + (cfg.torboxEnabled !== false ? ' checked' : '') + '><span class="form-check-label"><strong>Enable TorBox pipeline</strong></span></label><p class="text-secondary small mb-2">Resolves companion results and returns playable URLs. Turning it off preserves the encrypted API key.</p>' + secretField('TorBox API key', 'torboxApiKey', cfg.torboxApiKey, 'paste your TorBox API key') + '</div>'
+    +       '<div class="wide"><label class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" name="easynewsEnabled" value="on"' + (cfg.easynewsEnabled !== false ? ' checked' : '') + '><span class="form-check-label"><strong>Enable Easynews pipeline</strong></span></label><p class="text-secondary small mb-2">Turning it off preserves both credentials.</p></div>'
     +       '<div><label class="form-label" for="en-user">Easynews username</label><input class="form-control" type="text" id="en-user" name="easynewsUsername" value="' + escapeHtml(cfg.easynewsUsername || '') + '" autocomplete="off"></div>'
     +       '<div>' + secretField('Easynews password', 'easynewsPassword', cfg.easynewsPassword, 'your Easynews password') + '</div>'
-    +       '<div class="wide"><label class="form-label" for="uu-url">Usenet Ultimate manifest URL</label><input class="form-control text-mono" type="url" id="uu-url" name="uuManifestUrl" value="' + escapeHtml(cfg.uuManifestUrl || '') + '" placeholder="https://your-uu.example/stremio/&lt;config&gt;/manifest.json"></div>'
+    +       '<div class="wide"><label class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" name="uuEnabled" value="on"' + (cfg.uuEnabled !== false ? ' checked' : '') + '><span class="form-check-label"><strong>Enable Usenet Ultimate stream rows</strong></span></label><p class="text-secondary small mb-2">When disabled, DIY NZB DAV may still use UU for text search, but UU’s own playback rows are hidden.</p><label class="form-label" for="uu-url">Usenet Ultimate manifest URL</label><input class="form-control text-mono" type="url" id="uu-url" name="uuManifestUrl" value="' + escapeHtml(cfg.uuManifestUrl || '') + '" placeholder="https://your-uu.example/stremio/&lt;config&gt;/manifest.json"></div>'
     +     '</div>'
     +   '</div></section>'
     +   '<details class="config-fold" open><summary>DIY providers</summary><div class="config-fold-body">'

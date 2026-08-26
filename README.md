@@ -199,7 +199,10 @@ See [.env.example](./.env.example) for the annotated full list.
 | <code>STREAM_PIPELINE_TIMEOUT_MS</code> | <code>8000</code> | Maximum time allowed for each playback pipeline |
 
 Users configure TorBox, Usenet Ultimate, DIY NZB DAV, Easynews, catalog ordering, and client
-exports together on the signed-in Account page. The private manifest URL grants
+exports together on the signed-in Account page. Each legacy playback pipeline has
+an independent enable switch, so it can be excluded without deleting credentials.
+Disabling UU stream rows does not disable the UU text search used by DIY NZB DAV.
+The private manifest URL grants
 use, not editing access, and can be rotated from that page. Server-wide discovery
 credentials belong in Admin or the root environment. Companion-managed sources
 belong in the companion's own settings.
