@@ -23,7 +23,9 @@ services:
     volumes:
       - serioussportsync_data:/app/data
     ports:
-      - "7000:7000"
+      # Keep direct origin access on this host. Put a reverse proxy or
+      # Cloudflare Tunnel in front instead of exposing port 7000 to the LAN.
+      - "127.0.0.1:7000:7000"
 
 volumes:
   serioussportsync_data:

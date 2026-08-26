@@ -22,7 +22,7 @@ services:
       serioussportsync-scraper:
         condition: service_healthy
     ports:
-      - "${SSS_BIND_ADDRESS:-0.0.0.0}:${SSS_HOST_PORT:-7000}:7000"
+      - "${SSS_BIND_ADDRESS:-127.0.0.1}:${SSS_HOST_PORT:-7000}:7000"
     volumes:
       - "${SSS_DATA_PATH:-/mnt/storage/stremio-stack/serioussportsync-data}:/app/data"
     networks:
@@ -50,7 +50,9 @@ services:
       HTTPS_PROXY: "${GLUETUN_HTTP_PROXY:-http://gluetun:8888}"
       NO_PROXY: "${INTERNAL_NO_PROXY:-localhost,127.0.0.1,gluetun,prowlarr,zilean,serioussportsync}"
     ports:
-      - "${SCRAPER_BIND_ADDRESS:-0.0.0.0}:${SCRAPER_HOST_PORT:-8180}:8080"
+      # The operator GUI has no login wall and can export stored source keys.
+      # Keep it host-local; SSS reaches /scrape over stremio-net.
+      - "${SCRAPER_BIND_ADDRESS:-127.0.0.1}:${SCRAPER_HOST_PORT:-8180}:8080"
     volumes:
       - "${SCRAPER_DATA_PATH:-/mnt/storage/stremio-stack/serioussportsync-scraper/data}:/app/data"
     networks:

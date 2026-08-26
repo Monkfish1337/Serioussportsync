@@ -128,6 +128,10 @@ docker compose pull
 docker compose up -d --remove-orphans
 ~~~
 
+The default Compose port is bound to <code>127.0.0.1</code>. Put Cloudflare
+Tunnel or an authenticated reverse proxy in front instead of exposing port 7000
+directly to the LAN or Internet.
+
 The named volume preserves accounts, event data, settings, custom promotions,
 and matching overrides across container replacements.
 

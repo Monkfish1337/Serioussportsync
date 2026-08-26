@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.45.7
+
+### Public distribution hardening
+
+- Changed standalone and Dockge host-port defaults to loopback-only so direct
+  SSS and unauthenticated scraper-GUI access cannot bypass the intended proxy.
+- Updated Express and its locked transitive dependencies to patched releases.
+- Added production dependency auditing and a loopback-binding assertion to CI,
+  and made the same audit gate container publication.
+
 ## 0.45.6
 
 ### One-page account configuration
