@@ -14,6 +14,7 @@ const sessions = require('./lib/sessions');
 const { proxyWebdav } = require('./lib/webdav-proxy');
 const nzbdavClient = require('./lib/sources/nzbdav');
 const nzbdavWebdav = require('./lib/sources/nzbdav-webdav');
+const usenetIndexer = require('./lib/sources/usenet-indexer');
 // 0.24.0: per-provider state modules for the admin /health page.
 const rdDenylist = require('./lib/rd-denylist');
 const tbDenylist = require('./lib/tb-denylist');
@@ -332,6 +333,14 @@ function createApp() {
         easynewsPassword: String(b.easynewsPassword || ''),
         diyUsenetEnabled: b.diyUsenetEnabled === 'on'
           || b.diyUsenetEnabled === '1' || b.diyUsenetEnabled === 'true',
+        diyNativeSearchEnabled: b.diyNativeSearchEnabled === 'on'
+          || b.diyNativeSearchEnabled === '1' || b.diyNativeSearchEnabled === 'true',
+        diyUuSearchEnabled: b.diyUuSearchEnabled === 'on'
+          || b.diyUuSearchEnabled === '1' || b.diyUuSearchEnabled === 'true',
+        diySearchKind: String(b.diySearchKind || '') === 'prowlarr' ? 'prowlarr' : 'newznab',
+        diySearchName: String(b.diySearchName || '').trim().slice(0, 80),
+        diySearchUrl: String(b.diySearchUrl || '').trim(),
+        diySearchApiKey: String(b.diySearchApiKey || ''),
         nzbdavUrl: String(b.nzbdavUrl || '').trim(),
         nzbdavApiKey: String(b.nzbdavApiKey || ''),
         nzbdavWebdavUrl: String(b.nzbdavWebdavUrl || '').trim(),
@@ -368,6 +377,26 @@ function createApp() {
       res.redirect('/account?flash=' + encodeURIComponent('NZB DAV API and WebDAV connected'));
     } catch (error) {
       res.redirect('/account?flash=' + encodeURIComponent('NZB DAV connection failed: ' + error.message));
+    }
+  });
+
+  app.post('/account/test-diy-search', requireLogin, async (req, res) => {
+    const b = req.body || {};
+    const query = String(b.diySearchTestQuery || 'UFC').trim().slice(0, 200) || 'UFC';
+    try {
+      const result = await usenetIndexer.search([query], {
+        enabled: true,
+        kind: String(b.diySearchKind || '') === 'prowlarr' ? 'prowlarr' : 'newznab',
+        name: String(b.diySearchName || '').trim(),
+        url: String(b.diySearchUrl || '').trim(),
+        apiKey: String(b.diySearchApiKey || ''),
+      });
+      if (!result.ok) throw new Error(result.error || 'search failed');
+      res.redirect('/account?flash=' + encodeURIComponent(
+        'Native Usenet search connected: ' + result.results.length + ' result(s) for "' + query + '"'));
+    } catch (error) {
+      res.redirect('/account?flash=' + encodeURIComponent(
+        'Native Usenet search failed: ' + error.message));
     }
   });
 
@@ -2059,8 +2088,18 @@ function renderAccountPage(user, opts) {
     +     '</div>'
     +   '</div></section>'
     +   '<details class="config-fold" open><summary>DIY providers</summary><div class="config-fold-body">'
-    +     '<div class="alert alert-info"><strong>Additive pipeline:</strong> NZB DAV runs alongside TorBox, Easynews, and Usenet Ultimate. In this first P0 release, UU supplies the title-search candidates while SSS performs NZB DAV playback directly.</div>'
+    +     '<div class="alert alert-info"><strong>Additive pipeline:</strong> NZB DAV runs alongside TorBox, Easynews, and Usenet Ultimate. SSS can now search a Newznab/NZBHydra endpoint or Prowlarr directly; UU remains an optional parallel search source.</div>'
     +     '<label class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" name="diyUsenetEnabled" value="on"' + (cfg.diyUsenetEnabled === true ? ' checked' : '') + '><span class="form-check-label">Enable SSS + NZB DAV</span></label>'
+    +     '<div class="provider-grid mb-3">'
+    +       '<div class="wide"><label class="form-check form-switch"><input class="form-check-input" type="checkbox" name="diyNativeSearchEnabled" value="on"' + (cfg.diyNativeSearchEnabled === true ? ' checked' : '') + '><span class="form-check-label"><strong>Enable native Usenet text search</strong></span></label></div>'
+    +       '<div><label class="form-label" for="diy-search-kind">Search service</label><select class="form-select" id="diy-search-kind" name="diySearchKind"><option value="newznab"' + (cfg.diySearchKind !== 'prowlarr' ? ' selected' : '') + '>Newznab / NZBHydra</option><option value="prowlarr"' + (cfg.diySearchKind === 'prowlarr' ? ' selected' : '') + '>Prowlarr</option></select></div>'
+    +       '<div><label class="form-label" for="diy-search-name">Display name</label><input class="form-control" type="text" id="diy-search-name" name="diySearchName" value="' + escapeHtml(cfg.diySearchName || '') + '" placeholder="NZBHydra or NZBGeek"></div>'
+    +       '<div><label class="form-label" for="diy-search-url">Search URL</label><input class="form-control text-mono" type="url" id="diy-search-url" name="diySearchUrl" value="' + escapeHtml(cfg.diySearchUrl || '') + '" placeholder="http://nzbhydra2:5076 or http://prowlarr:9696"></div>'
+    +       '<div>' + secretField('Search API key', 'diySearchApiKey', cfg.diySearchApiKey, 'paste the indexer or manager API key') + '</div>'
+    +       '<div><label class="form-label" for="diy-search-test-query">Test query</label><input class="form-control" type="text" id="diy-search-test-query" name="diySearchTestQuery" value="UFC" maxlength="200"></div>'
+    +       '<div class="d-flex align-items-end"><button class="btn btn-outline-primary w-100" type="submit" formaction="/account/test-diy-search" formnovalidate>Test native search</button></div>'
+    +       '<div class="wide"><label class="form-check form-switch"><input class="form-check-input" type="checkbox" name="diyUuSearchEnabled" value="on"' + (cfg.diyUuSearchEnabled !== false ? ' checked' : '') + '><span class="form-check-label">Also use UU text search for DIY results</span></label><div class="form-hint">Turn this off to validate SSS native search without UU. This does not control UU’s own stream rows.</div></div>'
+    +     '</div>'
     +     '<div class="provider-grid">'
     +       '<div><label class="form-label" for="nzbdav-url">NZB DAV API URL</label><input class="form-control text-mono" type="url" id="nzbdav-url" name="nzbdavUrl" value="' + escapeHtml(cfg.nzbdavUrl || '') + '" placeholder="http://nzbdav:3000"></div>'
     +       '<div>' + secretField('NZB DAV API key', 'nzbdavApiKey', cfg.nzbdavApiKey, 'paste the NZB DAV API key') + '</div>'

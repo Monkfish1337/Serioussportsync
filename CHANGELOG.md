@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.47.0
+
+- Added native event-title Usenet discovery for direct Newznab/NZBHydra
+  endpoints and Prowlarr's aggregate API.
+- Added encrypted per-account native-search configuration, a live test-query
+  action, and independent native/UU DIY discovery switches.
+- Removed UU as a mandatory dependency for DIY NZB DAV playback while keeping
+  UU search available as an optional parallel source and UU playback unchanged.
+- Bounded native-search response sizes, request duration, query count, and
+  returned results before storing candidates in the encrypted candidate store.
+
 ## 0.46.4
 
 - Fixed DIY NZB DAV playback when PROPFIND responses advertise an internal or

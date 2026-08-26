@@ -148,6 +148,22 @@ assert.ok(
   diyOnlyManifest.resources.some((resource) => resource.name === 'stream'),
   'DIY remains advertised when UU rows are disabled but UU search is configured',
 );
+const nativeDiyOnlyManifest = buildManifest({
+  user: { config: {
+    torboxEnabled: false,
+    uuEnabled: false,
+    easynewsEnabled: false,
+    diyUsenetEnabled: true,
+    diyNativeSearchEnabled: true,
+    diyUuSearchEnabled: false,
+    diySearchUrl: 'https://indexer.example/api',
+    diySearchApiKey: 'key',
+  } },
+});
+assert.ok(
+  nativeDiyOnlyManifest.resources.some((resource) => resource.name === 'stream'),
+  'native DIY search advertises streams without a UU manifest',
+);
 
 const collectionsOnlyManifest = buildManifest({
   user: { config: { showCatalogsOnHome: false } },

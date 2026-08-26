@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.45.5-blue.svg" alt="Version 0.45.5"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.47.0-blue.svg" alt="Version 0.47.0"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -57,6 +57,7 @@ returns only the rows that finish within the configured request budget.
 | Companion scraper | TorBox | Combines Prowlarr, Zilean, Torznab, and other configured companion sources |
 | Usenet Ultimate | Usenet Ultimate / NzbDAV | Sends event title variants to the user's UU instance; UU searches its configured indexers and handles playback |
 | Usenet Ultimate search | DIY NZB DAV | Optional additive path: SSS keeps candidates opaque, submits on Play, and range-proxies authenticated WebDAV |
+| Native Newznab, NZBHydra, or Prowlarr search | DIY NZB DAV | SSS searches the configured endpoint directly and uses the same verified deferred playback path without requiring UU |
 | Easynews | Easynews | Searches and plays with credentials stored on the user's account |
 
 > **Usenet Ultimate compatibility:** direct sports-title search requires the
@@ -65,6 +66,8 @@ returns only the rows that finish within the configured request budget.
 > `ghcr.io/monkfish1337/usenet-ultimate:sss-direct` for the UU service. The
 > normal UU configuration, manifest URL, indexers, and NzbDAV setup are unchanged.
 
+Native DIY search and UU search can be enabled independently or merged. UU is
+no longer required for DIY playback when native search is configured.
 Credentials are encrypted at rest where applicable and are never included in
 the stream list returned to the client. TorBox, Easynews, and DIY NZB DAV use
 signed, short-lived resolve URLs. Configure the experimental DIY path in the

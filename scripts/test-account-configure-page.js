@@ -63,6 +63,12 @@ function listen(app) {
       'name="uuEnabled"',
       'DIY providers',
       'name="diyUsenetEnabled"',
+      'name="diyNativeSearchEnabled"',
+      'name="diyUuSearchEnabled"',
+      'name="diySearchKind"',
+      'name="diySearchUrl"',
+      'name="diySearchApiKey"',
+      'Test native search',
       'name="nzbdavUrl"',
       'name="nzbdavApiKey"',
       'name="nzbdavWebdavUrl"',
@@ -95,6 +101,12 @@ function listen(app) {
         uuEnabled: 'on',
         uuManifestUrl: 'https://uu.example/private/manifest.json',
         diyUsenetEnabled: 'on',
+        diyNativeSearchEnabled: 'on',
+        diyUuSearchEnabled: 'on',
+        diySearchKind: 'newznab',
+        diySearchName: 'Test Hydra',
+        diySearchUrl: 'https://hydra.example',
+        diySearchApiKey: 'test-search-api-secret',
         nzbdavUrl: 'https://dav.example',
         nzbdavApiKey: 'test-nzbdav-api-secret',
         nzbdavWebdavUrl: 'https://dav.example',
@@ -119,6 +131,11 @@ function listen(app) {
     assert.strictEqual(saved.uuManifestUrl, 'https://uu.example/private/manifest.json');
     assert.strictEqual(saved.uuEnabled, true);
     assert.strictEqual(saved.diyUsenetEnabled, true);
+    assert.strictEqual(saved.diyNativeSearchEnabled, true);
+    assert.strictEqual(saved.diyUuSearchEnabled, true);
+    assert.strictEqual(saved.diySearchKind, 'newznab');
+    assert.strictEqual(saved.diySearchUrl, 'https://hydra.example');
+    assert.strictEqual(saved.diySearchApiKey, 'test-search-api-secret');
     assert.strictEqual(saved.nzbdavUrl, 'https://dav.example');
     assert.strictEqual(saved.nzbdavApiKey, 'test-nzbdav-api-secret');
     assert.strictEqual(saved.nzbdavWebdavUsername, 'dav-user');
@@ -126,6 +143,7 @@ function listen(app) {
     const usersOnDisk = fs.readFileSync(process.env.USERS_FILE, 'utf8');
     assert.ok(!usersOnDisk.includes('test-nzbdav-api-secret'));
     assert.ok(!usersOnDisk.includes('test-webdav-secret'));
+    assert.ok(!usersOnDisk.includes('test-search-api-secret'));
     assert.deepStrictEqual(saved.catalogs, [firstCatalog]);
     assert.strictEqual(saved.maxStreams, 7);
     assert.strictEqual(saved.showWarmRows, true);
