@@ -15,6 +15,7 @@ const { proxyWebdav } = require('./lib/webdav-proxy');
 const nzbdavClient = require('./lib/sources/nzbdav');
 const nzbdavWebdav = require('./lib/sources/nzbdav-webdav');
 const usenetIndexer = require('./lib/sources/usenet-indexer');
+const nntpClient = require('./lib/sources/nntp-client');
 // 0.24.0: per-provider state modules for the admin /health page.
 const rdDenylist = require('./lib/rd-denylist');
 const tbDenylist = require('./lib/tb-denylist');
@@ -346,6 +347,15 @@ function createApp() {
         nzbdavWebdavUrl: String(b.nzbdavWebdavUrl || '').trim(),
         nzbdavWebdavUsername: String(b.nzbdavWebdavUsername || '').trim(),
         nzbdavWebdavPassword: String(b.nzbdavWebdavPassword || ''),
+        nativeNntpEnabled: b.nativeNntpEnabled === 'on'
+          || b.nativeNntpEnabled === '1' || b.nativeNntpEnabled === 'true',
+        nntpHost: String(b.nntpHost || '').trim(),
+        nntpPort: Math.min(65535, Math.max(1, parseInt(String(b.nntpPort || '563'), 10) || 563)),
+        nntpTls: b.nntpTls === 'on' || b.nntpTls === '1' || b.nntpTls === 'true',
+        nntpUsername: String(b.nntpUsername || '').trim(),
+        nntpPassword: String(b.nntpPassword || ''),
+        nntpConnections: Math.min(50, Math.max(1,
+          parseInt(String(b.nntpConnections || '8'), 10) || 8)),
         catalogs: finalCats,
         catalogDefaultsVersion: CURRENT_DEFAULTS_VERSION,
         showCatalogsOnHome: b.showCatalogsOnHome === 'on' || b.showCatalogsOnHome === '1' || b.showCatalogsOnHome === 'true',
@@ -397,6 +407,24 @@ function createApp() {
     } catch (error) {
       res.redirect('/account?flash=' + encodeURIComponent(
         'Native Usenet search failed: ' + error.message));
+    }
+  });
+
+  app.post('/account/test-nntp', requireLogin, async (req, res) => {
+    const b = req.body || {};
+    try {
+      const result = await nntpClient.testConnection({
+        host: String(b.nntpHost || '').trim(),
+        port: parseInt(String(b.nntpPort || '563'), 10),
+        tls: b.nntpTls === 'on' || b.nntpTls === '1' || b.nntpTls === 'true',
+        username: String(b.nntpUsername || '').trim(),
+        password: String(b.nntpPassword || ''),
+      });
+      res.redirect('/account?flash=' + encodeURIComponent(
+        'Native NNTP connected and authenticated' + (result.proxied ? ' through the outbound proxy' : '')));
+    } catch (error) {
+      res.redirect('/account?flash=' + encodeURIComponent(
+        'Native NNTP connection failed: ' + error.message));
     }
   });
 
@@ -2093,7 +2121,7 @@ function renderAccountPage(user, opts) {
     +     '</div>'
     +   '</div></section>'
     +   '<details class="config-fold" open><summary>DIY providers</summary><div class="config-fold-body">'
-    +     '<div class="alert alert-info"><strong>Additive pipeline:</strong> NZB DAV runs alongside TorBox, Easynews, and Usenet Ultimate. SSS can now search a Newznab/NZBHydra endpoint or Prowlarr directly; UU remains an optional parallel search source.</div>'
+    +     '<div class="alert alert-info"><strong>Additive pipeline:</strong> NZB DAV runs alongside TorBox, Easynews, and Usenet Ultimate. Native NNTP is being added as a second DIY playback backend; existing pipelines and defaults remain unchanged.</div>'
     +     '<label class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" name="diyUsenetEnabled" value="on"' + (cfg.diyUsenetEnabled === true ? ' checked' : '') + '><span class="form-check-label">Enable SSS + NZB DAV</span></label>'
     +     '<div class="provider-grid mb-3">'
     +       '<div class="wide"><label class="form-check form-switch"><input class="form-check-input" type="checkbox" name="diyNativeSearchEnabled" value="on"' + (cfg.diyNativeSearchEnabled === true ? ' checked' : '') + '><span class="form-check-label"><strong>Enable native Usenet text search</strong></span></label></div>'
@@ -2113,6 +2141,17 @@ function renderAccountPage(user, opts) {
     +       '<div>' + secretField('WebDAV password', 'nzbdavWebdavPassword', cfg.nzbdavWebdavPassword, 'your WebDAV password') + '</div>'
     +     '</div>'
     +     '<button class="btn btn-outline-primary mt-2" type="submit" formaction="/account/test-nzbdav" formnovalidate>Test API + WebDAV</button>'
+    +     '<hr class="my-4"><h3 class="h4 mb-2">Native NNTP <span class="badge bg-azure-lt">Preview</span></h3><p class="text-secondary small">Provider configuration and authenticated connectivity are available now. Enabling this preserves NZB DAV and prepares the account for the native range-streaming engine.</p>'
+    +     '<label class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" name="nativeNntpEnabled" value="on"' + (cfg.nativeNntpEnabled === true ? ' checked' : '') + '><span class="form-check-label">Enable native NNTP backend when streaming support is available</span></label>'
+    +     '<div class="provider-grid">'
+    +       '<div><label class="form-label" for="nntp-host">NNTP host</label><input class="form-control text-mono" id="nntp-host" name="nntpHost" value="' + escapeHtml(cfg.nntpHost || '') + '" placeholder="news.provider.example"></div>'
+    +       '<div><label class="form-label" for="nntp-port">Port</label><input class="form-control" type="number" min="1" max="65535" id="nntp-port" name="nntpPort" value="' + escapeHtml(String(cfg.nntpPort || 563)) + '"></div>'
+    +       '<div><label class="form-label" for="nntp-user">Username</label><input class="form-control" id="nntp-user" name="nntpUsername" value="' + escapeHtml(cfg.nntpUsername || '') + '" autocomplete="off"></div>'
+    +       '<div>' + secretField('NNTP password', 'nntpPassword', cfg.nntpPassword, 'your NNTP password') + '</div>'
+    +       '<div><label class="form-label" for="nntp-connections">Maximum connections</label><input class="form-control" type="number" min="1" max="50" id="nntp-connections" name="nntpConnections" value="' + escapeHtml(String(cfg.nntpConnections || 8)) + '"></div>'
+    +       '<div class="d-flex align-items-center"><label class="form-check form-switch mt-4"><input class="form-check-input" type="checkbox" name="nntpTls" value="on"' + (cfg.nntpTls !== false ? ' checked' : '') + '><span class="form-check-label">Use TLS (recommended)</span></label></div>'
+    +     '</div>'
+    +     '<button class="btn btn-outline-primary mt-2" type="submit" formaction="/account/test-nntp" formnovalidate>Test NNTP authentication</button>'
     +   '</div></details>'
     +   '<details class="config-fold"><summary>Catalogs and display order</summary>' + catalogsPanel + '</details>'
     +   '<details class="config-fold"><summary>Advanced playback settings</summary><div class="config-fold-body">'

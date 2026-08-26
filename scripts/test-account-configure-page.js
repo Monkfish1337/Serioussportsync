@@ -73,6 +73,10 @@ function listen(app) {
       'name="nzbdavApiKey"',
       'name="nzbdavWebdavUrl"',
       'Test API + WebDAV',
+      'name="nativeNntpEnabled"',
+      'name="nntpHost"',
+      'name="nntpPassword"',
+      'Test NNTP authentication',
       'Catalogs and display order',
       'Save configuration',
       'Install Stremio',
@@ -112,6 +116,13 @@ function listen(app) {
         nzbdavWebdavUrl: 'https://dav.example',
         nzbdavWebdavUsername: 'dav-user',
         nzbdavWebdavPassword: 'test-webdav-secret',
+        nativeNntpEnabled: 'on',
+        nntpHost: 'news.example',
+        nntpPort: '563',
+        nntpTls: 'on',
+        nntpUsername: 'nntp-user',
+        nntpPassword: 'test-nntp-secret',
+        nntpConnections: '12',
         catalogs: firstCatalog,
         catalogOrder: firstCatalog,
         promotionOrder: promotions.enabled[0].id,
@@ -140,10 +151,17 @@ function listen(app) {
     assert.strictEqual(saved.nzbdavApiKey, 'test-nzbdav-api-secret');
     assert.strictEqual(saved.nzbdavWebdavUsername, 'dav-user');
     assert.strictEqual(saved.nzbdavWebdavPassword, 'test-webdav-secret');
+    assert.strictEqual(saved.nativeNntpEnabled, true);
+    assert.strictEqual(saved.nntpHost, 'news.example');
+    assert.strictEqual(saved.nntpTls, true);
+    assert.strictEqual(saved.nntpUsername, 'nntp-user');
+    assert.strictEqual(saved.nntpPassword, 'test-nntp-secret');
+    assert.strictEqual(saved.nntpConnections, 12);
     const usersOnDisk = fs.readFileSync(process.env.USERS_FILE, 'utf8');
     assert.ok(!usersOnDisk.includes('test-nzbdav-api-secret'));
     assert.ok(!usersOnDisk.includes('test-webdav-secret'));
     assert.ok(!usersOnDisk.includes('test-search-api-secret'));
+    assert.ok(!usersOnDisk.includes('test-nntp-secret'));
     assert.deepStrictEqual(saved.catalogs, [firstCatalog]);
     assert.strictEqual(saved.maxStreams, 7);
     assert.strictEqual(saved.showWarmRows, true);
@@ -167,6 +185,12 @@ function listen(app) {
         nzbdavWebdavUrl: 'https://dav.example',
         nzbdavWebdavUsername: 'dav-user',
         nzbdavWebdavPassword: 'test-webdav-secret',
+        nntpHost: 'news.example',
+        nntpPort: '563',
+        nntpTls: 'on',
+        nntpUsername: 'nntp-user',
+        nntpPassword: 'test-nntp-secret',
+        nntpConnections: '12',
       }).toString(),
     });
     assert.strictEqual(disableLegacy.status, 302);
@@ -175,9 +199,11 @@ function listen(app) {
     assert.strictEqual(isolated.uuEnabled, false);
     assert.strictEqual(isolated.easynewsEnabled, false);
     assert.strictEqual(isolated.diyUsenetEnabled, true);
+    assert.strictEqual(isolated.nativeNntpEnabled, false);
     assert.strictEqual(isolated.torboxApiKey, 'test-torbox-key', 'disabling preserves TorBox credentials');
     assert.strictEqual(isolated.easynewsPassword, 'test-easynews-password', 'disabling preserves Easynews credentials');
     assert.strictEqual(isolated.uuManifestUrl, 'https://uu.example/private/manifest.json', 'disabling preserves UU configuration');
+    assert.strictEqual(isolated.nntpPassword, 'test-nntp-secret', 'disabling preserves NNTP credentials');
 
     const removedProbe = await fetch(base + '/account/torbox-unified-probe', {
       method: 'POST',

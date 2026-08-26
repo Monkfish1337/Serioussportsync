@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.48.0
+
+- Added the first SSS-native NNTP foundation: encrypted per-account host,
+  port, TLS, username, password, and connection-limit settings in DIY providers.
+- Added a live NNTP test that verifies greeting, authentication, and the DATE
+  command without exposing credentials in errors.
+- Routed NNTP connections through the configured HTTP/HTTPS outbound proxy via
+  CONNECT, while retaining `NO_PROXY` handling for explicitly bypassed hosts.
+- Kept native NNTP playback rows disabled until NZB parsing and range assembly
+  are complete; existing NZB DAV and other pipelines remain unchanged.
+
 ## 0.47.1
 
 - Fixed DIY NZB DAV playback probes by ending HEAD requests without attempting

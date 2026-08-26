@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.47.1-blue.svg" alt="Version 0.47.1"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.48.0-blue.svg" alt="Version 0.48.0"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -68,6 +68,10 @@ returns only the rows that finish within the configured request budget.
 
 Native DIY search and UU search can be enabled independently or merged. UU is
 no longer required for DIY playback when native search is configured.
+The DIY panel also contains the preview foundation for SSS-native NNTP:
+encrypted per-account provider settings and an authenticated connection test.
+It does not emit native NNTP playback rows yet, so enabling it cannot disturb
+the working NZB DAV pipeline while range streaming is completed.
 Credentials are encrypted at rest where applicable and are never included in
 the stream list returned to the client. TorBox, Easynews, and DIY NZB DAV use
 signed, short-lived resolve URLs. Configure the experimental DIY path in the
