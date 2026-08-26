@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.46.2
+
+- Kept active NZB DAV request deadlines referenced so stalled requests reliably
+  abort under Node.js 20 and Linux CI.
+
 ## 0.46.1
 
 - Fixed the Linux CI unit-test command so the shell expands the scoped test
