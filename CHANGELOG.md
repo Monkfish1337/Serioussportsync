@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.47.1
+
+- Fixed DIY NZB DAV playback probes by ending HEAD requests without attempting
+  to pipe a nonexistent response body.
+- Preserved byte-range streaming while treating player-cancelled speculative
+  requests as normal cancellation instead of proxy failures.
+- Added safe media MIME and filename fallbacks for WebDAV servers that expose
+  video files as generic binary downloads.
+
 ## 0.47.0
 
 - Added native event-title Usenet discovery for direct Newznab/NZBHydra

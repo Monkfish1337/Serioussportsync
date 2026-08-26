@@ -497,7 +497,12 @@ function createApp() {
           username: req.userAccount.username,
           userId: req.params.userId,
         });
-        if (out && out.upstream) return await proxyWebdav(req, res, out.upstream);
+        if (out && out.upstream) {
+          const range = req.headers.range ? ' ' + String(req.headers.range) : '';
+          console.log('[resolve ' + req.userAccount.username + '] webdav proxy '
+            + req.method + range);
+          return await proxyWebdav(req, res, out.upstream);
+        }
         if (out && out.url) {
           res.setHeader('Cache-Control', 'no-store');
           return res.redirect(302, out.url);

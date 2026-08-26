@@ -52,3 +52,38 @@ test('proxies WebDAV authentication and byte ranges without credential redirects
     await close(upstream);
   }
 });
+
+test('answers HEAD probes without trying to pipe a missing body', async () => {
+  let upstreamMethod;
+  const upstream = http.createServer((req, res) => {
+    upstreamMethod = req.method;
+    res.writeHead(200, {
+      'Content-Type': 'application/octet-stream',
+      'Content-Length': '12345',
+    });
+    res.end();
+  });
+  const upstreamPort = await listen(upstream);
+  const proxy = http.createServer((req, res) => {
+    proxyWebdav(req, res, {
+      url: 'http://127.0.0.1:' + upstreamPort + '/Fight%20Night.mkv',
+      headers: {},
+    }).catch((error) => {
+      if (!res.headersSent) res.writeHead(502);
+      res.end(error.message);
+    });
+  });
+  const proxyPort = await listen(proxy);
+  try {
+    const response = await fetch('http://127.0.0.1:' + proxyPort + '/play', { method: 'HEAD' });
+    assert.equal(response.status, 200);
+    assert.equal(upstreamMethod, 'HEAD');
+    assert.equal(response.headers.get('content-length'), '12345');
+    assert.equal(response.headers.get('content-type'), 'video/x-matroska');
+    assert.match(response.headers.get('content-disposition'), /Fight%20Night\.mkv/);
+    assert.equal(await response.text(), '');
+  } finally {
+    await close(proxy);
+    await close(upstream);
+  }
+});
