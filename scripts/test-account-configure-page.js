@@ -58,6 +58,12 @@ function listen(app) {
       'name="easynewsUsername"',
       'name="easynewsPassword"',
       'name="uuManifestUrl"',
+      'DIY providers',
+      'name="diyUsenetEnabled"',
+      'name="nzbdavUrl"',
+      'name="nzbdavApiKey"',
+      'name="nzbdavWebdavUrl"',
+      'Test API + WebDAV',
       'Catalogs and display order',
       'Save configuration',
       'Install Stremio',
@@ -82,6 +88,12 @@ function listen(app) {
         easynewsUsername: 'test-easynews-user',
         easynewsPassword: 'test-easynews-password',
         uuManifestUrl: 'https://uu.example/private/manifest.json',
+        diyUsenetEnabled: 'on',
+        nzbdavUrl: 'https://dav.example',
+        nzbdavApiKey: 'test-nzbdav-api-secret',
+        nzbdavWebdavUrl: 'https://dav.example',
+        nzbdavWebdavUsername: 'dav-user',
+        nzbdavWebdavPassword: 'test-webdav-secret',
         catalogs: firstCatalog,
         catalogOrder: firstCatalog,
         promotionOrder: promotions.enabled[0].id,
@@ -97,6 +109,14 @@ function listen(app) {
     assert.strictEqual(saved.easynewsUsername, 'test-easynews-user');
     assert.strictEqual(saved.easynewsPassword, 'test-easynews-password');
     assert.strictEqual(saved.uuManifestUrl, 'https://uu.example/private/manifest.json');
+    assert.strictEqual(saved.diyUsenetEnabled, true);
+    assert.strictEqual(saved.nzbdavUrl, 'https://dav.example');
+    assert.strictEqual(saved.nzbdavApiKey, 'test-nzbdav-api-secret');
+    assert.strictEqual(saved.nzbdavWebdavUsername, 'dav-user');
+    assert.strictEqual(saved.nzbdavWebdavPassword, 'test-webdav-secret');
+    const usersOnDisk = fs.readFileSync(process.env.USERS_FILE, 'utf8');
+    assert.ok(!usersOnDisk.includes('test-nzbdav-api-secret'));
+    assert.ok(!usersOnDisk.includes('test-webdav-secret'));
     assert.deepStrictEqual(saved.catalogs, [firstCatalog]);
     assert.strictEqual(saved.maxStreams, 7);
     assert.strictEqual(saved.showWarmRows, true);

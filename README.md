@@ -56,6 +56,7 @@ returns only the rows that finish within the configured request budget.
 | Direct Prowlarr | TorBox | Searches when an event is opened, checks the user's cache, and resolves on play |
 | Companion scraper | TorBox | Combines Prowlarr, Zilean, Torznab, and other configured companion sources |
 | Usenet Ultimate | Usenet Ultimate / NzbDAV | Sends event title variants to the user's UU instance; UU searches its configured indexers and handles playback |
+| Usenet Ultimate search | DIY NZB DAV | Optional additive path: SSS keeps candidates opaque, submits on Play, and range-proxies authenticated WebDAV |
 | Easynews | Easynews | Searches and plays with credentials stored on the user's account |
 
 > **Usenet Ultimate compatibility:** direct sports-title search requires the
@@ -65,8 +66,10 @@ returns only the rows that finish within the configured request budget.
 > normal UU configuration, manifest URL, indexers, and NzbDAV setup are unchanged.
 
 Credentials are encrypted at rest where applicable and are never included in
-the stream list returned to the client. TorBox and Easynews playback use signed,
-short-lived resolve URLs.
+the stream list returned to the client. TorBox, Easynews, and DIY NZB DAV use
+signed, short-lived resolve URLs. Configure the experimental DIY path in the
+open **DIY providers** section on the Account page; it does not disable or
+replace any existing service.
 
 ## Quick start with Docker Compose
 
@@ -195,7 +198,7 @@ See [.env.example](./.env.example) for the annotated full list.
 | <code>STREAM_MAX_ROWS</code> | <code>20</code> | Maximum stream rows returned per request |
 | <code>STREAM_PIPELINE_TIMEOUT_MS</code> | <code>8000</code> | Maximum time allowed for each playback pipeline |
 
-Users configure TorBox, Usenet Ultimate, Easynews, catalog ordering, and client
+Users configure TorBox, Usenet Ultimate, DIY NZB DAV, Easynews, catalog ordering, and client
 exports together on the signed-in Account page. The private manifest URL grants
 use, not editing access, and can be rotated from that page. Server-wide discovery
 credentials belong in Admin or the root environment. Companion-managed sources

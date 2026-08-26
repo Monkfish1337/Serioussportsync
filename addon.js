@@ -11,6 +11,9 @@ const { runRefresh: runEventsRefresh } = require('./scripts/refresh');
 const promotions = require('./lib/promotions');
 const users = require('./lib/users');
 const sessions = require('./lib/sessions');
+const { proxyWebdav } = require('./lib/webdav-proxy');
+const nzbdavClient = require('./lib/sources/nzbdav');
+const nzbdavWebdav = require('./lib/sources/nzbdav-webdav');
 // 0.24.0: per-provider state modules for the admin /health page.
 const rdDenylist = require('./lib/rd-denylist');
 const tbDenylist = require('./lib/tb-denylist');
@@ -321,6 +324,13 @@ function createApp() {
         torboxApiKey: String(b.torboxApiKey || '').trim(),
         easynewsUsername: String(b.easynewsUsername || '').trim(),
         easynewsPassword: String(b.easynewsPassword || ''),
+        diyUsenetEnabled: b.diyUsenetEnabled === 'on'
+          || b.diyUsenetEnabled === '1' || b.diyUsenetEnabled === 'true',
+        nzbdavUrl: String(b.nzbdavUrl || '').trim(),
+        nzbdavApiKey: String(b.nzbdavApiKey || ''),
+        nzbdavWebdavUrl: String(b.nzbdavWebdavUrl || '').trim(),
+        nzbdavWebdavUsername: String(b.nzbdavWebdavUsername || '').trim(),
+        nzbdavWebdavPassword: String(b.nzbdavWebdavPassword || ''),
         catalogs: finalCats,
         catalogDefaultsVersion: CURRENT_DEFAULTS_VERSION,
         showCatalogsOnHome: b.showCatalogsOnHome === 'on' || b.showCatalogsOnHome === '1' || b.showCatalogsOnHome === 'true',
@@ -333,6 +343,25 @@ function createApp() {
       res.redirect('/account?flash=saved');
     } catch (err) {
       res.redirect('/account?flash=' + encodeURIComponent('Save failed: ' + err.message));
+    }
+  });
+
+  app.post('/account/test-nzbdav', requireLogin, async (req, res) => {
+    const b = req.body || {};
+    try {
+      const api = await nzbdavClient.testConnection({
+        url: String(b.nzbdavUrl || '').trim(),
+        apiKey: String(b.nzbdavApiKey || ''),
+      });
+      if (!api.ok) throw new Error('API check failed: ' + api.error);
+      await nzbdavWebdav.list({
+        url: String(b.nzbdavWebdavUrl || b.nzbdavUrl || '').trim(),
+        username: String(b.nzbdavWebdavUsername || ''),
+        password: String(b.nzbdavWebdavPassword || ''),
+      }, '/');
+      res.redirect('/account?flash=' + encodeURIComponent('NZB DAV API and WebDAV connected'));
+    } catch (error) {
+      res.redirect('/account?flash=' + encodeURIComponent('NZB DAV connection failed: ' + error.message));
     }
   });
 
@@ -431,7 +460,9 @@ function createApp() {
           infoHash,
           creds: req.userAccount.config || null,
           username: req.userAccount.username,
+          userId: req.params.userId,
         });
+        if (out && out.upstream) return await proxyWebdav(req, res, out.upstream);
         if (out && out.url) {
           res.setHeader('Cache-Control', 'no-store');
           return res.redirect(302, out.url);
@@ -440,7 +471,8 @@ function createApp() {
         res.status(404).send('Not cached on ' + provider + ' (or no longer available).');
       } catch (err) {
         console.error('[resolve] handler error:', err);
-        res.status(502).send('Resolve failed.');
+        if (!res.headersSent) res.status(502).send('Resolve failed.');
+        else res.destroy(err);
       }
     });
 
@@ -2019,6 +2051,18 @@ function renderAccountPage(user, opts) {
     +       '<div class="wide"><label class="form-label" for="uu-url">Usenet Ultimate manifest URL</label><input class="form-control text-mono" type="url" id="uu-url" name="uuManifestUrl" value="' + escapeHtml(cfg.uuManifestUrl || '') + '" placeholder="https://your-uu.example/stremio/&lt;config&gt;/manifest.json"></div>'
     +     '</div>'
     +   '</div></section>'
+    +   '<details class="config-fold" open><summary>DIY providers</summary><div class="config-fold-body">'
+    +     '<div class="alert alert-info"><strong>Additive pipeline:</strong> NZB DAV runs alongside TorBox, Easynews, and Usenet Ultimate. In this first P0 release, UU supplies the title-search candidates while SSS performs NZB DAV playback directly.</div>'
+    +     '<label class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" name="diyUsenetEnabled" value="on"' + (cfg.diyUsenetEnabled === true ? ' checked' : '') + '><span class="form-check-label">Enable SSS + NZB DAV</span></label>'
+    +     '<div class="provider-grid">'
+    +       '<div><label class="form-label" for="nzbdav-url">NZB DAV API URL</label><input class="form-control text-mono" type="url" id="nzbdav-url" name="nzbdavUrl" value="' + escapeHtml(cfg.nzbdavUrl || '') + '" placeholder="http://nzbdav:3000"></div>'
+    +       '<div>' + secretField('NZB DAV API key', 'nzbdavApiKey', cfg.nzbdavApiKey, 'paste the NZB DAV API key') + '</div>'
+    +       '<div><label class="form-label" for="nzbdav-webdav-url">WebDAV URL</label><input class="form-control text-mono" type="url" id="nzbdav-webdav-url" name="nzbdavWebdavUrl" value="' + escapeHtml(cfg.nzbdavWebdavUrl || '') + '" placeholder="http://nzbdav:3000"></div>'
+    +       '<div><label class="form-label" for="nzbdav-webdav-user">WebDAV username</label><input class="form-control" type="text" id="nzbdav-webdav-user" name="nzbdavWebdavUsername" value="' + escapeHtml(cfg.nzbdavWebdavUsername || '') + '" autocomplete="off"></div>'
+    +       '<div>' + secretField('WebDAV password', 'nzbdavWebdavPassword', cfg.nzbdavWebdavPassword, 'your WebDAV password') + '</div>'
+    +     '</div>'
+    +     '<button class="btn btn-outline-primary mt-2" type="submit" formaction="/account/test-nzbdav" formnovalidate>Test API + WebDAV</button>'
+    +   '</div></details>'
     +   '<details class="config-fold"><summary>Catalogs and display order</summary>' + catalogsPanel + '</details>'
     +   '<details class="config-fold"><summary>Advanced playback settings</summary><div class="config-fold-body">'
     +     '<div class="provider-grid">'

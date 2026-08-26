@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.46.0
+
+### Additive DIY NZB DAV playback
+
+- Added an opt-in DIY provider section to the signed-in account page without
+  changing TorBox, Easynews, or legacy Usenet Ultimate configuration.
+- Reused UU title-search candidates while resolving selected NZBs directly in
+  SSS through NZB DAV only after Play is clicked.
+- Added encrypted, expiring, user/event-bound candidate references so indexer
+  URLs and NZB DAV credentials never enter stream rows.
+- Added bounded SAB-compatible submission and polling, deterministic WebDAV
+  media discovery, authenticated HTTP range proxying, and connection testing.
+- Added provider regression tests for authentication, timeouts, failed jobs,
+  WebDAV traversal, encrypted candidates, and byte ranges.
+
 ## 0.45.7
 
 ### Public distribution hardening
