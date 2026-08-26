@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.46.1
+
+- Fixed the Linux CI unit-test command so the shell expands the scoped test
+  files correctly during container publication checks.
+
 ## 0.46.0
 
 ### Additive DIY NZB DAV playback
