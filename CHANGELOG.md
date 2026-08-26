@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.46.4
+
+- Fixed DIY NZB DAV playback when PROPFIND responses advertise an internal or
+  reverse-proxy hostname by safely rebasing resource paths onto the configured
+  WebDAV origin.
+- Derived the mounted WebDAV folder from the completed job's authoritative
+  `storage` and `category` fields.
+- Added stage-specific NZB DAV resolve logs without exposing URLs or secrets.
+
 ## 0.46.3
 
 - Added account-level toggles for TorBox, Usenet Ultimate stream rows, and

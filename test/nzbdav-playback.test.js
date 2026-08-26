@@ -23,7 +23,11 @@ test('downloads, submits, waits, and discovers only after resolution', async () 
       calls.push('submit:' + opts.title); return { jobId: 'job-1' };
     },
     waitForJob: async () => {
-      calls.push('wait'); return { slot: { status: 'Completed', name: 'UFC 300- Main Card' } };
+      calls.push('wait'); return { slot: {
+        status: 'Completed',
+        name: 'ignored-display-name',
+        storage: '/content/sports/UFC 300- Main Card',
+      } };
     },
     discoverVideo: async (_cfg, root) => {
       calls.push('discover:' + root);

@@ -57,6 +57,32 @@ test('does not allow discovery to leave the configured WebDAV origin', async () 
     return true;
   });
 });
+test('rebases absolute WebDAV hrefs onto the configured origin', async () => {
+  const requests = [];
+  const selected = await webdav.discoverVideo(
+    { url: 'https://dav.example', username: 'alice', password: 'secret' },
+    '/content/sports/event/',
+    {
+      minVideoBytes: 1,
+      fetchImpl: async (url) => {
+        requests.push(url);
+        const path = new URL(url).pathname;
+        if (path.endsWith('/event/')) return response(multiStatus([
+          { href: 'http://nzbdav:3000/content/sports/event/', directory: true },
+          { href: 'http://nzbdav:3000/content/sports/event/disc/', directory: true },
+        ]));
+        return response(multiStatus([
+          { href: 'http://nzbdav:3000/content/sports/event/disc/', directory: true },
+          { href: 'http://nzbdav:3000/content/sports/event/disc/main.mkv', size: 1800 },
+        ]));
+      },
+    }
+  );
+  assert.equal(requests.length, 2);
+  assert.ok(requests.every((url) => new URL(url).origin === 'https://dav.example'));
+  assert.equal(new URL(selected.url).origin, 'https://dav.example');
+  assert.match(selected.url, /\/main\.mkv$/);
+});
 test('reports a completed job with no usable video', async () => {
   await assert.rejects(webdav.discoverVideo(
     { url: 'https://dav.example' }, '/content/sports/event/', {
