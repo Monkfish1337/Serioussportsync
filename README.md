@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.49.1-blue.svg" alt="Version 0.49.1"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.50.0-blue.svg" alt="Version 0.50.0"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -56,8 +56,8 @@ returns only the rows that finish within the configured request budget.
 | Direct Prowlarr | TorBox | Searches when an event is opened, checks the user's cache, and resolves on play |
 | Companion scraper | TorBox | Combines Prowlarr, Zilean, Torznab, and other configured companion sources |
 | Usenet Ultimate | Usenet Ultimate / NzbDAV | Sends event title variants to the user's UU instance; UU searches its configured indexers and handles playback |
-| Usenet Ultimate search | DIY NZB DAV | Optional additive path: SSS keeps candidates opaque, submits on Play, and range-proxies authenticated WebDAV |
-| Native Newznab, NZBHydra, or Prowlarr search | DIY NZB DAV | SSS searches the configured endpoint directly and uses the same verified deferred playback path without requiring UU |
+| Usenet Ultimate search | DIY Usenet pipeline | Optional additive discovery path shared by the enabled NZB DAV and native NNTP playback backends |
+| Native Newznab, NZBHydra, or Prowlarr search | DIY Usenet pipeline | SSS searches the configured endpoint directly, filters candidates once, and exposes independently toggled playback rows |
 | Native Newznab, NZBHydra, or Prowlarr search | Native NNTP preview | SSS parses direct-video NZBs on Play, decodes yEnc articles, and serves authenticated HTTP byte ranges; archive releases retain an adjacent NZB DAV fallback row |
 | Easynews | Easynews | Searches and plays with credentials stored on the user's account |
 
@@ -68,15 +68,17 @@ returns only the rows that finish within the configured request budget.
 > normal UU configuration, manifest URL, indexers, and NzbDAV setup are unchanged.
 
 Native DIY search and UU search can be enabled independently or merged. UU is
-no longer required for DIY playback when native search is configured.
-The DIY panel also contains the SSS-native NNTP preview. It stores provider
+no longer required for DIY playback when native search is configured. The
+Account page presents this as a Discover → Match → Play pipeline, with a shared
+search stage and separate NZB DAV and native NNTP playback cards.
+The native NNTP preview stores provider
 credentials encrypted, tests authentication, and emits separate native rows
 for direct-file playback. RAR/7z-contained releases are not yet native and
 should be opened through their existing NZB DAV row.
 Credentials are encrypted at rest where applicable and are never included in
 the stream list returned to the client. TorBox, Easynews, and DIY NZB DAV use
 signed, short-lived resolve URLs. Configure the experimental DIY path in the
-open **DIY providers** section on the Account page; it does not disable or
+open **DIY Usenet pipeline** section on the Account page; it does not disable or
 replace any existing service.
 
 ## Quick start with Docker Compose
@@ -206,10 +208,10 @@ See [.env.example](./.env.example) for the annotated full list.
 | <code>STREAM_MAX_ROWS</code> | <code>20</code> | Maximum stream rows returned per request |
 | <code>STREAM_PIPELINE_TIMEOUT_MS</code> | <code>8000</code> | Maximum time allowed for each playback pipeline |
 
-Users configure TorBox, Usenet Ultimate, DIY NZB DAV, Easynews, catalog ordering, and client
+Users configure TorBox, Usenet Ultimate, the DIY Usenet pipeline, Easynews, catalog ordering, and client
 exports together on the signed-in Account page. Each legacy playback pipeline has
 an independent enable switch, so it can be excluded without deleting credentials.
-Disabling UU stream rows does not disable the UU text search used by DIY NZB DAV.
+Disabling UU stream rows does not disable the optional UU text search used by the DIY pipeline.
 The private manifest URL grants
 use, not editing access, and can be rotated from that page. Server-wide discovery
 credentials belong in Admin or the root environment. Companion-managed sources

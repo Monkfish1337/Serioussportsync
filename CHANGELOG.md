@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.50.0
+
+- Reorganized the Account page's DIY settings into a clear Discover, Match,
+  and Play pipeline without changing existing stored configuration fields.
+- Grouped shared native/UU search controls into one discovery stage and moved
+  NZB DAV and native NNTP into independently toggled playback cards.
+- Added responsive pipeline guidance, backend status labels, and clearer test
+  actions while preserving all existing playback services alongside DIY.
+
 ## 0.49.1
 
 - Wired the native NNTP maximum-connections setting into a bounded global
