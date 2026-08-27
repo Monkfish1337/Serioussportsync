@@ -71,8 +71,6 @@ Do not put the GitHub token in the stack `.env`.
 | --- | --- |
 | `SSS_SESSION_SECRET` | Rename to `SESSION_SECRET`; preserve its value |
 | `SCRAPER_AUTH_TOKEN` | Preserve; Compose also supplies it to SSS as `COMPANION_AUTH_TOKEN` |
-| `WARMER_TB_TOKEN` | Rename to `ADMIN_TB_TOKEN` |
-| `WARMER_PM_KEY` | Rename to `ADMIN_PM_KEY` |
 | `PROWLARR_HYDRATE_MAX` | Remove; no longer part of stable SSS configuration |
 | `STREAM_CACHE_REFRESH` | Remove; no longer part of stable SSS configuration |
 | `NEWSNAB_URL`, `NEWSNAB_API_KEY`, `NEWSNAB_CATEGORIES` | Remove from stable `main`; configure per-user UU or use the separately tagged experimental native-Newznab build |

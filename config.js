@@ -166,12 +166,4 @@ module.exports = {
     ttlDays: parseFloat(process.env.POSITIVE_CACHE_TTL_DAYS || '7'),
   },
 
-  // Optional admin power-tool credentials. These are used only for explicit
-  // per-event verify/warm actions initiated by an administrator.
-  adminPowerTool: {
-    // WARMER_* fallbacks preserve existing deployments after removal of the
-    // global warmer; both values are used only on explicit admin actions.
-    tbToken:  process.env.ADMIN_TB_TOKEN || process.env.WARMER_TB_TOKEN || '',
-    pmApiKey: process.env.ADMIN_PM_KEY   || process.env.WARMER_PM_KEY   || '',
-  },
 };

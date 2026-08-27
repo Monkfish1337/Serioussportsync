@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.63.0
+
+- Fully retired the standalone Power Tool, Search, Match Editor, and Content
+  Studio routes, views, and UI-only modules now covered by Promotions.
+- Made every legacy URL, including old POST actions, safely redirect to
+  Promotions without executing mutations.
+- Retained the content store and promotion override data layers so existing
+  manual events, editorial decisions, aliases, and exclusions survive upgrades
+  and remain rollback-compatible.
+- Removed the obsolete admin warm credentials and per-event candidate-search
+  helper that were only used by Power Tool.
+
 ## 0.62.0
 
 - Added mandatory read-only event diffs before per-promotion refreshes and

@@ -51,6 +51,15 @@ test('retired expert tools are absent from the admin sidebar', () => {
   }
 });
 
+test('retired expert UI modules have been deleted while data layers remain', () => {
+  for (const file of ['power-tool.js', 'admin-general-search.js', 'admin-match-editor.js', 'admin-content-studio.js']) {
+    assert.equal(fs.existsSync(path.join(__dirname, '..', 'lib', file)), false, file + ' remains deleted');
+  }
+  for (const file of ['content-store.js', 'match-overrides.js']) {
+    assert.equal(fs.existsSync(path.join(__dirname, '..', 'lib', file)), true, file + ' remains available');
+  }
+});
+
 test('rejects incomplete or duplicate source definitions', () => {
   assert.throws(() => sources.add({ id: 'bad-source', name: 'Bad', type: 'tmdb', tvIds: 'abc' }), /numeric/);
   assert.throws(() => sources.add({ id: 'tsdb-nfl', name: 'Duplicate', type: 'onefc' }), /already exists/);

@@ -93,6 +93,31 @@ function listen(app) {
       assert.ok(!html.includes(removed), 'account page omits ' + removed);
     }
 
+    for (const legacy of [
+      { method: 'GET', path: '/admin/power-tool' },
+      { method: 'POST', path: '/admin/power-tool/warm' },
+      { method: 'GET', path: '/admin/search' },
+      { method: 'POST', path: '/admin/search/scrape' },
+      { method: 'GET', path: '/admin/match-editor' },
+      { method: 'POST', path: '/admin/match-editor/save' },
+      { method: 'POST', path: '/admin/match-test' },
+      { method: 'GET', path: '/admin/content' },
+      { method: 'POST', path: '/admin/content/events/create' },
+    ]) {
+      const response = await fetch(base + legacy.path, {
+        method: legacy.method,
+        redirect: 'manual',
+        headers: {
+          Cookie: cookie,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: legacy.method === 'POST' ? 'event=must-not-mutate' : undefined,
+      });
+      assert.strictEqual(response.status, 303, legacy.path + ' is retired');
+      assert.ok(String(response.headers.get('location') || '').startsWith('/admin/promotions?flash='),
+        legacy.path + ' redirects to Promotions');
+    }
+
     const firstCatalog = promotions.enabled[0].catalogs[0].id;
     const save = await fetch(base + '/account/save', {
       method: 'POST',
@@ -220,7 +245,7 @@ function listen(app) {
     });
     assert.strictEqual(removedProbe.status, 404, 'obsolete TorBox probe endpoint stays removed');
 
-    console.log('OK — authenticated one-page account configuration, persistence, exports, and retired diagnostic verified.');
+    console.log('OK — account configuration, persistence, retired-tool redirects, exports, and retired diagnostic verified.');
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

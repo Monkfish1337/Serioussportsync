@@ -58,10 +58,10 @@ migration. The removal is complete only when promotion creation, example-title
 alias derivation, matching preview, discovery preview, and safe editing are all
 available from the unified Promotions workflow.
 
-Progress: all four sidebar entries are removed and their legacy URLs redirect
-to Promotions. Existing stored editor/content data is intentionally retained.
-Internal dead-code deletion can follow after the new workflow has completed a
-release-and-rollback cycle.
+Progress: complete. All four sidebar entries, route/view implementations, and
+UI-only modules are removed. Every legacy GET or POST URL redirects to
+Promotions without mutation. Existing content-store and match-override data is
+intentionally retained for live compatibility and safe rollback.
 
 ## Configurable Nuvio collections
 
