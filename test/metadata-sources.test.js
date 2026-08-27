@@ -51,6 +51,21 @@ test('retired expert tools are absent from the admin sidebar', () => {
   }
 });
 
+test('account identity and POST-only logout live in the sidebar, not the topbar', () => {
+  const user = { username: 'tester', role: 'admin' };
+  const sidebar = chrome.buildSidebar('account', user, true);
+  const topbar = chrome.buildTopbar(user, true);
+  assert.match(sidebar, /href="\/account"/);
+  assert.match(sidebar, /aria-label="Profile"/);
+  assert.match(sidebar, /method="POST" action="\/logout"/);
+  assert.match(sidebar, />Log out</);
+  assert.doesNotMatch(topbar, /tester|\/account|\/logout/);
+
+  const userSidebar = chrome.buildSidebar('account', { username: 'viewer', role: 'user' }, false);
+  assert.match(userSidebar, />Account</);
+  assert.doesNotMatch(userSidebar, />Admin</);
+});
+
 test('retired expert UI modules have been deleted while data layers remain', () => {
   for (const file of ['power-tool.js', 'admin-general-search.js', 'admin-match-editor.js', 'admin-content-studio.js']) {
     assert.equal(fs.existsSync(path.join(__dirname, '..', 'lib', file)), false, file + ' remains deleted');

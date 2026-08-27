@@ -71,6 +71,7 @@ jobs:
               './lib/provider-denylist',
               './lib/positive-cache',
               './lib/availability-index',
+              './lib/availability-warmer',
               './lib/release-parts',
               './lib/url-sign',
               './lib/crypto-keys',

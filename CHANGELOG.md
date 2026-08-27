@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.66.0
+
+### Rolling availability warm-up
+
+- Added a scheduled, non-blocking warm-up that searches events aired during a
+  configurable rolling seven-day window rather than waiting for stream clicks.
+- Spread work across rotating 25-event batches, reused fresh search TTLs, and
+  coalesced overlapping jobs to limit indexer and provider traffic.
+- Warmed server-wide torrent discovery plus account-scoped TorBox, Usenet
+  Ultimate, native Newznab/Prowlarr, and Easynews knowledge without creating
+  downloads or playback jobs.
+- Added warm-up status and a manual **Warm recent events now** action to Admin
+  Health, with safe controls to disable or tune the window and schedule.
+- Moved Account, signed-in profile details, and the POST-only Log out control
+  from the top-right dropdown into the sidebar for both admins and users.
+
 ## 0.65.0
 
 ### Smart Availability Index foundation

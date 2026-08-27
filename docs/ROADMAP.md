@@ -20,6 +20,11 @@ checks reuse account-scoped observations, successful playback raises confidence,
 and the original stream rows remain unchanged. Legacy positive-cache knowledge
 is imported without deleting its rollback source.
 
+Phase 2 is implemented in v0.66.0. A bounded background warmer rotates through
+events aired in the last seven days and pre-populates configured Torrent,
+TorBox, UU, native indexer, and Easynews scopes. It runs after catalog refreshes
+and on a schedule, while fresh TTLs prevent duplicate live provider requests.
+
 Next phases will add provider-priority settings and Smart Play rows for Full
 Event, Main Card, Prelims, and Early Prelims, followed by a short fallback
 resolver that selects the best recently verified candidate on click.

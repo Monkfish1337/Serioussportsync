@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.65.0-blue.svg" alt="Version 0.65.0"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.66.0-blue.svg" alt="Version 0.66.0"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -55,9 +55,10 @@ returns only the rows that finish within the configured request budget.
 
 The local Smart Availability Index stores encrypted, normalized discoveries in
 SQLite. Fresh Torrent, UU, native indexer, and Easynews searches are reused;
-TorBox cache observations remain isolated by account credentials. Current stream
-rows and provider toggles remain unchanged while this knowledge base is populated
-for the upcoming Smart Play selector.
+TorBox cache observations remain isolated by account credentials. A bounded
+background job rotates through events aired in the last seven days, so the
+knowledge base is populated before a user opens an event. Current stream rows
+and provider toggles remain unchanged for the upcoming Smart Play selector.
 
 | Discovery | Per-user playback | How it works |
 | --- | --- | --- |
@@ -228,6 +229,9 @@ See [.env.example](./.env.example) for the annotated full list.
 | <code>CUSTOM_PROMOTIONS_FILE</code> | <code>./data/custom-promotions.json</code> | User-created promotion and release-matching rules |
 | <code>NUVIO_COLLECTIONS_FILE</code> | <code>./data/nuvio-collections.json</code> | Nuvio collection title, folders, promotion assignments, and artwork |
 | <code>AVAILABILITY_DB_FILE</code> | <code>./data/availability.sqlite</code> | Encrypted reusable provider searches, event/release matches, card-part classification, and scoped availability observations |
+| <code>AVAILABILITY_WARM_ENABLED</code> | <code>true</code> | Proactively populate recent-event availability in the background |
+| <code>AVAILABILITY_WARM_WINDOW_DAYS</code> / <code>AVAILABILITY_WARM_MAX_EVENTS_PER_RUN</code> | <code>7</code> / <code>25</code> | Bounded aired-event window and rotating batch size used by the warmer |
+| <code>AVAILABILITY_WARM_INTERVAL_HOURS</code> | <code>6</code> | Warm-up schedule; fresh provider searches are reused rather than repeated |
 | <code>COMPANION_URL</code> | none | Optional SeriousSportScraper companion endpoint |
 | <code>PROWLARR_URL</code> / <code>PROWLARR_API_KEY</code> | none | Optional direct Prowlarr discovery |
 | <code>STREAM_MAX_ROWS</code> | <code>20</code> | Maximum stream rows returned per request |

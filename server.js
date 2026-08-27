@@ -11,6 +11,7 @@ const { createApp } = require('./addon');
 const store = require('./lib/store');
 const { runRefresh } = require('./scripts/refresh');
 const availabilityStore = require('./lib/availability-index');
+const availabilityWarmer = require('./lib/availability-warmer');
 
 // SESSION_SECRET hard-fail (0.22.2). A missing or short shared secret would
 // make session, resolve-signature, and encrypted-provider protections unsafe.
@@ -76,9 +77,11 @@ function scheduleBackgroundWork(currentCount) {
   // Empty cache: refresh right away in the background.
   if (config.refreshOnEmptyCache && currentCount === 0) {
     console.log('[serioussportsync] cache empty — kicking off initial refresh in background');
-    runRefresh({ log: (m) => console.log(m) }).catch((err) => {
-      console.error('[serioussportsync] initial refresh failed:', err.message);
-    });
+    runRefresh({ log: (m) => console.log(m) })
+      .then(() => triggerAvailabilityWarm('initial-refresh'))
+      .catch((err) => {
+        console.error('[serioussportsync] initial refresh failed:', err.message);
+      });
   } else if (currentCount === 0) {
     console.log('[serioussportsync] cache empty — run `npm run refresh` to populate.');
   }
@@ -89,15 +92,46 @@ function scheduleBackgroundWork(currentCount) {
     const ms = Math.round(hours * 60 * 60 * 1000);
     console.log(`[serioussportsync] scheduling refresh every ${hours}h`);
     const t = setInterval(() => {
-      runRefresh({ log: (m) => console.log(m) }).catch((err) => {
-        console.error('[serioussportsync] scheduled refresh failed:', err.message);
-      });
+      runRefresh({ log: (m) => console.log(m) })
+        .then(() => triggerAvailabilityWarm('catalog-refresh'))
+        .catch((err) => {
+          console.error('[serioussportsync] scheduled refresh failed:', err.message);
+        });
     }, ms);
     if (typeof t.unref === 'function') t.unref();
   } else {
     console.log('[serioussportsync] periodic refresh disabled (REFRESH_INTERVAL_HOURS=0)');
   }
 
+  const warm = config.availabilityWarm || {};
+  if (availabilityIndex && warm.enabled !== false) {
+    const warmMs = Math.round((warm.intervalHours || 6) * 60 * 60 * 1000);
+    const delayMs = Math.round((warm.startDelaySeconds || 60) * 1000);
+    console.log('[availability] scheduling recent-event warm-up every '
+      + warm.intervalHours + 'h (last ' + warm.windowDays + ' days, up to '
+      + warm.maxEventsPerRun + ' events per run)');
+    const initialWarm = setTimeout(() => {
+      triggerAvailabilityWarm('startup');
+      const warmTimer = setInterval(() => triggerAvailabilityWarm('scheduled'), warmMs);
+      if (typeof warmTimer.unref === 'function') warmTimer.unref();
+    }, delayMs);
+    if (typeof initialWarm.unref === 'function') initialWarm.unref();
+  } else if (!availabilityIndex) {
+    console.log('[availability] recent-event warm-up disabled because SQLite is unavailable');
+  } else {
+    console.log('[availability] recent-event warm-up disabled (AVAILABILITY_WARM_ENABLED=false)');
+  }
+
+}
+
+function triggerAvailabilityWarm(reason) {
+  if (!availabilityIndex || (config.availabilityWarm && config.availabilityWarm.enabled === false)) {
+    return Promise.resolve({ ok: false, skipped: 'disabled' });
+  }
+  return availabilityWarmer.run({ reason }).catch((error) => {
+    console.error('[availability] warm-up failed:', error.message);
+    return { ok: false, error: error.message };
+  });
 }
 
 // Graceful shutdown so Docker's SIGTERM closes connections cleanly.

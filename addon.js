@@ -23,6 +23,7 @@ const tbDenylist = require('./lib/tb-denylist');
 const pmDenylist = require('./lib/pm-denylist');
 const positiveCache = require('./lib/positive-cache');
 const availabilityStore = require('./lib/availability-index');
+const availabilityWarmer = require('./lib/availability-warmer');
 // 0.27.0: in-memory log buffer for /admin/logs.
 const logBuffer = require('./lib/log-buffer');
 const security = require('./lib/security');
@@ -697,7 +698,10 @@ function createApp() {
   // in the catalog within ~minute(s) without waiting on the scheduled refresh.
   app.post('/admin/refresh-events', requireAdmin, (req, res) => {
     runEventsRefresh({ log: (m) => console.log(m) })
-      .then(() => console.log('[admin] manual events refresh complete'))
+      .then(() => {
+        console.log('[admin] manual events refresh complete');
+        return availabilityWarmer.run({ reason: 'manual-catalog-refresh' });
+      })
       .catch((err) => console.error('[admin] manual events refresh failed:', err.message));
     res.redirect('/admin?flash=' + encodeURIComponent('Catalog refresh started in the background — pulls events from TSDB for every promotion. Check server logs for progress.'));
   });
@@ -726,6 +730,8 @@ function createApp() {
           + (result.ok ? 'complete: ' : 'failed: ') + JSON.stringify(result);
         if (result.ok) console.log(line);
         else console.error(line);
+        if (result.ok) return availabilityWarmer.run({ reason: 'promotion-refresh' });
+        return null;
       })
       .catch((err) => console.error('[admin] per-promotion refresh "' + id + '" failed: ' + err.message));
     res.redirect('/admin/promotions?flash=' + encodeURIComponent('Refresh started for "' + p.name + '" — other promotions untouched. Check server logs for progress.'));
@@ -860,6 +866,17 @@ function createApp() {
     res.send(tablerChrome.tablerPage('Metadata', adminMetadata.renderBody({ flash: req.query.flash || null }), {
       user: req.user, currentSection: 'metadata',
     }));
+  });
+
+  app.post('/admin/health/warm-availability', requireAdmin, (req, res) => {
+    const alreadyRunning = availabilityWarmer.status().running;
+    availabilityWarmer.run({ reason: 'manual', force: true }).catch((error) => {
+      console.error('[availability] manual warm-up failed:', error.message);
+    });
+    const message = alreadyRunning
+      ? 'Recent-event warm-up is already running.'
+      : 'Recent-event warm-up started in the background.';
+    res.redirect('/admin/health?flash=' + encodeURIComponent(message));
   });
 
   app.get('/admin/nuvio-collections', requireAdmin, (req, res) => {
@@ -1370,16 +1387,26 @@ function renderHealthPage(currentUser, opts) {
     searchHits: 0, searchMisses: 0, hitRate: 0, byProvider: {},
   };
   try { availabilityStats = availabilityStore.getDefault().stats(); } catch (_) { /* */ }
+  const warmStatus = availabilityWarmer.status();
   const availabilityProviders = Object.entries(availabilityStats.byProvider || {})
     .map(([provider, count]) => escapeHtml(provider) + ': ' + count).join(' &middot; ') || 'no observations yet';
+  const warmLast = warmStatus.lastCompletedAt
+    ? new Date(warmStatus.lastCompletedAt).toLocaleString('en-GB') : 'not run yet';
+  const warmSummary = (warmStatus.running ? 'Warm-up running' : 'Warm-up idle')
+    + ' &middot; last: ' + escapeHtml(warmLast)
+    + ' &middot; rolling ' + warmStatus.windowDays + '-day window'
+    + ' &middot; ' + warmStatus.attemptedEvents + '/' + warmStatus.eligibleEvents + ' events last run';
   const availabilityCardHtml = statCard(
     'Smart availability index',
     '<strong>' + availabilityStats.releases + '</strong> <span class="text-secondary fs-4">release' + (availabilityStats.releases === 1 ? '' : 's') + '</span>',
     availabilityStats.eventMatches + ' event matches &middot; '
       + availabilityStats.freshSearches + ' fresh searches &middot; '
       + Math.round(availabilityStats.hitRate * 100) + '% query hit rate<br>'
-      + availabilityProviders,
-    '<form method="POST" action="/admin/health/wipe/availability-index" onsubmit="return confirm(\'Wipe the smart availability index? Provider searches will run again as needed.\');" class="d-inline">'
+      + availabilityProviders + '<br>' + warmSummary,
+    '<form method="POST" action="/admin/health/warm-availability" class="d-inline me-1">'
+      + '<button type="submit" class="btn btn-sm btn-outline-primary">Warm recent events now</button>'
+      + '</form>'
+      + '<form method="POST" action="/admin/health/wipe/availability-index" onsubmit="return confirm(\'Wipe the smart availability index? Provider searches will run again as needed.\');" class="d-inline">'
       + '<button type="submit" class="btn btn-sm btn-outline-danger">Wipe</button>'
       + '</form>'
   );
