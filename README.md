@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.53.0-blue.svg" alt="Version 0.53.0"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.54.0-blue.svg" alt="Version 0.54.0"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -75,6 +75,9 @@ The native NNTP preview stores provider credentials encrypted, tests
 authentication, and emits separate native rows for direct files and stored,
 unencrypted RAR4/RAR5 videos. Compressed or encrypted RAR files and 7z releases
 continue through their existing NZB DAV row.
+New NNTP configurations default to 20 connections, pre-authenticate their pool
+after resolution, and pipeline bounded read windows to reduce startup and seek
+latency. Set a lower account limit when required by the provider.
 Provider credentials, admin source keys, and private install tokens are encrypted
 at rest and are never included in the stream list returned to the client. Existing
 plaintext settings are migrated automatically. TorBox, Easynews, and DIY NZB DAV use

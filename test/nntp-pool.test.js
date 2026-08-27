@@ -32,3 +32,21 @@ test('bounds concurrent NNTP work and reuses authenticated sessions', async () =
     assert.equal(connections, 2);
   } finally { pool.close(); }
 });
+
+test('pre-authenticates idle sessions up to the configured ceiling', async () => {
+  let connections = 0;
+  const pool = new NntpConnectionPool({ maxConnections: 4 }, {
+    connect: async () => {
+      connections++;
+      const socket = { destroyed: false };
+      return { socket, destroy() { socket.destroyed = true; } };
+    },
+  });
+  try {
+    assert.equal(await pool.warm(), 4);
+    assert.equal(connections, 4);
+    assert.equal(pool.idle.length, 4);
+    assert.equal(await pool.warm(), 0);
+    assert.equal(connections, 4);
+  } finally { pool.close(); }
+});
