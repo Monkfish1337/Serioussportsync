@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.50.0-blue.svg" alt="Version 0.50.0"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.51.0-blue.svg" alt="Version 0.51.0"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -58,7 +58,7 @@ returns only the rows that finish within the configured request budget.
 | Usenet Ultimate | Usenet Ultimate / NzbDAV | Sends event title variants to the user's UU instance; UU searches its configured indexers and handles playback |
 | Usenet Ultimate search | DIY Usenet pipeline | Optional additive discovery path shared by the enabled NZB DAV and native NNTP playback backends |
 | Native Newznab, NZBHydra, or Prowlarr search | DIY Usenet pipeline | SSS searches the configured endpoint directly, filters candidates once, and exposes independently toggled playback rows |
-| Native Newznab, NZBHydra, or Prowlarr search | Native NNTP preview | SSS parses direct-video NZBs on Play, decodes yEnc articles, and serves authenticated HTTP byte ranges; archive releases retain an adjacent NZB DAV fallback row |
+| Native Newznab, NZBHydra, or Prowlarr search | Native NNTP preview | SSS serves direct videos and stored, unencrypted RAR4/RAR5 videos with HTTP byte ranges; unsupported archives retain an adjacent NZB DAV fallback row |
 | Easynews | Easynews | Searches and plays with credentials stored on the user's account |
 
 > **Usenet Ultimate compatibility:** direct sports-title search requires the
@@ -71,10 +71,10 @@ Native DIY search and UU search can be enabled independently or merged. UU is
 no longer required for DIY playback when native search is configured. The
 Account page presents this as a Discover → Match → Play pipeline, with a shared
 search stage and separate NZB DAV and native NNTP playback cards.
-The native NNTP preview stores provider
-credentials encrypted, tests authentication, and emits separate native rows
-for direct-file playback. RAR/7z-contained releases are not yet native and
-should be opened through their existing NZB DAV row.
+The native NNTP preview stores provider credentials encrypted, tests
+authentication, and emits separate native rows for direct files and stored,
+unencrypted RAR4/RAR5 videos. Compressed or encrypted RAR files and 7z releases
+continue through their existing NZB DAV row.
 Credentials are encrypted at rest where applicable and are never included in
 the stream list returned to the client. TorBox, Easynews, and DIY NZB DAV use
 signed, short-lived resolve URLs. Configure the experimental DIY path in the

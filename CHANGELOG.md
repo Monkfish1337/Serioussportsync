@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.51.0
+
+- Added native byte-range playback for stored, unencrypted videos inside
+  single- and multi-volume RAR4/RAR5 releases without downloading the archive.
+- Added bounded RAR volume grouping, header inspection, split-file fragment
+  mapping, and exact cross-volume seek handling through the NNTP pool.
+- Kept compressed, encrypted, damaged, incomplete, and 7z archives on the
+  existing NZB DAV fallback path.
+- Added archive volume, entry, header, media-size, and malformed-range limits
+  plus end-to-end RAR range playback coverage.
+
 ## 0.50.0
 
 - Reorganized the Account page's DIY settings into a clear Discover, Match,
