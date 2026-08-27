@@ -163,6 +163,9 @@ function listen(app) {
     assert.strictEqual(saved.nntpPassword, 'test-nntp-secret');
     assert.strictEqual(saved.nntpConnections, 12);
     const usersOnDisk = fs.readFileSync(process.env.USERS_FILE, 'utf8');
+    assert.ok(!usersOnDisk.includes(user.apiToken), 'install/API token is encrypted at rest');
+    assert.strictEqual(users.findByApiToken(user.id, user.apiToken).id, user.id,
+      'encrypted-at-rest install token still authenticates');
     assert.ok(!usersOnDisk.includes('test-nzbdav-api-secret'));
     assert.ok(!usersOnDisk.includes('test-webdav-secret'));
     assert.ok(!usersOnDisk.includes('test-search-api-secret'));
