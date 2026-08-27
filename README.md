@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.51.0-blue.svg" alt="Version 0.51.0"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.52.0-blue.svg" alt="Version 0.52.0"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -207,6 +207,7 @@ See [.env.example](./.env.example) for the annotated full list.
 | <code>PROWLARR_URL</code> / <code>PROWLARR_API_KEY</code> | none | Optional direct Prowlarr discovery |
 | <code>STREAM_MAX_ROWS</code> | <code>20</code> | Maximum stream rows returned per request |
 | <code>STREAM_PIPELINE_TIMEOUT_MS</code> | <code>8000</code> | Maximum time allowed for each playback pipeline |
+| <code>STREAM_DISCOVERY_BUDGET_MS</code> | <code>5000</code> | Search budget that reserves the remainder for filtering and cache checks |
 
 Users configure TorBox, Usenet Ultimate, the DIY Usenet pipeline, Easynews, catalog ordering, and client
 exports together on the signed-in Account page. Each legacy playback pipeline has

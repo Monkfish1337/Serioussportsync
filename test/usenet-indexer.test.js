@@ -87,6 +87,39 @@ test('deduplicates results returned by multiple title variants', async () => {
   assert.equal(out.results.length, 1);
 });
 
+test('keeps successful variants when another variant fails', async () => {
+  const xml = rss(['<item><title>Formula.1.2026.Dutch.GP.1080p</title>'
+    + '<link>https://indexer.example/get/dutch-gp</link></item>']);
+  const out = await indexer.search(['Dutch GP', 'Dutch Grand Prix'], {
+    enabled: true,
+    kind: 'newznab',
+    url: 'https://indexer.example/api',
+    apiKey: 'key',
+  }, {
+    fetchImpl: async (url) => {
+      if (new URL(url).searchParams.get('q') === 'Dutch Grand Prix') {
+        throw new Error('simulated slow indexer failure');
+      }
+      return response(xml);
+    },
+  });
+  assert.equal(out.ok, true);
+  assert.equal(out.results.length, 1);
+  assert.equal(out.results[0].title, 'Formula.1.2026.Dutch.GP.1080p');
+});
+
+test('reports all-failed only when no title variant completes', async () => {
+  const out = await indexer.search(['Dutch GP'], {
+    enabled: true,
+    kind: 'newznab',
+    url: 'https://indexer.example/api',
+    apiKey: 'key',
+  }, { fetchImpl: async () => { throw new Error('offline'); } });
+  assert.equal(out.ok, false);
+  assert.equal(out.error, 'all-failed');
+  assert.deepEqual(out.results, []);
+});
+
 test('rejects oversized search responses before buffering', async () => {
   await assert.rejects(indexer.searchOne('UFC', {
     enabled: true,
