@@ -37,6 +37,11 @@ from promotions. A source definition contains:
 - credential reference, never a plaintext credential;
 - enabled state and last validation/refresh result.
 
+Implementation status: the registry, nine seeded definitions, reusable source
+creation, and promotion reassignment are now implemented. Existing behavior is
+preserved when no override is saved. External validation/sample preview and the
+common adapter dispatch contract remain the next source-focused slice.
+
 Promotions should store a `sourceRef`. The Promotions page will offer:
 
 1. Assign an existing source.

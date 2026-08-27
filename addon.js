@@ -1054,6 +1054,22 @@ function createApp() {
     }
   });
 
+  // Retired expert tools now converge on the unified Promotions workflow.
+  // Keep stored data files untouched so upgrades and rollback remain safe.
+  app.use(['/admin/power-tool', '/admin/search', '/admin/match-editor', '/admin/content'], requireAdmin, (req, res) => {
+    res.redirect(303, '/admin/promotions?flash=' + encodeURIComponent(
+      'This legacy tool has moved into Promotions. No stored configuration was deleted.'));
+  });
+
+  app.post('/admin/metadata-sources/create', requireAdmin, (req, res) => {
+    try {
+      const source = adminPromotions.createMetadataSource(req.body || {});
+      res.redirect('/admin/promotions?flash=' + encodeURIComponent('Added metadata source "' + source.name + '".'));
+    } catch (err) {
+      res.redirect('/admin/promotions?flash=' + encodeURIComponent('Add source failed: ' + err.message));
+    }
+  });
+
   app.post('/admin/promotions/derive-aliases', requireAdmin, (req, res) => {
     const body = req.body || {};
     const out = adminPromotions.deriveAliases(body.name, body.examples, body.badExamples);
@@ -1079,6 +1095,17 @@ function createApp() {
     } catch (err) {
       res.redirect('/admin/promotions?edit=' + encodeURIComponent(id)
         + '&flash=' + encodeURIComponent('Update failed: ' + err.message));
+    }
+  });
+
+  app.post('/admin/promotions/:id/source', requireAdmin, (req, res) => {
+    const id = String(req.params.id || '').trim();
+    try {
+      const promotion = adminPromotions.assignSource(id, String((req.body && req.body.sourceRef) || '').trim());
+      res.redirect('/admin/promotions?flash=' + encodeURIComponent(
+        'Metadata source updated for "' + promotion.name + '". Run its refresh when ready to import events from the new source.'));
+    } catch (err) {
+      res.redirect('/admin/promotions?flash=' + encodeURIComponent('Source assignment failed: ' + err.message));
     }
   });
 
@@ -1485,13 +1512,6 @@ function renderAdminPage(currentUser, opts) {
     +       '<h4 class="mb-2">football-data.org</h4>'
     +       '<p class="text-secondary small mb-3">API key for the football-data.org parallel source — used by custom promotions whose source is set to football-data (FIFA WC, EPL, Champions League, etc.). Free tier covers ~10 req/min. Sign up at <a href="https://www.football-data.org/client/register" target="_blank" rel="noopener" class="link-primary">football-data.org/client/register</a>. Saving here overrides the FOOTBALL_DATA_API_KEY env var.</p>'
     +       secretField('football-data.org API key', 'footballDataApiKey', _fd.apiKey, 'paste your football-data.org token')
-
-    // 0.39.0: general-search config lives on the scraper, not SSS. Indexer
-    // sources are configured in the scraper at /sources; downloader targets
-    // (qBit + SAB) at /downloaders. SSS only proxies — see /admin/search.
-    +       '<hr class="my-4">'
-    +       '<h4 class="mb-2">General search</h4>'
-    +       '<p class="text-secondary small mb-0">The <a href="/admin/search" class="link-primary">/admin/search</a> page proxies through to the companion scraper above. The direct Prowlarr option above is also available in the event power tool. Configure companion-managed Prowlarr instances on the scraper\'s <a href="' + escapeHtml(_comp.url || '#') + '/sources" target="_blank" rel="noopener" class="link-primary">Sources</a> page and qBit / SAB credentials on its <a href="' + escapeHtml(_comp.url || '#') + '/downloaders" target="_blank" rel="noopener" class="link-primary">Downloaders</a> page (scraper v0.1.4+).</p>'
 
     +       '<hr class="my-4">'
     +       '<button class="btn btn-primary" type="submit">Save sources</button>'

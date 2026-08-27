@@ -61,6 +61,8 @@ test('promotions form emits valid browser JavaScript for the alias assistant', (
   assert.match(html, /name="promotionAliases"/);
   assert.match(html, /name="exclusionKeywords"/);
   assert.match(html, /id="previewMatching"/);
+  assert.match(html, /Add a reusable source/);
+  assert.match(html, /name="sourceRef"/);
 });
 
 test('matching preview shows generated queries and good/bad verdicts', () => {
