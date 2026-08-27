@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.49.1
+
+- Wired the native NNTP maximum-connections setting into a bounded global
+  provider pool instead of leaving it as configuration-only metadata.
+- Reused authenticated NNTP sockets across probes and range requests, and
+  added ordered parallel segment prefetch for faster startup and seeking.
+- Cancelled in-flight prefetch when the player abandons a speculative range,
+  while retaining the configured connection ceiling across concurrent probes.
+
 ## 0.49.0
 
 - Added opt-in native NNTP preview rows alongside the existing NZB DAV rows.

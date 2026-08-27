@@ -2165,7 +2165,7 @@ function renderAccountPage(user, opts) {
     +       '<div><label class="form-label" for="nntp-port">Port</label><input class="form-control" type="number" min="1" max="65535" id="nntp-port" name="nntpPort" value="' + escapeHtml(String(cfg.nntpPort || 563)) + '"></div>'
     +       '<div><label class="form-label" for="nntp-user">Username</label><input class="form-control" id="nntp-user" name="nntpUsername" value="' + escapeHtml(cfg.nntpUsername || '') + '" autocomplete="off"></div>'
     +       '<div>' + secretField('NNTP password', 'nntpPassword', cfg.nntpPassword, 'your NNTP password') + '</div>'
-    +       '<div><label class="form-label" for="nntp-connections">Maximum connections</label><input class="form-control" type="number" min="1" max="50" id="nntp-connections" name="nntpConnections" value="' + escapeHtml(String(cfg.nntpConnections || 8)) + '"></div>'
+    +       '<div><label class="form-label" for="nntp-connections">Maximum connections</label><input class="form-control" type="number" min="1" max="50" id="nntp-connections" name="nntpConnections" value="' + escapeHtml(String(cfg.nntpConnections || 8)) + '"><div class="form-hint">Global provider ceiling shared by active native streams. SSS reuses connections and prefetches ordered segments within this limit.</div></div>'
     +       '<div class="d-flex align-items-center"><label class="form-check form-switch mt-4"><input class="form-check-input" type="checkbox" name="nntpTls" value="on"' + (cfg.nntpTls !== false ? ' checked' : '') + '><span class="form-check-label">Use TLS (recommended)</span></label></div>'
     +     '</div>'
     +     '<button class="btn btn-outline-primary mt-2" type="submit" formaction="/account/test-nntp" formnovalidate>Test NNTP authentication</button>'
