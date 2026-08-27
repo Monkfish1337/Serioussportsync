@@ -16,6 +16,7 @@ const nzbdavClient = require('./lib/sources/nzbdav');
 const nzbdavWebdav = require('./lib/sources/nzbdav-webdav');
 const usenetIndexer = require('./lib/sources/usenet-indexer');
 const nntpClient = require('./lib/sources/nntp-client');
+const nntpPlayback = require('./lib/sources/nntp-playback');
 // 0.24.0: per-provider state modules for the admin /health page.
 const rdDenylist = require('./lib/rd-denylist');
 const tbDenylist = require('./lib/tb-denylist');
@@ -531,6 +532,15 @@ function createApp() {
             + req.method + range);
           return await proxyWebdav(req, res, out.upstream);
         }
+        if (out && out.nativeNntp) {
+          const range = req.headers.range ? ' ' + String(req.headers.range) : '';
+          console.log('[resolve ' + req.userAccount.username + '] native nntp '
+            + req.method + range);
+          return await nntpPlayback.serve(req, res,
+            out.nativeNntp.descriptor, out.nativeNntp.config, {
+              log: (message) => console.log('[resolve ' + req.userAccount.username + '] ' + message),
+            });
+        }
         if (out && out.url) {
           res.setHeader('Cache-Control', 'no-store');
           return res.redirect(302, out.url);
@@ -539,7 +549,14 @@ function createApp() {
         res.status(404).send('Not cached on ' + provider + ' (or no longer available).');
       } catch (err) {
         console.error('[resolve] handler error:', err);
-        if (!res.headersSent) res.status(502).send('Resolve failed.');
+        if (!res.headersSent) {
+          res.removeHeader('Content-Range');
+          res.removeHeader('Content-Length');
+          res.removeHeader('Content-Disposition');
+          const safeMessage = err && err.httpStatus && err.message
+            ? err.message : 'Resolve failed.';
+          res.status(Number(err && err.httpStatus) || 502).send(safeMessage);
+        }
         else res.destroy(err);
       }
     });
@@ -2141,8 +2158,8 @@ function renderAccountPage(user, opts) {
     +       '<div>' + secretField('WebDAV password', 'nzbdavWebdavPassword', cfg.nzbdavWebdavPassword, 'your WebDAV password') + '</div>'
     +     '</div>'
     +     '<button class="btn btn-outline-primary mt-2" type="submit" formaction="/account/test-nzbdav" formnovalidate>Test API + WebDAV</button>'
-    +     '<hr class="my-4"><h3 class="h4 mb-2">Native NNTP <span class="badge bg-azure-lt">Preview</span></h3><p class="text-secondary small">Provider configuration and authenticated connectivity are available now. Enabling this preserves NZB DAV and prepares the account for the native range-streaming engine.</p>'
-    +     '<label class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" name="nativeNntpEnabled" value="on"' + (cfg.nativeNntpEnabled === true ? ' checked' : '') + '><span class="form-check-label">Enable native NNTP backend when streaming support is available</span></label>'
+    +     '<hr class="my-4"><h3 class="h4 mb-2">Native NNTP <span class="badge bg-azure-lt">Preview</span></h3><p class="text-secondary small">Streams direct MKV/MP4-style Usenet posts from SSS with HTTP range support. Archive-contained releases continue to use the adjacent NZB DAV rows while native RAR/7z support is developed.</p>'
+    +     '<label class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" name="nativeNntpEnabled" value="on"' + (cfg.nativeNntpEnabled === true ? ' checked' : '') + '><span class="form-check-label">Enable native NNTP direct-file rows</span></label>'
     +     '<div class="provider-grid">'
     +       '<div><label class="form-label" for="nntp-host">NNTP host</label><input class="form-control text-mono" id="nntp-host" name="nntpHost" value="' + escapeHtml(cfg.nntpHost || '') + '" placeholder="news.provider.example"></div>'
     +       '<div><label class="form-label" for="nntp-port">Port</label><input class="form-control" type="number" min="1" max="65535" id="nntp-port" name="nntpPort" value="' + escapeHtml(String(cfg.nntpPort || 563)) + '"></div>'

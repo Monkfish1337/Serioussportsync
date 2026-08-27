@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.49.0
+
+- Added opt-in native NNTP preview rows alongside the existing NZB DAV rows.
+- Added bounded deferred NZB parsing, largest direct-video selection, binary
+  NNTP BODY retrieval, dot unstuffing, and multipart yEnc decoding.
+- Added native HTTP HEAD and single-range playback with exact content headers,
+  client-cancellation handling, and cached/deduplicated play-time inspection.
+- Kept archive-contained releases on NZB DAV with an explicit fallback message;
+  native RAR/7z virtual streaming remains the next engine stage.
+
 ## 0.48.0
 
 - Added the first SSS-native NNTP foundation: encrypted per-account host,

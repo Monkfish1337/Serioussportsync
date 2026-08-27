@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.48.0-blue.svg" alt="Version 0.48.0"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.49.0-blue.svg" alt="Version 0.49.0"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -58,6 +58,7 @@ returns only the rows that finish within the configured request budget.
 | Usenet Ultimate | Usenet Ultimate / NzbDAV | Sends event title variants to the user's UU instance; UU searches its configured indexers and handles playback |
 | Usenet Ultimate search | DIY NZB DAV | Optional additive path: SSS keeps candidates opaque, submits on Play, and range-proxies authenticated WebDAV |
 | Native Newznab, NZBHydra, or Prowlarr search | DIY NZB DAV | SSS searches the configured endpoint directly and uses the same verified deferred playback path without requiring UU |
+| Native Newznab, NZBHydra, or Prowlarr search | Native NNTP preview | SSS parses direct-video NZBs on Play, decodes yEnc articles, and serves authenticated HTTP byte ranges; archive releases retain an adjacent NZB DAV fallback row |
 | Easynews | Easynews | Searches and plays with credentials stored on the user's account |
 
 > **Usenet Ultimate compatibility:** direct sports-title search requires the
@@ -68,10 +69,10 @@ returns only the rows that finish within the configured request budget.
 
 Native DIY search and UU search can be enabled independently or merged. UU is
 no longer required for DIY playback when native search is configured.
-The DIY panel also contains the preview foundation for SSS-native NNTP:
-encrypted per-account provider settings and an authenticated connection test.
-It does not emit native NNTP playback rows yet, so enabling it cannot disturb
-the working NZB DAV pipeline while range streaming is completed.
+The DIY panel also contains the SSS-native NNTP preview. It stores provider
+credentials encrypted, tests authentication, and emits separate native rows
+for direct-file playback. RAR/7z-contained releases are not yet native and
+should be opened through their existing NZB DAV row.
 Credentials are encrypted at rest where applicable and are never included in
 the stream list returned to the client. TorBox, Easynews, and DIY NZB DAV use
 signed, short-lived resolve URLs. Configure the experimental DIY path in the

@@ -97,3 +97,37 @@ test('uses an HTTP CONNECT proxy without losing an immediate NNTP greeting', asy
     assert.equal(connectTarget, 'CONNECT news.example:119 HTTP/1.1');
   } finally { await close(proxy); }
 });
+
+test('fetches a dot-terminated BODY without corrupting binary yEnc bytes', async () => {
+  const server = net.createServer((socket) => {
+    socket.setEncoding('latin1');
+    socket.write('200 ready\r\n');
+    let buffer = '';
+    socket.on('data', (chunk) => {
+      buffer += chunk;
+      let split;
+      while ((split = buffer.indexOf('\r\n')) >= 0) {
+        const line = buffer.slice(0, split); buffer = buffer.slice(split + 2);
+        if (line === 'BODY <article@id>') {
+          socket.write(Buffer.concat([
+            Buffer.from('222 0 article follows\r\n=ypart begin=1 end=3\r\n', 'latin1'),
+            Buffer.from([0x80, 0xff, 0x2a]), Buffer.from('\r\n..dot-line\r\n.\r\n', 'latin1'),
+          ]));
+        } else if (line === 'QUIT') socket.end();
+      }
+    });
+  });
+  const port = await listen(server);
+  let session;
+  try {
+    session = await nntp.connectAuthenticated({ host: '127.0.0.1', port, tls: false }, {
+      proxyUrl: '', timeoutMs: 1000,
+    });
+    const body = await session.body('article@id');
+    assert.ok(body.includes(Buffer.from([0x80, 0xff, 0x2a])));
+    assert.match(body.toString('latin1'), /\.dot-line/);
+  } finally {
+    if (session) session.close();
+    await close(server);
+  }
+});
