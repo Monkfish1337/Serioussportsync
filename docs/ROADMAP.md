@@ -15,6 +15,11 @@ Replace the fragmented expert tooling with one workflow under Promotions:
 6. Save the promotion and matching rules together, then run an immediate
    discovery preview without requiring a refresh or container restart.
 
+Progress: the first slice is implemented. Promotions can derive editable,
+persistent search aliases and recognition terms from known-good release titles.
+Known-bad examples, live classification, query preview, and guided source/event
+selection remain next.
+
 The basic path must require no JSON or regular expressions. Advanced controls
 can remain available in a collapsed section.
 
