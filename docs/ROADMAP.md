@@ -58,3 +58,14 @@ Progress: all four sidebar entries are removed and their legacy URLs redirect
 to Promotions. Existing stored editor/content data is intentionally retained.
 Internal dead-code deletion can follow after the new workflow has completed a
 release-and-rollback cycle.
+
+## Configurable Nuvio collections
+
+Progress: implemented. Nuvio Collections now has a dedicated admin sidebar
+workflow. The existing Combat Sports, Wrestling, Football, and Motorsport
+folders remain the upgrade-safe defaults. Admins can create, edit, or remove
+folders; assign new or existing promotions; choose bundled, promotion-derived,
+or custom URL artwork; select tile shape and title visibility; and configure
+collection-level backdrop, pinning, and the All tab. Promotion creation hands
+the new promotion directly to this workflow, while each user's exported JSON
+continues to respect their enabled catalogs and saved ordering.

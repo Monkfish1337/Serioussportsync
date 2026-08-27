@@ -1034,6 +1034,8 @@ function createApp() {
   // --- 0.35.0: promotion creator (admin-added TSDB-backed promotions) ---
   const adminPromotions = require('./lib/admin-promotions');
   const adminMetadata = require('./lib/admin-metadata');
+  const adminNuvioCollections = require('./lib/admin-nuvio-collections');
+  const nuvioCollectionSettings = require('./lib/nuvio-collection-settings');
 
   app.get('/admin/metadata', requireAdmin, (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -1041,6 +1043,53 @@ function createApp() {
     res.send(tablerChrome.tablerPage('Metadata', adminMetadata.renderBody({ flash: req.query.flash || null }), {
       user: req.user, currentSection: 'metadata',
     }));
+  });
+
+  app.get('/admin/nuvio-collections', requireAdmin, (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    const body = adminNuvioCollections.renderBody({
+      flash: req.query.flash || null,
+      promotion: String(req.query.promotion || '').trim() || null,
+    });
+    res.send(tablerChrome.tablerPage('Nuvio Collections', body, {
+      user: req.user, currentSection: 'nuvio-collections',
+    }));
+  });
+
+  app.post('/admin/nuvio-collections/save', requireAdmin, (req, res) => {
+    try {
+      const body = req.body || {};
+      nuvioCollectionSettings.updateCollection({
+        title: body.title,
+        backdropImage: body.backdropImage,
+        pinToTop: body.pinToTop === '1' || body.pinToTop === 'on',
+        showAllTab: body.showAllTab === '1' || body.showAllTab === 'on',
+      });
+      res.redirect('/admin/nuvio-collections?flash=' + encodeURIComponent('Collection settings saved. Export JSON again in Account to apply it in Nuvio.'));
+    } catch (err) {
+      res.redirect('/admin/nuvio-collections?flash=' + encodeURIComponent('Save failed: ' + err.message));
+    }
+  });
+
+  function saveNuvioFolder(req, res, folderId) {
+    try {
+      const validIds = new Set(promotions.enabled.map((promotion) => promotion.id));
+      const input = adminNuvioCollections.folderInput(req.body || {});
+      nuvioCollectionSettings.upsertFolder(folderId, input, validIds);
+      res.redirect('/admin/nuvio-collections?flash=' + encodeURIComponent(
+        (folderId ? 'Collection folder updated.' : 'Collection folder added.') + ' Export JSON again in Account to apply it in Nuvio.'));
+    } catch (err) {
+      res.redirect('/admin/nuvio-collections?flash=' + encodeURIComponent('Folder save failed: ' + err.message));
+    }
+  }
+
+  app.post('/admin/nuvio-collections/folders/create', requireAdmin, (req, res) => saveNuvioFolder(req, res, null));
+  app.post('/admin/nuvio-collections/folders/:id/save', requireAdmin, (req, res) => saveNuvioFolder(req, res, req.params.id));
+  app.post('/admin/nuvio-collections/folders/:id/delete', requireAdmin, (req, res) => {
+    const removed = nuvioCollectionSettings.removeFolder(String(req.params.id || ''));
+    res.redirect('/admin/nuvio-collections?flash=' + encodeURIComponent(
+      removed ? 'Collection folder removed. Promotions and events were not deleted.' : 'Collection folder not found.'));
   });
 
   app.get('/admin/promotions', requireAdmin, (req, res) => {
@@ -1056,8 +1105,8 @@ function createApp() {
   app.post('/admin/promotions/create', requireAdmin, (req, res) => {
     try {
       const spec = adminPromotions.saveFromForm(req.body || {});
-      res.redirect('/admin/promotions?flash=' + encodeURIComponent(
-        'Created custom promotion "' + spec.name + '". Run a refresh from /admin to populate its events.'));
+      res.redirect('/admin/nuvio-collections?promotion=' + encodeURIComponent(spec.id)
+        + '&flash=' + encodeURIComponent('Created "' + spec.name + '". Choose its Nuvio folder and artwork below, then refresh it from Promotions.'));
     } catch (err) {
       res.redirect('/admin/promotions?flash=' + encodeURIComponent('Create failed: ' + err.message));
     }

@@ -74,6 +74,7 @@ module.exports = {
   contentStudioFile: process.env.CONTENT_STUDIO_FILE || './data/content-studio.json',
   metadataSourcesFile: process.env.METADATA_SOURCES_FILE || './data/metadata-sources.json',
   customPromotionsFile: process.env.CUSTOM_PROMOTIONS_FILE || './data/custom-promotions.json',
+  nuvioCollectionsFile: process.env.NUVIO_COLLECTIONS_FILE || './data/nuvio-collections.json',
 
   // Sliding window of events kept in cache. Asymmetric so users can see
   // multiple upcoming events (promotions like ONE list 6+ months ahead)

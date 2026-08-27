@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.58.0-blue.svg" alt="Version 0.58.0"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.59.0-blue.svg" alt="Version 0.59.0"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -150,7 +150,7 @@ Tunnel or an authenticated reverse proxy in front instead of exposing port 7000
 directly to the LAN or Internet.
 
 The named volume preserves accounts, event data, settings, custom promotions,
-and matching overrides across container replacements.
+Nuvio collection layouts, and matching overrides across container replacements.
 
 ## How it fits together
 
@@ -182,6 +182,9 @@ JSON or application code.
   The official MLB schedule is supported directly and requires no API key.
 - **Promotions:** select a schedule, paste releases that should or should not
   appear, review the aliases SSS learns, and test its queries before saving.
+- **Nuvio Collections:** group promotions into collection folders, choose
+  bundled, promotion-derived, or custom artwork, and download the current JSON.
+  Newly created promotions are handed directly into this workflow.
 - **Missing event inbox:** accept, merge, or ignore source events rejected by
   promotion filters and possible duplicate detection.
 - **Imports and matching assistant:** preview ICS, CSV, or JSON calendars, then
@@ -207,6 +210,7 @@ See [.env.example](./.env.example) for the annotated full list.
 | <code>CONTENT_STUDIO_FILE</code> | <code>./data/content-studio.json</code> | Refresh-safe manual content and editorial decisions |
 | <code>METADATA_SOURCES_FILE</code> | <code>./data/metadata-sources.json</code> | Reusable metadata source definitions and assignments |
 | <code>CUSTOM_PROMOTIONS_FILE</code> | <code>./data/custom-promotions.json</code> | User-created promotion and release-matching rules |
+| <code>NUVIO_COLLECTIONS_FILE</code> | <code>./data/nuvio-collections.json</code> | Nuvio collection title, folders, promotion assignments, and artwork |
 | <code>COMPANION_URL</code> | none | Optional SeriousSportScraper companion endpoint |
 | <code>PROWLARR_URL</code> / <code>PROWLARR_API_KEY</code> | none | Optional direct Prowlarr discovery |
 | <code>STREAM_MAX_ROWS</code> | <code>20</code> | Maximum stream rows returned per request |
