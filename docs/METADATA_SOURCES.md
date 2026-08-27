@@ -14,16 +14,19 @@
 | Match of the Day | TMDB | TV shows `224` and `3231` |
 | Man United | football-data.org | team `66` |
 
+Custom sources can also use MLB's official public Stats API schedule. It needs
+no API key and supplies game IDs, dates, teams, venues, status, and start times.
+
 ONE's adapter discovers the current Next.js build identifier from the official
 site, then reads its public upcoming and past event data. Wikipedia remains a
 description/artwork enrichment source for eligible promotions. The repository
 also contains Wikipedia year-page and list-page primary adapters, although no
 currently enabled built-in promotion selects either as its primary source.
 
-Custom promotions can currently select TheSportsDB, football-data.org, or TMDB,
-but the choice and identifier are embedded directly in each promotion. Built-in
-source assignments are JavaScript constants. The refresh dispatcher also owns a
-hardcoded branch for every adapter.
+Custom promotions select a named source definition. TheSportsDB,
+football-data.org, TMDB, the official ONE feed, and official MLB schedule are
+supported in the source registry. The refresh dispatcher still owns a hardcoded
+branch for every adapter.
 
 ## Target model
 
@@ -37,10 +40,11 @@ from promotions. A source definition contains:
 - credential reference, never a plaintext credential;
 - enabled state and last validation/refresh result.
 
-Implementation status: the registry, nine seeded definitions, reusable source
-creation, and promotion reassignment are now implemented. Existing behavior is
-preserved when no override is saved. External validation/sample preview and the
-common adapter dispatch contract remain the next source-focused slice.
+Implementation status: the registry, nine seeded definitions, dedicated
+Metadata page, reusable source creation, official MLB adapter, and promotion
+reassignment are implemented. Existing behavior is preserved when no override
+is saved. External validation/sample preview and the common adapter dispatch
+contract remain the next source-focused slice.
 
 Promotions should store a `sourceRef`. The Promotions page will offer:
 
@@ -63,7 +67,7 @@ Move refresh dispatch behind a registry with a common contract:
 - `transform(record, promotion)` selects the existing normalizer;
 - `redact(config)` removes secrets from logs and admin responses.
 
-Initial adapters: TheSportsDB, official ONE, football-data.org, TMDB,
+Initial adapters: TheSportsDB, official ONE, official MLB, football-data.org, TMDB,
 Wikipedia year pages, and Wikipedia list pages. The official ONE adapter can be
 reused by another promotion only when its feed contains events that promotion
 can safely filter; the UI must explain this rather than presenting every source

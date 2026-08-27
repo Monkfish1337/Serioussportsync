@@ -1033,6 +1033,15 @@ function createApp() {
 
   // --- 0.35.0: promotion creator (admin-added TSDB-backed promotions) ---
   const adminPromotions = require('./lib/admin-promotions');
+  const adminMetadata = require('./lib/admin-metadata');
+
+  app.get('/admin/metadata', requireAdmin, (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(tablerChrome.tablerPage('Metadata', adminMetadata.renderBody({ flash: req.query.flash || null }), {
+      user: req.user, currentSection: 'metadata',
+    }));
+  });
 
   app.get('/admin/promotions', requireAdmin, (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -1064,9 +1073,9 @@ function createApp() {
   app.post('/admin/metadata-sources/create', requireAdmin, (req, res) => {
     try {
       const source = adminPromotions.createMetadataSource(req.body || {});
-      res.redirect('/admin/promotions?flash=' + encodeURIComponent('Added metadata source "' + source.name + '".'));
+      res.redirect('/admin/metadata?flash=' + encodeURIComponent('Added metadata source "' + source.name + '". It is now available in Promotions.'));
     } catch (err) {
-      res.redirect('/admin/promotions?flash=' + encodeURIComponent('Add source failed: ' + err.message));
+      res.redirect('/admin/metadata?flash=' + encodeURIComponent('Add source failed: ' + err.message));
     }
   });
 

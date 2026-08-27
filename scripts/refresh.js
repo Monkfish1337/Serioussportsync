@@ -12,6 +12,8 @@ let wiki = null;
 try { wiki = require('../lib/sources/wikipedia'); } catch (e) { wiki = null; }
 let onefc = null;
 try { onefc = require('../lib/sources/onefc'); } catch (e) { onefc = null; }
+let mlb = null;
+try { mlb = require('../lib/sources/mlb'); } catch (e) { mlb = null; }
 let wikiList = null;
 try { wikiList = require('../lib/sources/wikipedia-list'); } catch (e) { wikiList = null; }
 // 0.38.0: football-data.org parallel source for custom promotions whose
@@ -94,6 +96,12 @@ async function refreshPromotion(promotion, log) {
   } else if (promotion.source.type === 'onefc') {
     if (!onefc) { log('  onefc source unavailable — skipping'); return { ok: true }; }
     raw = await onefc.fetchAll({ log });
+  } else if (promotion.source.type === 'mlb') {
+    if (!mlb) { log('  mlb source unavailable — skipping'); return { ok: true }; }
+    const today = new Date(); today.setUTCHours(0, 0, 0, 0);
+    const from = new Date(today); from.setUTCDate(from.getUTCDate() - Math.max(0, config.eventWindowDaysBack | 0));
+    const to = new Date(today); to.setUTCDate(to.getUTCDate() + Math.max(0, config.eventWindowDaysAhead | 0));
+    raw = await mlb.fetchAll({ dateFrom: from.toISOString().slice(0, 10), dateTo: to.toISOString().slice(0, 10), log });
   } else if (promotion.source.type === 'wikipedia-list') {
     if (!wikiList) { log('  wikipedia-list source unavailable — skipping'); return { ok: true }; }
     // Tell the parser the earliest date we care about so it skips year
@@ -288,7 +296,7 @@ async function runRefresh(options) {
       if (p.source.type === 'thesportsdb') norm = transform.fromTsdb(r, p);
       else if (p.source.type === 'football-data') norm = transform.fromFootballData(r, p);
       else if (p.source.type === 'tmdb') norm = transform.fromTmdb(r, p);
-      else if (p.source.type === 'wikipedia' || p.source.type === 'onefc' || p.source.type === 'wikipedia-list') {
+      else if (p.source.type === 'wikipedia' || p.source.type === 'onefc' || p.source.type === 'mlb' || p.source.type === 'wikipedia-list') {
         norm = transform.fromWiki(r, p);
       }
       if (!norm) continue;

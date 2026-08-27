@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.57.0-blue.svg" alt="Version 0.57.0"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.58.0-blue.svg" alt="Version 0.58.0"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -178,16 +178,14 @@ JSON or application code.
 - **Dashboard:** refresh metadata, inspect service health, and review state.
 - **Services:** configure direct Prowlarr and the optional companion scraper.
 - **Users:** create invites and manage shared deployments.
-- **Match editor:** add aliases or noise rules and test a release before saving.
-- **Guided promotions creator:** find a TSDB, football-data.org, or TMDB source,
-  preview real events, auto-configure matching, then create and import in one step.
-- **Content Studio:** search metadata sources, review promotion coverage, add or
-  edit events, and disable unwanted entries without losing changes on refresh.
+- **Metadata:** register reusable event schedules independently of promotions.
+  The official MLB schedule is supported directly and requires no API key.
+- **Promotions:** select a schedule, paste releases that should or should not
+  appear, review the aliases SSS learns, and test its queries before saving.
 - **Missing event inbox:** accept, merge, or ignore source events rejected by
   promotion filters and possible duplicate detection.
 - **Imports and matching assistant:** preview ICS, CSV, or JSON calendars, then
   derive event-specific search aliases and exclusions from good and bad titles.
-- **Event power tool:** run an explicit event search and inspect matching results.
 - **Logs:** inspect discovery, filtering, cache checks, and playback resolution.
 
 Content Studio uses a separate editorial layer under <code>/app/data</code>.
@@ -207,6 +205,8 @@ See [.env.example](./.env.example) for the annotated full list.
 | <code>REFRESH_INTERVAL_HOURS</code> | <code>6</code> | Metadata refresh interval |
 | <code>EVENT_WINDOW_START_DATE</code> | <code>2025-01-01</code> | Earliest catalog date |
 | <code>CONTENT_STUDIO_FILE</code> | <code>./data/content-studio.json</code> | Refresh-safe manual content and editorial decisions |
+| <code>METADATA_SOURCES_FILE</code> | <code>./data/metadata-sources.json</code> | Reusable metadata source definitions and assignments |
+| <code>CUSTOM_PROMOTIONS_FILE</code> | <code>./data/custom-promotions.json</code> | User-created promotion and release-matching rules |
 | <code>COMPANION_URL</code> | none | Optional SeriousSportScraper companion endpoint |
 | <code>PROWLARR_URL</code> / <code>PROWLARR_API_KEY</code> | none | Optional direct Prowlarr discovery |
 | <code>STREAM_MAX_ROWS</code> | <code>20</code> | Maximum stream rows returned per request |

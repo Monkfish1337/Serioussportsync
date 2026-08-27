@@ -13,6 +13,8 @@ config.metadataSourcesFile = testFile;
 const sources = require('../lib/metadata-sources');
 const promotions = require('../lib/promotions');
 const chrome = require('../lib/tabler-chrome');
+const adminMetadata = require('../lib/admin-metadata');
+const mlb = require('../lib/sources/mlb');
 
 test.after(() => {
   config.metadataSourcesFile = originalFile;
@@ -51,4 +53,29 @@ test('retired expert tools are absent from the admin sidebar', () => {
 test('rejects incomplete or duplicate source definitions', () => {
   assert.throws(() => sources.add({ id: 'bad-source', name: 'Bad', type: 'tmdb', tvIds: 'abc' }), /numeric/);
   assert.throws(() => sources.add({ id: 'tsdb-nfl', name: 'Duplicate', type: 'onefc' }), /already exists/);
+});
+
+test('creates a no-key MLB source and exposes Metadata navigation', () => {
+  const created = sources.add({ id: 'mlb-official', name: 'Official MLB schedule', type: 'mlb' });
+  assert.deepEqual(created.source, { type: 'mlb' });
+  assert.ok(chrome.ADMIN_SECTIONS.some((item) => item.id === 'metadata'));
+  const html = adminMetadata.renderBody({});
+  assert.match(html, /MLB official schedule/);
+  const script = html.match(/<script>([\s\S]*?)<\/script>/);
+  assert.ok(script);
+  assert.doesNotThrow(() => new Function(script[1])); // eslint-disable-line no-new-func
+});
+
+test('normalizes an official MLB fixture into a generic event record', () => {
+  const raw = mlb.toRaw({
+    gamePk: 825039,
+    officialDate: '2026-08-26',
+    gameDate: '2026-08-26T20:10:00Z',
+    teams: { away: { team: { name: 'Chicago Cubs' } }, home: { team: { name: 'Arizona Diamondbacks' } } },
+    venue: { name: 'Chase Field' },
+    status: { detailedState: 'Scheduled' },
+  });
+  assert.equal(raw.name, 'Chicago Cubs vs Arizona Diamondbacks');
+  assert.equal(raw.source.type, 'mlb');
+  assert.equal(raw.source.gamePk, '825039');
 });
