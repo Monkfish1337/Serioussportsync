@@ -167,4 +167,8 @@ module.exports = {
     ttlDays: parseFloat(process.env.POSITIVE_CACHE_TTL_DAYS || '7'),
   },
 
+  // Unified search/result/availability knowledge used to avoid repeat provider
+  // queries. Provider payloads are encrypted before entering SQLite.
+  availabilityDbFile: process.env.AVAILABILITY_DB_FILE || './data/availability.sqlite',
+
 };

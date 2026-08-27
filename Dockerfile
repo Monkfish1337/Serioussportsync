@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.6
 
 # ---- build stage --------------------------------------------------------
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 
 # Copy lockfile + manifest first so this layer caches between source edits.
@@ -9,7 +9,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev --no-audit --no-fund
 
 # ---- runtime stage ------------------------------------------------------
-FROM node:20-alpine AS runtime
+FROM node:24-alpine AS runtime
 WORKDIR /app
 
 # tini is a tiny init that reaps zombies and forwards SIGTERM cleanly.

@@ -22,6 +22,7 @@ const rdDenylist = require('./lib/rd-denylist');
 const tbDenylist = require('./lib/tb-denylist');
 const pmDenylist = require('./lib/pm-denylist');
 const positiveCache = require('./lib/positive-cache');
+const availabilityStore = require('./lib/availability-index');
 // 0.27.0: in-memory log buffer for /admin/logs.
 const logBuffer = require('./lib/log-buffer');
 const security = require('./lib/security');
@@ -751,8 +752,8 @@ function createApp() {
     res.send(JSON.stringify({ rows, stats: logBuffer.counts() }));
   });
 
-  // 0.24.0: admin observability page. Surfaces denylist sizes, positive-cache
-  // hits and provider state — everything that used to require SSH + cat.
+  // Admin observability for denylist, legacy positive-cache, and the unified
+  // availability index — everything that used to require SSH + file access.
   // Each card has wipe buttons for the things that
   // are safe to nuke (denylists / positive cache; not user data).
   app.get('/admin/health', requireAdmin, (req, res) => {
@@ -769,6 +770,7 @@ function createApp() {
         case 'tb-denylist': tbDenylist.wipe(); msg = 'TB denylist wiped.'; break;
         case 'pm-denylist': pmDenylist.wipe(); msg = 'PM denylist wiped.'; break;
         case 'positive-cache': positiveCache.wipe(); msg = 'Positive cache wiped.'; break;
+        case 'availability-index': availabilityStore.getDefault().wipe(); msg = 'Smart availability index wiped.'; break;
         default: return res.redirect('/admin/health?flash=' + encodeURIComponent('Unknown wipe kind: ' + kind));
       }
       res.redirect('/admin/health?flash=' + encodeURIComponent(msg));
@@ -784,6 +786,10 @@ function createApp() {
   // container's bundled tar binary so we don't bloat the npm tree.
   app.get('/admin/backup', requireAdmin, (req, res) => {
     const { spawn } = require('child_process');
+    // Fold the WAL into the main database so a copied archive is immediately
+    // self-contained even when no later write has triggered a checkpoint.
+    try { availabilityStore.getDefault().checkpoint(); }
+    catch (error) { console.error('[availability] backup checkpoint failed:', error.message); }
     const dataDir = path.dirname(config.dataFile); // ./data → /app/data
     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const filename = 'serioussportsync-backup-' + ts + '.tar.gz';
@@ -1351,10 +1357,29 @@ function renderHealthPage(currentUser, opts) {
     .map((p) => p.toUpperCase() + ': ' + (posS.byProvider[p] || 0))
     .join(' &middot; ');
   const positiveCardHtml = statCard(
-    'Positive cache',
+    'Legacy positive history',
     '<strong>' + posS.freshEntries + '</strong> <span class="text-secondary fs-4">fresh entr' + (posS.freshEntries === 1 ? 'y' : 'ies') + '</span>',
-    'across ' + posS.totalHashes + ' hash' + (posS.totalHashes === 1 ? '' : 'es') + ' &middot; ' + byProvText + ' &middot; TTL ' + posS.ttlDays + 'd',
-    '<form method="POST" action="/admin/health/wipe/positive-cache" onsubmit="return confirm(\'Wipe positive cache? All known-cached (hash, provider) entries will be removed.\');" class="d-inline">'
+    'Imported once into Smart Availability; retained for rollback &middot; ' + posS.totalHashes + ' hash' + (posS.totalHashes === 1 ? '' : 'es') + ' &middot; ' + byProvText,
+    '<form method="POST" action="/admin/health/wipe/positive-cache" onsubmit="return confirm(\'Wipe legacy positive history? The Smart Availability import will not be removed.\');" class="d-inline">'
+      + '<button type="submit" class="btn btn-sm btn-outline-danger">Wipe</button>'
+      + '</form>'
+  );
+
+  let availabilityStats = {
+    releases: 0, eventMatches: 0, freshSearches: 0, freshObservations: 0,
+    searchHits: 0, searchMisses: 0, hitRate: 0, byProvider: {},
+  };
+  try { availabilityStats = availabilityStore.getDefault().stats(); } catch (_) { /* */ }
+  const availabilityProviders = Object.entries(availabilityStats.byProvider || {})
+    .map(([provider, count]) => escapeHtml(provider) + ': ' + count).join(' &middot; ') || 'no observations yet';
+  const availabilityCardHtml = statCard(
+    'Smart availability index',
+    '<strong>' + availabilityStats.releases + '</strong> <span class="text-secondary fs-4">release' + (availabilityStats.releases === 1 ? '' : 's') + '</span>',
+    availabilityStats.eventMatches + ' event matches &middot; '
+      + availabilityStats.freshSearches + ' fresh searches &middot; '
+      + Math.round(availabilityStats.hitRate * 100) + '% query hit rate<br>'
+      + availabilityProviders,
+    '<form method="POST" action="/admin/health/wipe/availability-index" onsubmit="return confirm(\'Wipe the smart availability index? Provider searches will run again as needed.\');" class="d-inline">'
       + '<button type="submit" class="btn btn-sm btn-outline-danger">Wipe</button>'
       + '</form>'
   );
@@ -1363,7 +1388,7 @@ function renderHealthPage(currentUser, opts) {
   const backupCardHtml = statCard(
     'Backup',
     '<span class="text-secondary fs-3">tar.gz</span>',
-    'Timestamped tar.gz of /app/data (events, users, settings, denylists, and positive cache).',
+    'Timestamped tar.gz of /app/data, including the smart availability database.',
     '<a href="/admin/backup" class="btn btn-sm btn-outline-primary">Download backup</a>'
   );
 
@@ -1372,7 +1397,7 @@ function renderHealthPage(currentUser, opts) {
     +   '<div class="row align-items-center">'
     +     '<div class="col">'
     +       '<h2 class="page-title">Health</h2>'
-    +       '<div class="text-secondary mt-1">Admin observability — provider denylists and positive cache.</div>'
+    +       '<div class="text-secondary mt-1">Admin observability — provider health and reusable availability knowledge.</div>'
     +     '</div>'
     +   '</div>'
     + '</div>'
@@ -1382,6 +1407,7 @@ function renderHealthPage(currentUser, opts) {
     +   denyCard('TB', tbDenylist)
     +   denyCard('PM', pmDenylist)
     +   positiveCardHtml
+    +   availabilityCardHtml
     +   backupCardHtml
     + '</div>';
 
@@ -1403,7 +1429,7 @@ function renderLogsPage(currentUser, q) {
   const stats = logBuffer.counts();
   const rows = logBuffer.filtered({ category, user: userFilter, substring, level, limit });
 
-  const knownCats = ['stream','resolve','warm','refresh','admin','server','denylist','positive-cache','dead-indexer','onefc','crypto-keys','users','other'];
+  const knownCats = ['stream','resolve','warm','refresh','admin','server','availability','denylist','positive-cache','dead-indexer','onefc','crypto-keys','users','other'];
   const seenCats = new Set(Object.keys(stats.byCategory || {}));
   knownCats.forEach((c) => seenCats.add(c));
   const cats = ['all', ...Array.from(seenCats).sort()];

@@ -10,6 +10,7 @@ logBuffer.wrapConsole(console);
 const { createApp } = require('./addon');
 const store = require('./lib/store');
 const { runRefresh } = require('./scripts/refresh');
+const availabilityStore = require('./lib/availability-index');
 
 // SESSION_SECRET hard-fail (0.22.2). A missing or short shared secret would
 // make session, resolve-signature, and encrypted-provider protections unsafe.
@@ -32,6 +33,22 @@ const { runRefresh } = require('./scripts/refresh');
 
 const app = createApp();
 
+// Open and migrate the availability index before accepting traffic. The
+// original positive-cache file remains untouched as a rollback-safe source.
+let availabilityIndex = null;
+try {
+  availabilityIndex = availabilityStore.getDefault();
+  const availabilityMigration = availabilityIndex.migratePositiveCache(config.positiveCache.file);
+  const availabilityPruned = availabilityIndex.prune();
+  console.log('[availability] SQLite ready (' + availabilityIndex.stats().releases
+    + ' releases, imported ' + availabilityMigration.imported + ', pruned '
+    + Object.values(availabilityPruned).reduce((sum, value) => sum + value, 0) + ')');
+} catch (error) {
+  // Availability knowledge is an optimization. A damaged/locked cache must not
+  // take the metadata and existing playback pipelines offline.
+  console.error('[availability] disabled for this process:', error.message);
+}
+
 // Warm the cache on boot so the first request is fast.
 const initial = store.loadFromDisk();
 const initialCount = (initial.events || []).length;
@@ -45,6 +62,17 @@ const server = app.listen(config.port, config.host, () => {
 });
 
 function scheduleBackgroundWork(currentCount) {
+  const availabilityTimer = availabilityIndex && setInterval(() => {
+    try {
+      const removed = availabilityIndex.prune();
+      const total = Object.values(removed).reduce((sum, value) => sum + value, 0);
+      if (total) console.log('[availability] pruned ' + total + ' expired row(s)');
+    } catch (error) {
+      console.error('[availability] scheduled prune failed:', error.message);
+    }
+  }, 6 * 60 * 60 * 1000);
+  if (availabilityTimer && typeof availabilityTimer.unref === 'function') availabilityTimer.unref();
+
   // Empty cache: refresh right away in the background.
   if (config.refreshOnEmptyCache && currentCount === 0) {
     console.log('[serioussportsync] cache empty — kicking off initial refresh in background');
@@ -75,7 +103,10 @@ function scheduleBackgroundWork(currentCount) {
 // Graceful shutdown so Docker's SIGTERM closes connections cleanly.
 function shutdown(signal) {
   console.log(`[serioussportsync] ${signal} received, shutting down`);
-  server.close(() => process.exit(0));
+  server.close(() => {
+    try { if (availabilityIndex) availabilityIndex.close(); } catch (_) { /* already closed */ }
+    process.exit(0);
+  });
   setTimeout(() => process.exit(1), 10000).unref();
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));

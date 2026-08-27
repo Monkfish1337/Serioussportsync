@@ -33,6 +33,10 @@ can manage only their own playback providers and catalog preferences.
 - Provider credentials, provider usernames, private install tokens, and UU
   manifest URLs are encrypted at rest. Logs and browser errors redact common
   secret-bearing query parameters and URL credentials.
+- Smart Availability Index provider payloads are encrypted before entering
+  SQLite. Reusable release metadata may be shared locally, but availability
+  observations are keyed by a non-reversible credential/configuration scope so
+  one account cannot inherit another account's provider access.
 - Configurable HTTP endpoints reject URL credentials, cloud metadata addresses,
   unsafe protocols, and secret query parameters where a separate credential
   field exists. Local Docker/private-network service names remain supported.

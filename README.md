@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.64.0-blue.svg" alt="Version 0.64.0"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.65.0-blue.svg" alt="Version 0.65.0"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -30,6 +30,8 @@ user-supplied, and remains under the operator's control.
 - Reject interviews, countdown shows, wrong years, wrong rounds, and unrelated releases.
 - Give every account its own private install URL, drag-ordered catalogs, and playback credentials.
 - Add simple TSDB-backed sports and tune matching rules from the admin interface.
+- Reuse encrypted provider searches and account-scoped availability observations
+  instead of repeating the same work whenever an event is opened.
 - Deploy and update with Docker Compose while preserving state in a named volume.
 
 ## Supported sports
@@ -50,6 +52,12 @@ user-supplied, and remains under the operator's control.
 
 Playback is optional. SeriousSportSync can combine multiple pipelines and
 returns only the rows that finish within the configured request budget.
+
+The local Smart Availability Index stores encrypted, normalized discoveries in
+SQLite. Fresh Torrent, UU, native indexer, and Easynews searches are reused;
+TorBox cache observations remain isolated by account credentials. Current stream
+rows and provider toggles remain unchanged while this knowledge base is populated
+for the upcoming Smart Play selector.
 
 | Discovery | Per-user playback | How it works |
 | --- | --- | --- |
@@ -219,6 +227,7 @@ See [.env.example](./.env.example) for the annotated full list.
 | <code>METADATA_SOURCES_FILE</code> | <code>./data/metadata-sources.json</code> | Reusable metadata source definitions and assignments |
 | <code>CUSTOM_PROMOTIONS_FILE</code> | <code>./data/custom-promotions.json</code> | User-created promotion and release-matching rules |
 | <code>NUVIO_COLLECTIONS_FILE</code> | <code>./data/nuvio-collections.json</code> | Nuvio collection title, folders, promotion assignments, and artwork |
+| <code>AVAILABILITY_DB_FILE</code> | <code>./data/availability.sqlite</code> | Encrypted reusable provider searches, event/release matches, card-part classification, and scoped availability observations |
 | <code>COMPANION_URL</code> | none | Optional SeriousSportScraper companion endpoint |
 | <code>PROWLARR_URL</code> / <code>PROWLARR_API_KEY</code> | none | Optional direct Prowlarr discovery |
 | <code>STREAM_MAX_ROWS</code> | <code>20</code> | Maximum stream rows returned per request |
@@ -233,6 +242,9 @@ The private manifest URL grants
 use, not editing access, and can be rotated from that page. Server-wide discovery
 credentials belong in Admin or the root environment. Companion-managed sources
 belong in the companion's own settings.
+
+Running from source requires Node.js 22 or newer. The supplied container uses
+Node.js 24 LTS.
 
 ## Development
 

@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.65.0
+
+### Smart Availability Index foundation
+
+- Added a local, WAL-backed SQLite availability database with schema migrations,
+  retention, safe backup checkpoints, health statistics, and an admin wipe action.
+- Reused fresh Torrent, Usenet Ultimate, native Newznab/Prowlarr, and Easynews
+  searches before making repeat provider calls; concurrent identical misses now
+  share a single request and negative results use a short TTL.
+- Stored provider payloads encrypted and isolated availability observations by
+  non-reversible credential/configuration scope fingerprints.
+- Reused fresh per-account TorBox cache observations and recorded successful or
+  failed TorBox, Easynews, NZB DAV, and native NNTP playback attempts.
+- Added reusable Full Event, Main Card, Prelims, Early Prelims, and Unknown
+  release classification without changing current stream output.
+- Imported legacy positive-cache history without deleting the rollback source.
+- Upgraded the container and CI runtime from end-of-life Node.js 20 to Node.js 24
+  LTS and raised source installations to Node.js 22 or newer.
+
 ## 0.64.0
 
 ### P1 security hardening

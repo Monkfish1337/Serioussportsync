@@ -9,6 +9,21 @@ limits, minimal public health output, dependency auditing, and non-root
 read-only container hardening are implemented and regression-tested. See
 `docs/SECURITY.md` for the deployment boundary and control inventory.
 
+## Smart Availability and one-click playback
+
+Phase 1 is implemented in v0.65.0. A local SQLite index now stores encrypted
+Torrent, UU, native indexer, and Easynews searches; normalized releases;
+event/release matches; conservative card-part classifications; and scoped
+provider availability observations. Fresh searches are served database-first,
+concurrent misses are coalesced, negative results expire quickly, TorBox cache
+checks reuse account-scoped observations, successful playback raises confidence,
+and the original stream rows remain unchanged. Legacy positive-cache knowledge
+is imported without deleting its rollback source.
+
+Next phases will add provider-priority settings and Smart Play rows for Full
+Event, Main Card, Prelims, and Early Prelims, followed by a short fallback
+resolver that selects the best recently verified candidate on click.
+
 ## Next major feature: guided promotion builder
 
 Replace the fragmented expert tooling with one workflow under Promotions:
