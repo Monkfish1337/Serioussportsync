@@ -1,5 +1,14 @@
 # SeriousSportSync roadmap
 
+## P1 security hardening
+
+Progress: complete in v0.64.0. Authentication/session revocation, cross-site
+mutation protection, browser headers and CORS scoping, trusted-proxy handling,
+secret storage/redaction, configurable URL boundaries, outbound response
+limits, minimal public health output, dependency auditing, and non-root
+read-only container hardening are implemented and regression-tested. See
+`docs/SECURITY.md` for the deployment boundary and control inventory.
+
 ## Next major feature: guided promotion builder
 
 Replace the fragmented expert tooling with one workflow under Promotions:

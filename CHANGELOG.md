@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.64.0
+
+### P1 security hardening
+
+- Added same-origin mutation enforcement, POST-only logout, scoped addon CORS,
+  non-cacheable account/admin pages, and CSP/frame/MIME/referrer/permissions
+  browser protections.
+- Made forwarded IP/host/protocol trust explicit with `TRUST_PROXY=1`, preventing
+  direct clients from bypassing login throttling or spoofing generated origins.
+- Added versioned sessions so password and role changes immediately revoke
+  existing cookies, and removed production secret fallbacks from session,
+  resolve-signature, and encryption code paths.
+- Encrypted UU manifest URLs and provider usernames at rest in addition to
+  existing provider secrets and private install tokens.
+- Hardened configurable HTTP endpoints against URL credentials, secret query
+  parameters, cloud metadata targets, unsafe redirects, and proxy-log leakage.
+- Added hard response-size ceilings for companion, Prowlarr search/torrent, and
+  NZB DAV control traffic; retained existing bounded indexer, WebDAV, NNTP, NZB,
+  and archive handling.
+- Reduced public health output to operational status only and restricted
+  wildcard CORS to client-facing addon API routes.
+- Hardened supplied containers with read-only roots, bounded tmpfs, all Linux
+  capabilities dropped, non-root execution, and no-new-privileges, with CI
+  assertions for those controls.
+- Completed a production dependency audit with zero known vulnerabilities and
+  added focused security and bounded-response regression coverage.
+
 ## 0.63.0
 
 - Fully retired the standalone Power Tool, Search, Match Editor, and Content

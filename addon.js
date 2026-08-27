@@ -24,6 +24,7 @@ const pmDenylist = require('./lib/pm-denylist');
 const positiveCache = require('./lib/positive-cache');
 // 0.27.0: in-memory log buffer for /admin/logs.
 const logBuffer = require('./lib/log-buffer');
+const security = require('./lib/security');
 // 0.37.0: Tabler-based page chrome (sidebar + topbar + container layout).
 // Used by all post-0.37.0 page renders; the legacy accountPage() wrapper
 // below remains for any unconverted pages and is removed once all renders
@@ -40,15 +41,7 @@ const APP_VERSION = require('./package.json').version || '?';
 // generate in HTML reflect the user's actual entry URL, not the internal
 // container address. Falls back to req.protocol/host, then to PUBLIC_URL env.
 function publicOriginFromReq(req) {
-  if (req) {
-    const xfp = (req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
-    const xfh = (req.headers['x-forwarded-host'] || '').split(',')[0].trim();
-    const proto = xfp || req.protocol || 'http';
-    const host = xfh || req.headers.host || '';
-    if (host) return proto + '://' + host;
-  }
-  if (config.publicUrl) return config.publicUrl.replace(/\/+$/, '');
-  return '';
+  return security.publicOrigin(req);
 }
 
 // Login rate-limiter (0.22.2). In-memory per-client-IP counter of failed login
@@ -62,12 +55,14 @@ const LOGIN_LOCKOUT_MS = parseInt(process.env.LOGIN_LOCKOUT_MS || (15 * 60 * 100
 const loginFails = new Map(); // ip -> { fails, firstFailAt, lockUntil }
 
 function clientIp(req) {
-  // Cloudflare Tunnel forwards the real IP in CF-Connecting-IP. Fall through
-  // to the standard proxy chain header, then the socket address.
-  const cf = req.headers['cf-connecting-ip'];
-  if (cf) return String(cf).trim();
-  const xff = req.headers['x-forwarded-for'];
-  if (xff) return String(xff).split(',')[0].trim();
+  // Forwarded addresses are attacker-controlled unless the deployment has
+  // explicitly declared its reverse proxy trusted.
+  if (config.trustProxy) {
+    const cf = req.headers['cf-connecting-ip'];
+    if (cf) return String(cf).trim();
+    const xff = req.headers['x-forwarded-for'];
+    if (xff) return String(xff).split(',')[0].trim();
+  }
   return (req.socket && req.socket.remoteAddress) || 'unknown';
 }
 
@@ -104,19 +99,19 @@ function recordLoginFail(ip) {
 function clearLoginFails(ip) { loginFails.delete(ip); }
 
 function createApp() {
+  security.assertRuntimeConfig();
   const app = express();
   app.disable('x-powered-by');
+  app.use(security.headers);
 
-  // Content Studio imports are still plain text forms, but calendar files can
-  // reasonably exceed the old settings-only 16 KB ceiling.
-  app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+  app.use(express.urlencoded({ extended: false, limit: '256kb', parameterLimit: 500 }));
 
   // Attach req.user from session cookie if present.
   function loadSession(req, res, next) {
     const sess = sessions.readSession(req);
     if (sess && sess.userId) {
       const u = users.findById(sess.userId);
-      if (u) {
+      if (u && Number(u.sessionVersion || 1) === Number(sess.sessionVersion || 1)) {
         req.user = u;
         users.touchLastSeen(u.id);
       }
@@ -124,6 +119,7 @@ function createApp() {
     next();
   }
   app.use(loadSession);
+  app.use(security.csrf);
 
   function requireLogin(req, res, next) {
     if (!req.user) return res.redirect('/login');
@@ -141,14 +137,9 @@ function createApp() {
     next();
   }
 
-  // CORS — needed for the Stremio install URL.
-  app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    if (req.method === 'OPTIONS') return res.sendStatus(204);
-    next();
-  });
+  // CORS is needed only for addon API resources consumed by clients. Admin,
+  // account, setup, login, health, and invite responses remain same-origin.
+  app.use(security.cors);
 
   // Branded artwork (UFC/WWE upcoming logo cards, etc). Public, no auth.
   app.use('/assets', express.static(path.join(__dirname, 'public'), { maxAge: '7d' }));
@@ -165,17 +156,11 @@ function createApp() {
     const events = store.getEvents();
     const meta = store.loadFromDisk() || {};
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    const companion = settings.getCompanion();
-    const prowlarr = settings.getProwlarr();
     res.send(JSON.stringify({
       ok: true,
+      version: APP_VERSION,
       events: events.length,
       updatedAt: meta.updatedAt || null,
-      companionConfigured: !!(companion && companion.url),
-      prowlarrConfigured: !!(prowlarr && prowlarr.url && prowlarr.apiKey),
-      accountsEnabled: true,
-      promotions: promotions.enabled.map((p) => p.id),
-      userCount: users.userCount(),
     }));
   });
 
@@ -207,7 +192,7 @@ function createApp() {
     const password = String(req.body.password || '');
     try {
       const u = await users.createUser({ username, password, role: 'admin' });
-      sessions.setCookie(res, u.id, req);
+      sessions.setCookie(res, u, req);
       res.redirect('/account');
     } catch (err) {
       res.status(400).send(authPage('Setup failed',
@@ -268,13 +253,12 @@ function createApp() {
       ));
     }
     clearLoginFails(ip);
-    sessions.setCookie(res, u.id, req);
+    sessions.setCookie(res, u, req);
     users.touchLastSeen(u.id);
     res.redirect('/account');
   });
 
   app.post('/logout', (req, res) => { sessions.clearCookie(res, req); res.redirect('/login'); });
-  app.get('/logout',  (req, res) => { sessions.clearCookie(res, req); res.redirect('/login'); });
 
   app.get('/account', requireLogin, (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -327,7 +311,9 @@ function createApp() {
           || b.uuEnabled === '1' || b.uuEnabled === 'true',
         easynewsEnabled: b.easynewsEnabled === 'on'
           || b.easynewsEnabled === '1' || b.easynewsEnabled === 'true',
-        uuManifestUrl: String(b.uuManifestUrl || '').trim(),
+        uuManifestUrl: security.cleanHttpUrl(b.uuManifestUrl, {
+          label: 'Usenet Ultimate manifest URL', allowSensitiveQuery: true,
+        }),
         torboxApiKey: String(b.torboxApiKey || '').trim(),
         easynewsUsername: String(b.easynewsUsername || '').trim(),
         easynewsPassword: String(b.easynewsPassword || ''),
@@ -339,11 +325,11 @@ function createApp() {
           || b.diyUuSearchEnabled === '1' || b.diyUuSearchEnabled === 'true',
         diySearchKind: String(b.diySearchKind || '') === 'prowlarr' ? 'prowlarr' : 'newznab',
         diySearchName: String(b.diySearchName || '').trim().slice(0, 80),
-        diySearchUrl: String(b.diySearchUrl || '').trim(),
+        diySearchUrl: security.cleanHttpUrl(b.diySearchUrl, { label: 'Search URL' }),
         diySearchApiKey: String(b.diySearchApiKey || ''),
-        nzbdavUrl: String(b.nzbdavUrl || '').trim(),
+        nzbdavUrl: security.cleanHttpUrl(b.nzbdavUrl, { label: 'NZB DAV API URL' }),
         nzbdavApiKey: String(b.nzbdavApiKey || ''),
-        nzbdavWebdavUrl: String(b.nzbdavWebdavUrl || '').trim(),
+        nzbdavWebdavUrl: security.cleanHttpUrl(b.nzbdavWebdavUrl, { label: 'NZB DAV WebDAV URL' }),
         nzbdavWebdavUsername: String(b.nzbdavWebdavUsername || '').trim(),
         nzbdavWebdavPassword: String(b.nzbdavWebdavPassword || ''),
         nativeNntpEnabled: b.nativeNntpEnabled === 'on'
@@ -366,7 +352,7 @@ function createApp() {
       });
       res.redirect('/account?flash=saved');
     } catch (err) {
-      res.redirect('/account?flash=' + encodeURIComponent('Save failed: ' + err.message));
+      res.redirect('/account?flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(err)));
     }
   });
 
@@ -385,7 +371,7 @@ function createApp() {
       }, '/');
       res.redirect('/account?flash=' + encodeURIComponent('NZB DAV API and WebDAV connected'));
     } catch (error) {
-      res.redirect('/account?flash=' + encodeURIComponent('NZB DAV connection failed: ' + error.message));
+      res.redirect('/account?flash=' + encodeURIComponent('NZB DAV connection failed: ' + security.safeErrorMessage(error)));
     }
   });
 
@@ -405,7 +391,7 @@ function createApp() {
         'Native Usenet search connected: ' + result.results.length + ' result(s) for "' + query + '"'));
     } catch (error) {
       res.redirect('/account?flash=' + encodeURIComponent(
-        'Native Usenet search failed: ' + error.message));
+        'Native Usenet search failed: ' + security.safeErrorMessage(error)));
     }
   });
 
@@ -423,7 +409,7 @@ function createApp() {
         'Native NNTP connected and authenticated' + (result.proxied ? ' through the outbound proxy' : '')));
     } catch (error) {
       res.redirect('/account?flash=' + encodeURIComponent(
-        'Native NNTP connection failed: ' + error.message));
+        'Native NNTP connection failed: ' + security.safeErrorMessage(error)));
     }
   });
 
@@ -821,11 +807,11 @@ function createApp() {
     const b = req.body || {};
     try {
       settings.setCompanion({
-        url: String(b.companionUrl || ''),
+        url: security.cleanHttpUrl(b.companionUrl, { label: 'Companion URL' }),
         authToken: String(b.companionAuthToken || ''),
       });
       settings.setProwlarr({
-        url: String(b.prowlarrUrl || ''),
+        url: security.cleanHttpUrl(b.prowlarrUrl, { label: 'Prowlarr URL' }),
         apiKey: String(b.prowlarrApiKey || ''),
       });
       // 0.38.1: football-data.org API key — admin-saved value wins over the
@@ -835,7 +821,7 @@ function createApp() {
       });
       res.redirect('/admin?flash=' + encodeURIComponent('Sources saved.'));
     } catch (err) {
-      res.redirect('/admin?flash=' + encodeURIComponent('Save failed: ' + err.message));
+      res.redirect('/admin?flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(err)));
     }
   });
 
@@ -1089,7 +1075,7 @@ function createApp() {
     const password = String(req.body.password || '');
     try {
       const u = await users.consumeInvite(req.params.token, password);
-      sessions.setCookie(res, u.id, req);
+      sessions.setCookie(res, u, req);
       res.redirect('/account?flash=' + encodeURIComponent('Welcome! Your account has been created.'));
     } catch (err) {
       res.status(400).send(authPage('Invite accept failed',

@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.63.0-blue.svg" alt="Version 0.63.0"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.64.0-blue.svg" alt="Version 0.64.0"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -212,6 +212,7 @@ See [.env.example](./.env.example) for the annotated full list.
 | <code>SESSION_SECRET</code> | required | Signs login cookies; use at least 32 random characters |
 | <code>ADMIN_USER</code> | none | Username promoted to administrator during initial signup |
 | <code>PUBLIC_URL</code> | auto-detected | Public origin used for private install and resolve URLs |
+| <code>TRUST_PROXY</code> | <code>false</code> | Set to <code>1</code> only when SSS is exclusively behind your trusted reverse proxy/tunnel; enables forwarded client IP, host, protocol, and secure-cookie handling |
 | <code>REFRESH_INTERVAL_HOURS</code> | <code>6</code> | Metadata refresh interval |
 | <code>EVENT_WINDOW_START_DATE</code> | <code>2025-01-01</code> | Earliest catalog date |
 | <code>CONTENT_STUDIO_FILE</code> | <code>./data/content-studio.json</code> | Refresh-safe manual content and editorial decisions |
@@ -248,6 +249,9 @@ added from the Promotions creator instead.
 Pull requests run JavaScript/module-load validation and a Docker Compose smoke
 deployment. Merges to <code>main</code> publish the public container image to
 GHCR and test that image through Compose.
+
+The deployment threat model, trusted-proxy guidance, encrypted data inventory,
+and reporting process are documented in [Security](docs/SECURITY.md).
 
 ## Responsible use
 

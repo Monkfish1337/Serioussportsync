@@ -49,6 +49,15 @@ function listen(app) {
     const account = await fetch(base + '/account', { headers: { Cookie: cookie } });
     assert.strictEqual(account.status, 200);
     assert.strictEqual(account.headers.get('cache-control'), 'no-store');
+    assert.strictEqual(account.headers.get('x-frame-options'), 'DENY');
+    assert.strictEqual(account.headers.get('x-content-type-options'), 'nosniff');
+    assert.ok(String(account.headers.get('content-security-policy') || '').includes("frame-ancestors 'none'"));
+    assert.strictEqual(account.headers.get('access-control-allow-origin'), null,
+      'account HTML is not exposed through wildcard CORS');
+    const manifest = await fetch(base + '/u/' + user.id + '/' + user.apiToken + '/manifest.json');
+    assert.strictEqual(manifest.status, 200);
+    assert.strictEqual(manifest.headers.get('access-control-allow-origin'), '*',
+      'addon API retains client-compatible CORS');
     const html = await account.text();
     for (const expected of [
       'Configure SeriousSportSync',
@@ -92,6 +101,24 @@ function listen(app) {
     for (const removed of ['TorBox Unified diagnostic', 'torbox-unified-probe', '#edit=']) {
       assert.ok(!html.includes(removed), 'account page omits ' + removed);
     }
+
+    const crossSiteSave = await fetch(base + '/account/save', {
+      method: 'POST',
+      redirect: 'manual',
+      headers: {
+        Cookie: cookie,
+        Origin: 'https://evil.example',
+        'Sec-Fetch-Site': 'cross-site',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'torboxApiKey=must-not-save',
+    });
+    assert.strictEqual(crossSiteSave.status, 403, 'cross-site account mutations are rejected');
+
+    const getLogout = await fetch(base + '/logout', {
+      method: 'GET', redirect: 'manual', headers: { Cookie: cookie },
+    });
+    assert.strictEqual(getLogout.status, 404, 'logout is POST-only');
 
     for (const legacy of [
       { method: 'GET', path: '/admin/power-tool' },
@@ -195,6 +222,10 @@ function listen(app) {
     assert.ok(!usersOnDisk.includes('test-webdav-secret'));
     assert.ok(!usersOnDisk.includes('test-search-api-secret'));
     assert.ok(!usersOnDisk.includes('test-nntp-secret'));
+    assert.ok(!usersOnDisk.includes('https://uu.example/private/manifest.json'));
+    assert.ok(!usersOnDisk.includes('test-easynews-user'));
+    assert.ok(!usersOnDisk.includes('dav-user'));
+    assert.ok(!usersOnDisk.includes('nntp-user'));
     assert.deepStrictEqual(saved.catalogs, [firstCatalog]);
     assert.strictEqual(saved.maxStreams, 7);
     assert.strictEqual(saved.showWarmRows, true);
@@ -244,6 +275,13 @@ function listen(app) {
       headers: { Cookie: cookie },
     });
     assert.strictEqual(removedProbe.status, 404, 'obsolete TorBox probe endpoint stays removed');
+
+    await users.setPassword(user.id, 'replacement-password-063');
+    const revokedSession = await fetch(base + '/account', {
+      redirect: 'manual', headers: { Cookie: cookie },
+    });
+    assert.strictEqual(revokedSession.status, 302, 'password changes revoke existing sessions');
+    assert.strictEqual(revokedSession.headers.get('location'), '/login');
 
     console.log('OK — account configuration, persistence, retired-tool redirects, exports, and retired diagnostic verified.');
   } finally {

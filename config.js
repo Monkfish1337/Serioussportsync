@@ -22,6 +22,7 @@ module.exports = {
   port: parseInt(process.env.PORT, 10) || 7000,
   host: process.env.HOST || '0.0.0.0',
   publicUrl: process.env.PUBLIC_URL || '',
+  trustProxy: process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY === 'true',
 
   addonType: process.env.ADDON_TYPE || 'movie',
 

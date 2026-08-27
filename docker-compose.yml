@@ -22,6 +22,13 @@ services:
       ADMIN_USER: "${ADMIN_USER:-}"
     volumes:
       - serioussportsync_data:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     ports:
       # Keep direct origin access on this host. Put a reverse proxy or
       # Cloudflare Tunnel in front instead of exposing port 7000 to the LAN.

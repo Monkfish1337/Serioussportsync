@@ -60,3 +60,16 @@ test('enforces the NZB response size before buffering', async () => {
     return true;
   });
 });
+
+test('rejects redirects into cloud metadata services', async () => {
+  await assert.rejects(playback.downloadNzb('https://indexer.example/get/1', {
+    fetchImpl: async () => ({
+      ok: false, status: 302,
+      headers: { get: (name) => name === 'location' ? 'http://169.254.169.254/latest/meta-data' : null },
+    }),
+  }), (error) => {
+    assert.equal(error.code, 'invalid-nzb-url');
+    assert.doesNotMatch(error.message, /169\.254/);
+    return true;
+  });
+});

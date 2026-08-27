@@ -1,5 +1,8 @@
 'use strict';
 
+process.env.SESSION_SECRET = process.env.SESSION_SECRET
+  || 'candidate-test-secret-00000000000000000000000000000000';
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');

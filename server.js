@@ -11,10 +11,9 @@ const { createApp } = require('./addon');
 const store = require('./lib/store');
 const { runRefresh } = require('./scripts/refresh');
 
-// SESSION_SECRET hard-fail (0.22.2). If unset or too short, sessions fall back
-// to a derived secret that can be guessed across default-config instances,
-// which is unsafe for any deployment that lets other people log in. Refuse to
-// boot instead of silently using the weak fallback. Dev-only escape hatch:
+// SESSION_SECRET hard-fail (0.22.2). A missing or short shared secret would
+// make session, resolve-signature, and encrypted-provider protections unsafe.
+// Refuse to boot instead of permitting an implicit production fallback. Dev-only escape hatch:
 // ALLOW_INSECURE_SECRET=1 (use only when iterating locally).
 (function enforceSessionSecret() {
   const secret = process.env.SESSION_SECRET || '';

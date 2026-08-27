@@ -25,6 +25,11 @@ services:
       - "${SSS_BIND_ADDRESS:-127.0.0.1}:${SSS_HOST_PORT:-7000}:7000"
     volumes:
       - "${SSS_DATA_PATH:-/mnt/storage/stremio-stack/serioussportsync-data}:/app/data"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
     networks:
       - stremio-net
     security_opt:
