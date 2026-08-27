@@ -35,7 +35,10 @@ tests saved or draft definitions, and previews normalized events without
 mutating catalog data. Promotions can reassign both built-in and custom
 promotions. An official, no-key MLB schedule adapter has been added and
 smoke-tested through source creation, preview, promotion matching, refresh, and
-stored event output. Event-diff preview and replacing dispatcher branches remain.
+stored event output. Promotion refreshes and source changes now require a
+read-only event diff showing added, updated, unchanged, and removed records
+before the mutating action is enabled. Replacing dispatcher branches with a
+common adapter registry remains.
 
 The basic path must require no JSON or regular expressions. Advanced controls
 can remain available in a collapsed section.

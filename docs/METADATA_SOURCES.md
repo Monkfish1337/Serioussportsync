@@ -44,8 +44,10 @@ Implementation status: the registry, nine seeded definitions, dedicated
 Metadata page, reusable source creation, official MLB adapter, promotion
 reassignment, external validation, and normalized sample preview are
 implemented. Preview is read-only and never replaces stored events. Existing
-behavior is preserved when no override is saved. The common adapter dispatch
-contract and refresh event-diff preview remain the next source-focused slices.
+behavior is preserved when no override is saved. Source changes and refreshes
+now fetch through the production adapter path and show a full event diff before
+the action is enabled. The common adapter dispatch contract remains the next
+source-focused slice.
 
 Promotions should store a `sourceRef`. The Promotions page will offer:
 

@@ -192,6 +192,18 @@ async function refreshPromotion(promotion, log) {
   return raw;
 }
 
+function normalizeRecord(raw, promotion) {
+  if (!promotion || !promotion.source) return null;
+  if (promotion.source.type === 'thesportsdb') return transform.fromTsdb(raw, promotion);
+  if (promotion.source.type === 'football-data') return transform.fromFootballData(raw, promotion);
+  if (promotion.source.type === 'tmdb') return transform.fromTmdb(raw, promotion);
+  if (promotion.source.type === 'wikipedia' || promotion.source.type === 'onefc'
+      || promotion.source.type === 'mlb' || promotion.source.type === 'wikipedia-list') {
+    return transform.fromWiki(raw, promotion);
+  }
+  return null;
+}
+
 async function runRefresh(options) {
   const opts = options || {};
   const log = opts.log || ((m) => console.log(m));
@@ -293,12 +305,7 @@ async function runRefresh(options) {
     let added = 0, updated = 0, skipped = 0;
     for (const r of raw) {
       let norm;
-      if (p.source.type === 'thesportsdb') norm = transform.fromTsdb(r, p);
-      else if (p.source.type === 'football-data') norm = transform.fromFootballData(r, p);
-      else if (p.source.type === 'tmdb') norm = transform.fromTmdb(r, p);
-      else if (p.source.type === 'wikipedia' || p.source.type === 'onefc' || p.source.type === 'mlb' || p.source.type === 'wikipedia-list') {
-        norm = transform.fromWiki(r, p);
-      }
+      norm = normalizeRecord(r, p);
       if (!norm) continue;
       // Promotion-level filter (e.g. drop WWE weekly TV, UFC Contender Series).
       if (typeof p.includeEvent === 'function' && !p.includeEvent(norm, config)) {
@@ -393,4 +400,4 @@ if (require.main === module) {
   runRefresh().then((r) => process.exit(r.ok ? 0 : 1));
 }
 
-module.exports = { runRefresh };
+module.exports = { runRefresh, refreshPromotion, normalizeRecord, inScope, activeSeasons };

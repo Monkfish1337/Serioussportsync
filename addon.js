@@ -730,6 +730,11 @@ function createApp() {
     if (!p.enabled) {
       return res.redirect('/admin/promotions?flash=' + encodeURIComponent('Refresh: promotion "' + id + '" is disabled'));
     }
+    const currentRef = String(p.sourceRef || '');
+    if (!Object.prototype.hasOwnProperty.call(req.body || {}, 'previewedSourceRef')
+        || String(req.body.previewedSourceRef || '') !== currentRef) {
+      return res.redirect('/admin/promotions?flash=' + encodeURIComponent('Preview the event changes before refreshing "' + id + '".'));
+    }
     runEventsRefresh({ promotionId: id, log: (m) => console.log(m) })
       .then((result) => {
         const line = '[admin] per-promotion refresh "' + id + '" '
@@ -1175,12 +1180,24 @@ function createApp() {
   app.post('/admin/promotions/:id/source', requireAdmin, (req, res) => {
     const id = String(req.params.id || '').trim();
     try {
-      const promotion = adminPromotions.assignSource(id, String((req.body && req.body.sourceRef) || '').trim());
+      const sourceRef = String((req.body && req.body.sourceRef) || '').trim();
+      if (!Object.prototype.hasOwnProperty.call(req.body || {}, 'previewedSourceRef')
+          || String(req.body.previewedSourceRef || '') !== sourceRef) {
+        throw new Error('Preview the event changes before saving this source');
+      }
+      const promotion = adminPromotions.assignSource(id, sourceRef);
       res.redirect('/admin/promotions?flash=' + encodeURIComponent(
         'Metadata source updated for "' + promotion.name + '". Run its refresh when ready to import events from the new source.'));
     } catch (err) {
       res.redirect('/admin/promotions?flash=' + encodeURIComponent('Source assignment failed: ' + err.message));
     }
+  });
+
+  app.post('/admin/promotions/:id/source-preview', requireAdmin, async (req, res) => {
+    const out = await adminPromotions.previewSourceChange(
+      req.params.id, String((req.body && req.body.sourceRef) || '').trim()
+    );
+    res.status(out.ok ? 200 : 422).json(out);
   });
 
   app.post('/admin/promotions/:id/delete', requireAdmin, (req, res) => {

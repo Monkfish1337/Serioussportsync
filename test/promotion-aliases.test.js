@@ -108,6 +108,9 @@ test('promotions form emits valid browser JavaScript for the alias assistant', (
   assert.match(html, /Help SSS recognize releases/);
   assert.match(html, /Add it under Metadata/);
   assert.match(html, /name="sourceRef"/);
+  assert.match(html, /Preview refresh/);
+  assert.match(html, /source-preview/);
+  assert.match(html, /event-diff-confirm[^>]+disabled/);
 });
 
 test('matching preview shows generated queries and good/bad verdicts', () => {
@@ -177,4 +180,28 @@ test('release finder explains when native indexer settings are absent', async ()
   const result = await adminPromotions.searchReleaseExamples({}, { query: 'MLB' });
   assert.equal(result.ok, false);
   assert.match(result.error, /DIY Discover/);
+});
+
+test('editing a legacy embedded MLB promotion does not fall back to TSDB validation', () => {
+  const originalUpdate = customPromotions.update;
+  const originalAssign = require('../lib/metadata-sources').assign;
+  const originalReload = require('../lib/promotions').reload;
+  let saved;
+  customPromotions.update = (_id, spec) => { saved = spec; return spec; };
+  require('../lib/metadata-sources').assign = () => null;
+  require('../lib/promotions').reload = () => null;
+  try {
+    adminPromotions.saveFromForm({
+      id: 'mlb', name: 'MLB', sourceRef: '', promotionAliases: 'MLB',
+      relevanceKeywords: 'mlb', exclusionKeywords: 'mlb',
+      searchTitleTemplates: '{promotion} {date_spaced} {name}', posterShape: 'landscape',
+    }, { updateId: 'mlb', existingSpec: { id: 'mlb', name: 'MLB', source: 'mlb' } });
+    assert.equal(saved.source, 'mlb');
+    assert.equal(saved.leagueId, undefined);
+    assert.deepEqual(saved.exclusionKeywords, []);
+  } finally {
+    customPromotions.update = originalUpdate;
+    require('../lib/metadata-sources').assign = originalAssign;
+    require('../lib/promotions').reload = originalReload;
+  }
 });

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.62.0
+
+- Added mandatory read-only event diffs before per-promotion refreshes and
+  metadata source changes, including added, updated, unchanged, and removed
+  counts plus representative event titles.
+- Reused the production refresh fetch and normalization path so previews match
+  the catalog operation they guard, while keeping preview requests mutation-free.
+- Preserved same-title/date doubleheaders as separate source events in diffs.
+- Fixed editing embedded legacy MLB promotions incorrectly falling back to TSDB
+  validation and demanding a numeric league ID; conflict cleanup can now save.
+
 ## 0.61.0
 
 - Added read-only validation and normalized sample-event previews for saved and
