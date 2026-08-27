@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.60.0-blue.svg" alt="Version 0.60.0"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.61.0-blue.svg" alt="Version 0.61.0"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -179,11 +179,14 @@ JSON or application code.
 - **Services:** configure direct Prowlarr and the optional companion scraper.
 - **Users:** create invites and manage shared deployments.
 - **Metadata:** register reusable event schedules independently of promotions.
-  The official MLB schedule is supported directly and requires no API key.
+  Test saved or unsaved providers and preview normalized events without changing
+  assignments or stored catalogs. The official MLB schedule requires no API key.
 - **Promotions:** select a schedule, paste releases that should or should not
   appear, review the aliases and search layout SSS learns, and test its queries
   before saving. Conflicting reject words are detected and repaired rather than
-  silently excluding every valid result.
+  silently excluding every valid result. A native indexer release finder can
+  search Newznab/NZBHydra or Prowlarr directly, filter and sort the titles, and
+  add selected examples without using the companion service.
 - **Nuvio Collections:** group promotions into collection folders, choose
   bundled, promotion-derived, or custom artwork, and download the current JSON.
   Newly created promotions are handed directly into this workflow.

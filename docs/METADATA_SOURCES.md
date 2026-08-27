@@ -41,10 +41,11 @@ from promotions. A source definition contains:
 - enabled state and last validation/refresh result.
 
 Implementation status: the registry, nine seeded definitions, dedicated
-Metadata page, reusable source creation, official MLB adapter, and promotion
-reassignment are implemented. Existing behavior is preserved when no override
-is saved. External validation/sample preview and the common adapter dispatch
-contract remain the next source-focused slice.
+Metadata page, reusable source creation, official MLB adapter, promotion
+reassignment, external validation, and normalized sample preview are
+implemented. Preview is read-only and never replaces stored events. Existing
+behavior is preserved when no override is saved. The common adapter dispatch
+contract and refresh event-diff preview remain the next source-focused slices.
 
 Promotions should store a `sourceRef`. The Promotions page will offer:
 

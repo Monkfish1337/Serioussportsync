@@ -16,10 +16,10 @@ Replace the fragmented expert tooling with one workflow under Promotions:
    discovery preview without requiring a refresh or container restart.
 
 Progress: the end-user workflow is implemented. Metadata sources now live in a
-dedicated sidebar page. Promotions can derive editable, persistent aliases and
-exclusions from good and bad release titles, show every generated query, and
-classify the examples before saving. Expert fields remain collapsed. Source
-validation/sample preview and a discovery preview remain future refinements.
+dedicated sidebar page. Promotions can find real releases through the account's
+native Newznab/NZBHydra or Prowlarr connection, filter and sort those results,
+feed selected titles into editable alias/layout derivation, show every generated
+query, and classify examples before saving. Expert fields remain collapsed.
 
 ## Configurable metadata sources
 
@@ -30,11 +30,12 @@ current assignments as seeded defaults, including ONE Championship's official
 adapter contract, migration order, and safety requirements.
 
 Progress: reusable definitions and assignments are implemented, with all nine
-current sources seeded as defaults. The dedicated Metadata page creates sources
-and Promotions can reassign both built-in and custom promotions. An official,
-no-key MLB schedule adapter has been added and smoke-tested through source
-creation, promotion matching, refresh, and stored event output. Adapter-level
-validation, event-diff preview, and replacing dispatcher branches remain.
+current sources seeded as defaults. The dedicated Metadata page creates sources,
+tests saved or draft definitions, and previews normalized events without
+mutating catalog data. Promotions can reassign both built-in and custom
+promotions. An official, no-key MLB schedule adapter has been added and
+smoke-tested through source creation, preview, promotion matching, refresh, and
+stored event output. Event-diff preview and replacing dispatcher branches remain.
 
 The basic path must require no JSON or regular expressions. Advanced controls
 can remain available in a collapsed section.

@@ -1130,6 +1130,11 @@ function createApp() {
     }
   });
 
+  app.post('/admin/metadata-sources/preview', requireAdmin, async (req, res) => {
+    const out = await adminMetadata.previewInput(req.body || {});
+    res.status(out.ok ? 200 : 422).json(out);
+  });
+
   app.post('/admin/promotions/derive-aliases', requireAdmin, (req, res) => {
     const body = req.body || {};
     const out = adminPromotions.deriveAliases(body.name, body.examples, body.badExamples);
@@ -1145,6 +1150,13 @@ function createApp() {
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 'no-store');
     res.send(JSON.stringify(out));
+  });
+
+  app.post('/admin/promotions/search-releases', requireAdmin, async (req, res) => {
+    const out = await adminPromotions.searchReleaseExamples(
+      (req.user && req.user.config) || {}, req.body || {}
+    );
+    res.status(out.ok ? 200 : 422).json(out);
   });
 
   app.post('/admin/promotions/:id/update', requireAdmin, (req, res) => {

@@ -14,6 +14,7 @@ const sources = require('../lib/metadata-sources');
 const promotions = require('../lib/promotions');
 const chrome = require('../lib/tabler-chrome');
 const adminMetadata = require('../lib/admin-metadata');
+const metadataPreview = require('../lib/metadata-preview');
 const mlb = require('../lib/sources/mlb');
 
 test.after(() => {
@@ -78,4 +79,48 @@ test('normalizes an official MLB fixture into a generic event record', () => {
   assert.equal(raw.name, 'Chicago Cubs vs Arizona Diamondbacks');
   assert.equal(raw.source.type, 'mlb');
   assert.equal(raw.source.gamePk, '825039');
+});
+
+test('previews normalized source events without saving or assigning them', async () => {
+  const before = fs.readFileSync(testFile, 'utf8');
+  const result = await metadataPreview.preview({
+    id: 'preview-mlb', name: 'MLB Preview', source: { type: 'mlb' },
+  }, {
+    now: new Date('2026-08-27T12:00:00Z'),
+    adapters: {
+      mlb: { fetchAll: async ({ dateFrom, dateTo }) => {
+        assert.equal(dateFrom, '2026-08-20');
+        assert.equal(dateTo, '2026-09-17');
+        return [mlb.toRaw({
+          gamePk: 825039, officialDate: '2026-08-26', gameDate: '2026-08-26T20:10:00Z',
+          teams: { away: { team: { name: 'Chicago Cubs' } }, home: { team: { name: 'Arizona Diamondbacks' } } },
+          venue: { name: 'Chase Field' }, status: { detailedState: 'Final' },
+        })];
+      } },
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.normalized, 1);
+  assert.deepEqual(result.events[0], {
+    name: 'Chicago Cubs vs Arizona Diamondbacks', date: '2026-08-26', time: '20:10:00',
+    venue: 'Chase Field', sourceId: '825039', hasArtwork: false,
+  });
+  assert.equal(fs.readFileSync(testFile, 'utf8'), before);
+});
+
+test('metadata page exposes draft and saved-source preview controls', () => {
+  const html = adminMetadata.renderBody({});
+  assert.match(html, /metadata-sources\/preview/);
+  assert.match(html, /Test &amp; preview/);
+  const script = html.match(/<script>([\s\S]*?)<\/script>/);
+  assert.ok(script);
+  assert.doesNotThrow(() => new Function(script[1])); // eslint-disable-line no-new-func
+});
+
+test('metadata preview errors redact provider credentials', () => {
+  const safe = adminMetadata.safeError(new Error(
+    'request to https://www.thesportsdb.com/api/v1/json/premium-secret/lookupleague.php?id=1&apikey=also-secret failed'
+  ));
+  assert.doesNotMatch(safe, /premium-secret|also-secret/);
+  assert.match(safe, /\[redacted\]/);
 });

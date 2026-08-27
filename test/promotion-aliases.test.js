@@ -142,3 +142,39 @@ test('matching preview reports and repairs conflicting reject words', () => {
   assert.deepEqual(result.warnings, ['mlb']);
   assert.equal(result.examples[0].accepted, true);
 });
+
+test('native indexer release finder applies expansive filters and sorting without exposing NZBs', async () => {
+  let capturedQueries;
+  const result = await adminPromotions.searchReleaseExamples({
+    diySearchKind: 'newznab', diySearchName: 'Hydra', diySearchUrl: 'http://hydra:5076',
+    diySearchApiKey: 'secret-key',
+  }, {
+    query: 'MLB; Cubs Diamondbacks', includeTerms: 'MLB', excludeTerms: 'network',
+    quality: '1080p', indexerName: 'geek', maxAgeDays: '30', minSizeGb: '1',
+    maxSizeGb: '20', sort: 'largest', limit: '20',
+  }, {
+    now: Date.parse('2026-08-27T12:00:00Z'),
+    search: async (queries, provider, options) => {
+      capturedQueries = queries;
+      assert.equal(provider.enabled, true);
+      assert.equal(options.maxQueries, 5);
+      return { ok: true, results: [
+        { title: 'MLB 2026 08 26 Cubs vs Diamondbacks 1080p', size: 8 * 1024 ** 3, publishedAt: '2026-08-26T12:00:00Z', indexer: 'NZBGeek', nzbUrl: 'https://secret/nzb/1' },
+        { title: 'MLB Network Daily Show 1080p', size: 10 * 1024 ** 3, publishedAt: '2026-08-26T12:00:00Z', indexer: 'NZBGeek', nzbUrl: 'https://secret/nzb/2' },
+        { title: 'MLB 2026 08 25 Padres vs Pirates 720p', size: 5 * 1024 ** 3, publishedAt: '2026-08-25T12:00:00Z', indexer: 'NZBGeek', nzbUrl: 'https://secret/nzb/3' },
+      ] };
+    },
+  });
+  assert.deepEqual(capturedQueries, ['MLB', 'Cubs Diamondbacks']);
+  assert.equal(result.total, 1);
+  assert.equal(result.results[0].title, 'MLB 2026 08 26 Cubs vs Diamondbacks 1080p');
+  assert.equal(result.results[0].sizeLabel, '8.0 GB');
+  assert.ok(!Object.hasOwn(result.results[0], 'nzbUrl'));
+  assert.doesNotMatch(JSON.stringify(result), /secret-key|secret\/nzb/);
+});
+
+test('release finder explains when native indexer settings are absent', async () => {
+  const result = await adminPromotions.searchReleaseExamples({}, { query: 'MLB' });
+  assert.equal(result.ok, false);
+  assert.match(result.error, /DIY Discover/);
+});

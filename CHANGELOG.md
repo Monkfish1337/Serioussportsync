@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.61.0
+
+- Added read-only validation and normalized sample-event previews for saved and
+  draft metadata sources without changing assignments or catalog data.
+- Added a companion-independent release finder to Promotions using each
+  account's native Newznab/NZBHydra or Prowlarr connection.
+- Added bounded multi-query search plus include/exclude, quality, indexer, age,
+  size, sorting, and result-limit controls.
+- Added one-click transfer of discovered titles into promotion alias and search
+  layout analysis while withholding NZB URLs and API credentials from the UI.
+
 ## 0.51.0
 
 - Added native byte-range playback for stored, unencrypted videos inside
