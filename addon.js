@@ -1105,8 +1105,10 @@ function createApp() {
   app.post('/admin/promotions/create', requireAdmin, (req, res) => {
     try {
       const spec = adminPromotions.saveFromForm(req.body || {});
+      const repaired = spec.ignoredExclusionKeywords && spec.ignoredExclusionKeywords.length
+        ? ' Conflicting reject words were ignored: ' + spec.ignoredExclusionKeywords.join(', ') + '.' : '';
       res.redirect('/admin/nuvio-collections?promotion=' + encodeURIComponent(spec.id)
-        + '&flash=' + encodeURIComponent('Created "' + spec.name + '". Choose its Nuvio folder and artwork below, then refresh it from Promotions.'));
+        + '&flash=' + encodeURIComponent('Created "' + spec.name + '".' + repaired + ' Choose its Nuvio folder and artwork below, then refresh it from Promotions.'));
     } catch (err) {
       res.redirect('/admin/promotions?flash=' + encodeURIComponent('Create failed: ' + err.message));
     }
@@ -1148,8 +1150,10 @@ function createApp() {
   app.post('/admin/promotions/:id/update', requireAdmin, (req, res) => {
     const id = req.params.id;
     try {
-      adminPromotions.saveFromForm(req.body || {}, { updateId: id });
-      res.redirect('/admin/promotions?flash=' + encodeURIComponent('Updated "' + id + '".'));
+      const spec = adminPromotions.saveFromForm(req.body || {}, { updateId: id });
+      const repaired = spec.ignoredExclusionKeywords && spec.ignoredExclusionKeywords.length
+        ? ' Conflicting reject words were removed: ' + spec.ignoredExclusionKeywords.join(', ') + '.' : '';
+      res.redirect('/admin/promotions?flash=' + encodeURIComponent('Updated "' + id + '".' + repaired));
     } catch (err) {
       res.redirect('/admin/promotions?edit=' + encodeURIComponent(id)
         + '&flash=' + encodeURIComponent('Update failed: ' + err.message));

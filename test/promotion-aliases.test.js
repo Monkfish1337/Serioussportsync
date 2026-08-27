@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const aliases = require('../lib/promotion-aliases');
 const { createGenericPromotion } = require('../lib/promotions');
 const adminPromotions = require('../lib/admin-promotions');
+const customPromotions = require('../lib/custom-promotions');
 
 test('derives stable F1 aliases while removing release noise', () => {
   const result = aliases.derivePromotionAliases('Formula 1', [
@@ -36,6 +37,49 @@ test('derives exclusions that distinguish known-bad releases', () => {
   assert.ok(result.exclusions.includes('Formula 2'));
   assert.ok(result.exclusions.includes('academy'));
   assert.ok(!result.exclusions.includes('1080p'));
+});
+
+test('learns a promotion-date-event search layout from release examples', () => {
+  const templates = aliases.deriveSearchTitleTemplates('Major League Baseball', [
+    'MLB.2026.08.25.Pittsburgh.Pirates.vs.San.Diego.Padres.1080p.WEB.h264',
+  ]);
+  assert.equal(templates[0], '{promotion} {date_spaced} {name}');
+});
+
+test('removes reject words that contradict promotion identity', () => {
+  const rules = aliases.sanitizeMatchingRules(
+    'Major League Baseball', ['MLB'], ['major league baseball', 'mlb'], ['mlb', 'network']
+  );
+  assert.deepEqual(rules.exclusions, ['network']);
+  assert.deepEqual(rules.removedExclusions, ['mlb']);
+});
+
+test('generic promotion repairs an MLB conflict and generates the observed release query', () => {
+  const promotion = createGenericPromotion({
+    id: 'baseball-test',
+    name: 'Major League Baseball',
+    source: 'mlb',
+    searchTitleTemplates: ['{promotion} {date_spaced} {name}', '{name}'],
+    relevanceKeywords: ['major league baseball', 'mlb'],
+    promotionAliases: ['Major League Baseball', 'MLB'],
+    exclusionKeywords: ['mlb', 'network'],
+  });
+  const event = { name: 'San Diego Padres vs Pittsburgh Pirates', date: '2026-08-25' };
+  assert.ok(promotion.searchTitles(event).includes('MLB 2026 08 25 Pittsburgh Pirates vs San Diego Padres'));
+  assert.deepEqual(promotion.ignoredExclusionKeywords, ['mlb']);
+  assert.equal(promotion.isRelevantStreamTitle(
+    'MLB 2026 08 25 Pittsburgh Pirates vs San Diego Padres 1080p WEB h264', event
+  ).ok, true);
+});
+
+test('stored promotion validation prevents contradictory reject rules', () => {
+  const verdict = customPromotions.validateSpec({
+    id: 'baseball-test', name: 'Major League Baseball', source: 'mlb',
+    searchTitleTemplates: ['{name}'], relevanceKeywords: ['mlb'],
+    promotionAliases: ['MLB'], exclusionKeywords: ['mlb'],
+  });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.error, /conflict/i);
 });
 
 test('saved aliases generate queries and participate in relevance matching', () => {
@@ -82,4 +126,19 @@ test('matching preview shows generated queries and good/bad verdicts', () => {
   assert.ok(result.queries.includes('F1 Dutch Grand Prix'));
   assert.deepEqual(result.examples.map((item) => item.accepted), [true, false]);
   assert.equal(result.examples[1].reason, 'excluded:academy');
+});
+
+test('matching preview reports and repairs conflicting reject words', () => {
+  const result = adminPromotions.previewMatching({
+    name: 'Major League Baseball',
+    eventName: 'San Diego Padres vs Pittsburgh Pirates',
+    eventDate: '2026-08-25',
+    searchTitleTemplates: '{promotion} {date_spaced} {name}',
+    relevanceKeywords: 'major league baseball, mlb',
+    promotionAliases: 'Major League Baseball\nMLB',
+    exclusionKeywords: 'mlb, network',
+    goodExamples: 'MLB.2026.08.25.Pittsburgh.Pirates.vs.San.Diego.Padres.1080p.WEB.h264',
+  });
+  assert.deepEqual(result.warnings, ['mlb']);
+  assert.equal(result.examples[0].accepted, true);
 });
