@@ -20,6 +20,14 @@ persistent search aliases and recognition terms from known-good release titles.
 Known-bad examples, live classification, query preview, and guided source/event
 selection remain next.
 
+## Configurable metadata sources
+
+Replace hardcoded promotion-to-source assignments with reusable source
+definitions and let Promotions assign a new or existing source. Preserve the
+current assignments as seeded defaults, including ONE Championship's official
+`watch.onefc.com` feed. See `docs/METADATA_SOURCES.md` for the audited inventory,
+adapter contract, migration order, and safety requirements.
+
 The basic path must require no JSON or regular expressions. Advanced controls
 can remain available in a collapsed section.
 

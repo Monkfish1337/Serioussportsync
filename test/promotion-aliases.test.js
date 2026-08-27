@@ -27,6 +27,17 @@ test('suggested keywords mirror aliases in lower case', () => {
   assert.deepEqual(result.keywords, ['formula 1', 'f1', 'formula1']);
 });
 
+test('derives exclusions that distinguish known-bad releases', () => {
+  const result = aliases.suggestPromotionSetup(
+    'Formula 1',
+    ['F1.2026.Dutch.Grand.Prix.1080p'],
+    ['Formula.2.2026.Dutch.Grand.Prix.1080p', 'F1.Academy.2026.Round.4.720p']
+  );
+  assert.ok(result.exclusions.includes('Formula 2'));
+  assert.ok(result.exclusions.includes('academy'));
+  assert.ok(!result.exclusions.includes('1080p'));
+});
+
 test('saved aliases generate queries and participate in relevance matching', () => {
   const promotion = createGenericPromotion({
     id: 'test-f1',
@@ -48,4 +59,24 @@ test('promotions form emits valid browser JavaScript for the alias assistant', (
   assert.doesNotThrow(() => new Function(script[1])); // eslint-disable-line no-new-func
   assert.match(html, /id="deriveAliases"/);
   assert.match(html, /name="promotionAliases"/);
+  assert.match(html, /name="exclusionKeywords"/);
+  assert.match(html, /id="previewMatching"/);
+});
+
+test('matching preview shows generated queries and good/bad verdicts', () => {
+  const result = adminPromotions.previewMatching({
+    name: 'Formula 1',
+    eventName: 'Formula 1 Dutch Grand Prix',
+    eventDate: '2026-08-23',
+    searchTitleTemplates: '{name}\n{name} {year}',
+    relevanceKeywords: 'formula 1',
+    promotionAliases: 'F1',
+    exclusionKeywords: 'formula 2, academy',
+    goodExamples: 'F1.2026.Dutch.Grand.Prix.1080p',
+    badExamples: 'F1.Academy.2026.Dutch.Grand.Prix.720p',
+  });
+  assert.equal(result.ok, true);
+  assert.ok(result.queries.includes('F1 Dutch Grand Prix'));
+  assert.deepEqual(result.examples.map((item) => item.accepted), [true, false]);
+  assert.equal(result.examples[1].reason, 'excluded:academy');
 });

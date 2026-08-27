@@ -1056,7 +1056,15 @@ function createApp() {
 
   app.post('/admin/promotions/derive-aliases', requireAdmin, (req, res) => {
     const body = req.body || {};
-    const out = adminPromotions.deriveAliases(body.name, body.examples);
+    const out = adminPromotions.deriveAliases(body.name, body.examples, body.badExamples);
+    res.status(out.ok ? 200 : 400);
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(JSON.stringify(out));
+  });
+
+  app.post('/admin/promotions/preview-matching', requireAdmin, (req, res) => {
+    const out = adminPromotions.previewMatching(req.body || {});
     res.status(out.ok ? 200 : 400);
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 'no-store');
