@@ -70,3 +70,35 @@ test('coalesces overlapping warm-up requests', async () => {
   assert.equal(warmer.status().currentEvent, null);
   assert.ok(warmer.status().lastDurationMs >= 0);
 });
+
+test('suppresses a failing provider for the remainder of one warming run', async () => {
+  warmer._test.resetForTests();
+  const skipHistory = [];
+  await warmer.run({
+    force: true,
+    events: [
+      event('one', '2026-08-27'), event('two', '2026-08-26'),
+      event('three', '2026-08-25'), event('four', '2026-08-24'),
+    ],
+    now: new Date('2026-08-27T18:00:00Z'),
+    profiles: [{ id: 'profile-1', username: 'test', config: {} }],
+    prefetch: async ({ skipProviders }) => {
+      skipHistory.push(skipProviders.slice());
+      if (skipProviders.includes('uu')) {
+        return { ok: true, errors: [], outcomes: [], skippedProviders: ['uu'] };
+      }
+      return {
+        ok: false,
+        errors: ['uu: network timeout'],
+        outcomes: [{ provider: 'uu', ok: false, error: 'network timeout', durationMs: 15000 }],
+      };
+    },
+    log: () => {},
+  });
+  assert.deepEqual(skipHistory, [[], [], ['uu'], ['uu']]);
+  assert.deepEqual(warmer.status().providerStatus.uu, {
+    attempts: 2, successes: 0, failures: 2, skipped: 2,
+    totalDurationMs: 30000, lastDurationMs: 15000, lastSuccessAt: null,
+    lastError: 'network timeout', suppressed: true,
+  });
+});

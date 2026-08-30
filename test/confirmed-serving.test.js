@@ -60,3 +60,50 @@ test('serves an account-scoped confirmed TorBox row without repeating discovery 
     index.close();
   }
 });
+
+test('background mode ignores confirmed rows so discovery can refresh the index', async () => {
+  const index = createAvailabilityIndex({ file: ':memory:', secret: process.env.SESSION_SECRET });
+  const originalDefault = availabilityStore.getDefault;
+  const originalCompanion = settings.getCompanion;
+  const originalProwlarr = settings.getProwlarr;
+  const originalAvailability = settings.getAvailabilityWarm;
+  const originalCheck = torbox.checkCachedBatch;
+  availabilityStore.getDefault = () => index;
+  settings.getCompanion = () => ({ url: '', authToken: '' });
+  settings.getProwlarr = () => ({ url: '', apiKey: '' });
+  settings.getAvailabilityWarm = () => ({ serveConfirmed: true });
+  torbox.checkCachedBatch = async () => new Set();
+  const candidate = {
+    title: 'UFC.300.Main.Card.1080p.WEB-DL', infoHash: 'e'.repeat(40), size: 8_000_000_000,
+  };
+  const sourceScope = index.scopeFingerprint('torrent', {
+    companionUrl: '', companionToken: '', prowlarrUrl: '', prowlarrApiKey: '',
+  });
+  const torboxScope = index.scopeFingerprint('torbox', { apiKey: 'torbox-key' });
+  index.recordSearch({
+    eventId: 'ufc:300', promotionId: 'ufc', provider: 'torrent', scope: sourceScope,
+    queries: ['UFC 300'], results: [candidate],
+  });
+  index.observe({ provider: 'torbox', scope: torboxScope, state: 'cached', candidate });
+  const messages = [];
+  try {
+    const rows = await streams.pipelineTorrentTorbox({
+      promo: { id: 'ufc', isRelevantStreamTitle: () => ({ ok: true }) },
+      event: { id: 'ufc:300', name: 'UFC 300', date: '2026-04-13', excludePatterns: [] },
+      titles: ['UFC 300'], torboxKey: 'torbox-key', discoveryBudgetMs: 10,
+      allowConfirmed: false,
+      urlCtx: { origin: 'http://sss:7000', userId: 'warm', apiToken: 'warm', showWarmRows: false },
+      log: (message) => messages.push(message),
+    });
+    assert.equal(rows.length, 0);
+    assert.ok(messages.some((message) => /no companion or direct Prowlarr configured/.test(message)));
+    assert.ok(!messages.some((message) => /recovered .* confirmed/.test(message)));
+  } finally {
+    availabilityStore.getDefault = originalDefault;
+    settings.getCompanion = originalCompanion;
+    settings.getProwlarr = originalProwlarr;
+    settings.getAvailabilityWarm = originalAvailability;
+    torbox.checkCachedBatch = originalCheck;
+    index.close();
+  }
+});

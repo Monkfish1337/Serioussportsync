@@ -45,6 +45,10 @@ test('renders database visibility, live warming and safe maintenance controls', 
       running: true, currentEvent: 'UFC 300', currentProfile: 'admin',
       completedProfiles: 2, totalProfiles: 4, attemptedEvents: 1,
       eligibleEvents: 5, errors: 0,
+      providerStatus: {
+        uu: { attempts: 2, successes: 0, failures: 2, skipped: 3,
+          totalDurationMs: 30000, lastDurationMs: 15000, lastError: 'network timeout', suppressed: true },
+      },
     },
     scheduler: {
       nextRunAt: '2026-08-30T22:00:00Z',
@@ -54,9 +58,13 @@ test('renders database visibility, live warming and safe maintenance controls', 
   });
   for (const expected of [
     'Background warming', 'UFC 300', 'Recent searches', 'ufc:300', 'Pereira vs Hill',
+    'Warmer provider diagnostics', 'Suppressed', 'network timeout',
     'Serve fresh confirmed results',
     'name="windowDays"', 'name="intervalHours"', 'name="maxEventsPerRun"',
     '/admin/database/prune', '/admin/database/wipe', '/admin/database/status.json',
   ]) assert.match(html, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  const script = html.match(/<script>([\s\S]+)<\/script>/);
+  assert.ok(script, 'database live-refresh script is present');
+  assert.doesNotThrow(() => new Function(script[1]));
   assert.doesNotMatch(html, /denylist|Legacy positive history|admin\/health/i);
 });

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.69.0
+
+### Background discovery reliability and diagnostics
+
+- Limited confirmed-result short-circuiting to interactive stream requests so
+  background warming continues through normal discovery and refreshes the
+  Smart Availability database.
+- Added a per-account, per-provider warm-up circuit breaker. A provider is
+  skipped for the rest of a run after two consecutive failures by default;
+  the next run starts clean and interactive requests are never suppressed.
+- Added live Database diagnostics for provider attempts, successes, failures,
+  skipped checks, average and latest latency, last success, latest error, and
+  circuit-breaker state.
+- Fixed generic MotoGP session parsing so Free Practice and FP1-FP4 labels are
+  removed before venue aliases are derived. This fixes malformed aliases such
+  as `Aragón Free` without adding a venue-specific workaround.
+
 ## 0.68.0
 
 ### Confirmed-result serving and database detail
