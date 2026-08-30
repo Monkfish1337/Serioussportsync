@@ -172,6 +172,7 @@ module.exports = {
   availabilityDbFile: process.env.AVAILABILITY_DB_FILE || './data/availability.sqlite',
   availabilityWarm: {
     enabled: (process.env.AVAILABILITY_WARM_ENABLED || 'true') !== 'false',
+    serveConfirmed: (process.env.AVAILABILITY_SERVE_CONFIRMED || 'true') !== 'false',
     windowDays: Math.max(1, parseInt(process.env.AVAILABILITY_WARM_WINDOW_DAYS || '7', 10) || 7),
     intervalHours: Math.max(0.25, parseFloat(process.env.AVAILABILITY_WARM_INTERVAL_HOURS || '6') || 6),
     maxEventsPerRun: Math.max(1, parseInt(process.env.AVAILABILITY_WARM_MAX_EVENTS_PER_RUN || '25', 10) || 25),

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.68.0
+
+### Confirmed-result serving and database detail
+
+- Database recent-search rows now show the human-readable event title together
+  with the stable event ID.
+- Added a live Database setting for serving fresh confirmed results. It is on by
+  default and can be disabled independently of background warming.
+- Added scope-safe confirmed-result retrieval: the event, discovery source,
+  provider account and unexpired availability observation must all match.
+- TorBox cached/verified results, verified Easynews results, and verified DIY
+  NZB DAV/native NNTP results can now bypass repeat discovery. Playback still
+  passes through the normal provider resolver, so TorBox eviction and Usenet
+  availability are revalidated when the user clicks.
+- Database statistics now count confirmed-result lookups and successful serves.
+
 ## 0.67.0
 
 ### Smart Availability database control centre

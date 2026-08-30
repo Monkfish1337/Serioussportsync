@@ -16,11 +16,11 @@ test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 test('persists validated warmer settings and restores environment defaults', () => {
   const saved = settings.setAvailabilityWarm({
-    enabled: false, windowDays: 14, intervalHours: 1.5,
+    enabled: false, serveConfirmed: true, windowDays: 14, intervalHours: 1.5,
     maxEventsPerRun: 40, startDelaySeconds: 30,
   });
   assert.deepEqual(saved, {
-    enabled: false, windowDays: 14, intervalHours: 1.5,
+    enabled: false, serveConfirmed: true, windowDays: 14, intervalHours: 1.5,
     maxEventsPerRun: 40, startDelaySeconds: 30,
   });
   assert.deepEqual(settings.getAvailabilityWarm(), saved);
@@ -48,12 +48,13 @@ test('renders database visibility, live warming and safe maintenance controls', 
     },
     scheduler: {
       nextRunAt: '2026-08-30T22:00:00Z',
-      settings: { enabled: true, windowDays: 7, intervalHours: 6, maxEventsPerRun: 25, startDelaySeconds: 60 },
+      settings: { enabled: true, serveConfirmed: true, windowDays: 7, intervalHours: 6, maxEventsPerRun: 25, startDelaySeconds: 60 },
     },
-    searches: [{ eventId: 'ufc:300', provider: 'torrent', resultCount: 6, searchedAt: Date.now(), expiresAt: Date.now() + 10000 }],
+    searches: [{ eventId: 'ufc:300', eventTitle: 'UFC 300: Pereira vs Hill', provider: 'torrent', resultCount: 6, searchedAt: Date.now(), expiresAt: Date.now() + 10000 }],
   });
   for (const expected of [
-    'Background warming', 'UFC 300', 'Recent searches', 'ufc:300',
+    'Background warming', 'UFC 300', 'Recent searches', 'ufc:300', 'Pereira vs Hill',
+    'Serve fresh confirmed results',
     'name="windowDays"', 'name="intervalHours"', 'name="maxEventsPerRun"',
     '/admin/database/prune', '/admin/database/wipe', '/admin/database/status.json',
   ]) assert.match(html, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));

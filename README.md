@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.67.0-blue.svg" alt="Version 0.67.0"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.68.0-blue.svg" alt="Version 0.68.0"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -230,6 +230,7 @@ See [.env.example](./.env.example) for the annotated full list.
 | <code>NUVIO_COLLECTIONS_FILE</code> | <code>./data/nuvio-collections.json</code> | Nuvio collection title, folders, promotion assignments, and artwork |
 | <code>AVAILABILITY_DB_FILE</code> | <code>./data/availability.sqlite</code> | Encrypted reusable provider searches, event/release matches, card-part classification, and scoped availability observations |
 | <code>AVAILABILITY_WARM_ENABLED</code> | <code>true</code> | Proactively populate recent-event availability in the background |
+| <code>AVAILABILITY_SERVE_CONFIRMED</code> | <code>true</code> | Reuse fresh, account-scoped confirmed results before repeating provider discovery |
 | <code>AVAILABILITY_WARM_WINDOW_DAYS</code> / <code>AVAILABILITY_WARM_MAX_EVENTS_PER_RUN</code> | <code>7</code> / <code>25</code> | Bounded aired-event window and rotating batch size used by the warmer |
 | <code>AVAILABILITY_WARM_INTERVAL_HOURS</code> | <code>6</code> | Warm-up schedule; fresh provider searches are reused rather than repeated. Admins can override warmer settings live from **Database**. |
 | <code>COMPANION_URL</code> | none | Optional SeriousSportScraper companion endpoint |

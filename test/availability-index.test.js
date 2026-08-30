@@ -76,6 +76,38 @@ test('tracks fresh availability independently for each credential scope', () => 
   } finally { fixture.close(); }
 });
 
+test('recovers only fresh confirmed event candidates from matching source and account scopes', () => {
+  const fixture = temporaryIndex();
+  try {
+    const candidate = { title: 'UFC.300.Main.Card.1080p', infoHash: 'c'.repeat(40), size: 999 };
+    fixture.index.recordSearch({
+      eventId: 'ufc:300', promotionId: 'ufc', provider: 'torrent',
+      scope: 'torrent-source-a', queries: ['UFC 300'], results: [candidate],
+    });
+    fixture.index.observe({
+      provider: 'torbox', scope: 'torbox-account-a', state: 'cached', candidate,
+    });
+    const recovered = fixture.index.confirmedForEvent({
+      eventId: 'ufc:300', sourceProvider: 'torrent', sourceScope: 'torrent-source-a',
+      availabilityProvider: 'torbox', availabilityScope: 'torbox-account-a',
+      states: ['cached', 'verified'],
+    });
+    assert.equal(recovered.length, 1);
+    assert.equal(recovered[0].candidate.infoHash, candidate.infoHash);
+    assert.equal(fixture.index.confirmedForEvent({
+      eventId: 'ufc:300', sourceProvider: 'torrent', sourceScope: 'torrent-source-a',
+      availabilityProvider: 'torbox', availabilityScope: 'another-account',
+      states: ['cached', 'verified'],
+    }).length, 0);
+    fixture.advance(7 * 60 * 60 * 1000);
+    assert.equal(fixture.index.confirmedForEvent({
+      eventId: 'ufc:300', sourceProvider: 'torrent', sourceScope: 'torrent-source-a',
+      availabilityProvider: 'torbox', availabilityScope: 'torbox-account-a',
+      states: ['cached', 'verified'],
+    }).length, 0);
+  } finally { fixture.close(); }
+});
+
 test('imports legacy positive-cache knowledge without exposing it as a scoped fresh hit', () => {
   const fixture = temporaryIndex();
   const legacy = path.join(path.dirname(fixture.index.stats().file), 'positive-cache.json');

@@ -766,7 +766,10 @@ function createApp() {
       fileSize,
       warm: availabilityWarmer.status(),
       scheduler: availabilityScheduler.status(),
-      searches: index.recentSearches(25),
+      searches: index.recentSearches(25).map((row) => {
+        const event = store.getEvent(row.eventId);
+        return Object.assign({}, row, { eventTitle: event && event.name || '' });
+      }),
     };
   }
 
@@ -802,6 +805,7 @@ function createApp() {
     try {
       settings.setAvailabilityWarm({
         enabled: req.body.enabled === 'on',
+        serveConfirmed: req.body.serveConfirmed === 'on',
         windowDays: req.body.windowDays,
         intervalHours: req.body.intervalHours,
         maxEventsPerRun: req.body.maxEventsPerRun,

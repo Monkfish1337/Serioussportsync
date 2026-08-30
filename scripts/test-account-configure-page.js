@@ -122,13 +122,14 @@ function listen(app) {
       method: 'POST', redirect: 'manual',
       headers: { Cookie: cookie, Origin: 'null', 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        enabled: 'on', windowDays: '10', intervalHours: '2',
+        enabled: 'on', serveConfirmed: 'on', windowDays: '10', intervalHours: '2',
         maxEventsPerRun: '30', startDelaySeconds: '45',
       }).toString(),
     });
     assert.strictEqual(saveDatabase.status, 302, 'Database settings save successfully');
     assert.ok(String(saveDatabase.headers.get('location')).startsWith('/admin/database?flash='));
     assert.equal(require('../lib/settings').getAvailabilityWarm().windowDays, 10);
+    assert.equal(require('../lib/settings').getAvailabilityWarm().serveConfirmed, true);
 
     const legacyHealth = await fetch(base + '/admin/health', {
       redirect: 'manual', headers: { Cookie: cookie },
