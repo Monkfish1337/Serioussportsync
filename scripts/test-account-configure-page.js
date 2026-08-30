@@ -11,6 +11,8 @@ process.env.SESSION_SECRET = 'account-page-test-secret-0000000000000000000000000
 process.env.USERS_FILE = path.join(testDir, 'users.json');
 process.env.DATA_FILE = path.join(testDir, 'events.json');
 process.env.CONTENT_STUDIO_FILE = path.join(testDir, 'content-studio.json');
+process.env.SETTINGS_FILE = path.join(testDir, 'settings.json');
+process.env.AVAILABILITY_DB_FILE = path.join(testDir, 'availability.sqlite');
 process.env.REFRESH_ON_EMPTY_CACHE = 'false';
 
 const users = require('../lib/users');
@@ -101,6 +103,43 @@ function listen(app) {
     for (const removed of ['TorBox Unified diagnostic', 'torbox-unified-probe', '#edit=']) {
       assert.ok(!html.includes(removed), 'account page omits ' + removed);
     }
+
+    const database = await fetch(base + '/admin/database', { headers: { Cookie: cookie } });
+    assert.strictEqual(database.status, 200, 'Database page is available to admins');
+    const databaseHtml = await database.text();
+    for (const expected of ['Database', 'Background warming', 'Recent searches', 'Warmer settings']) {
+      assert.ok(databaseHtml.includes(expected), 'Database page includes ' + expected);
+    }
+    assert.ok(!databaseHtml.includes('Legacy positive history'), 'legacy Health content is removed');
+
+    const databaseStatus = await fetch(base + '/admin/database/status.json', { headers: { Cookie: cookie } });
+    assert.strictEqual(databaseStatus.status, 200);
+    const databasePayload = await databaseStatus.json();
+    assert.ok(databasePayload.stats && databasePayload.warm && databasePayload.scheduler,
+      'Database status exposes storage, warmer and scheduler state');
+
+    const saveDatabase = await fetch(base + '/admin/database/settings', {
+      method: 'POST', redirect: 'manual',
+      headers: { Cookie: cookie, Origin: 'null', 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        enabled: 'on', windowDays: '10', intervalHours: '2',
+        maxEventsPerRun: '30', startDelaySeconds: '45',
+      }).toString(),
+    });
+    assert.strictEqual(saveDatabase.status, 302, 'Database settings save successfully');
+    assert.ok(String(saveDatabase.headers.get('location')).startsWith('/admin/database?flash='));
+    assert.equal(require('../lib/settings').getAvailabilityWarm().windowDays, 10);
+
+    const legacyHealth = await fetch(base + '/admin/health', {
+      redirect: 'manual', headers: { Cookie: cookie },
+    });
+    assert.strictEqual(legacyHealth.status, 302);
+    assert.strictEqual(legacyHealth.headers.get('location'), '/admin/database');
+    const retiredHealthAction = await fetch(base + '/admin/health/warm-availability', {
+      method: 'POST', redirect: 'manual',
+      headers: { Cookie: cookie, Origin: 'null', 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    assert.strictEqual(retiredHealthAction.status, 404, 'legacy Health mutations are removed');
 
     const crossSiteSave = await fetch(base + '/account/save', {
       method: 'POST',
@@ -284,9 +323,10 @@ function listen(app) {
     assert.strictEqual(revokedSession.status, 302, 'password changes revoke existing sessions');
     assert.strictEqual(revokedSession.headers.get('location'), '/login');
 
-    console.log('OK — account configuration, persistence, retired-tool redirects, exports, and retired diagnostic verified.');
+    console.log('OK — account configuration, Database controls, persistence, retired-tool redirects, and exports verified.');
   } finally {
     await new Promise((resolve) => server.close(resolve));
+    try { require('../lib/availability-index').getDefault().close(); } catch (_) { /* already closed */ }
   }
 })().catch((err) => {
   console.error(err);

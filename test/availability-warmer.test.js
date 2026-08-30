@@ -58,7 +58,15 @@ test('coalesces overlapping warm-up requests', async () => {
   const first = warmer.run(options);
   const second = warmer.run(options);
   assert.strictEqual(first, second);
+  await new Promise((resolve) => setImmediate(resolve));
+  const active = warmer.status();
+  assert.equal(active.running, true);
+  assert.equal(active.currentEvent, 'UFC one');
+  assert.equal(active.currentProfile, 'test');
+  assert.equal(active.totalProfiles, 1);
   release();
   await first;
   assert.equal(calls, 1);
+  assert.equal(warmer.status().currentEvent, null);
+  assert.ok(warmer.status().lastDurationMs >= 0);
 });

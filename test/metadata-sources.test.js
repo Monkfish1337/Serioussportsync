@@ -46,6 +46,8 @@ test('creates a reusable source and assigns it to a promotion', () => {
 test('retired expert tools are absent from the admin sidebar', () => {
   const labels = chrome.ADMIN_SECTIONS.map((item) => item.label);
   assert.ok(labels.includes('Promotions'));
+  assert.ok(labels.includes('Database'));
+  assert.ok(!labels.includes('Health'));
   for (const retired of ['Power Tool', 'Search', 'Match Editor', 'Content Studio']) {
     assert.ok(!labels.includes(retired));
   }

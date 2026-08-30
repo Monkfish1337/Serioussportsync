@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.67.0
+
+### Smart Availability database control centre
+
+- Replaced the legacy admin Health page and sidebar entry with a dedicated
+  Database workspace.
+- Added live background-warmer progress, current event/account scope, last-run
+  results, errors, next scheduled run, provider coverage, hit rate, database
+  size, and recent search activity.
+- Added validated, persistent GUI controls for the rolling window, schedule,
+  event batch size, startup delay, and enabled state. Changes apply to the
+  running scheduler without a container restart and can be reset to environment
+  defaults.
+- Added focused maintenance actions for immediate warming, expired-row pruning,
+  and wiping Smart Availability knowledge. The old Health mutation endpoints
+  are removed; `/admin/health` redirects old bookmarks to Database.
+
 ## 0.66.1
 
 ### Configuration and playback compatibility hotfix

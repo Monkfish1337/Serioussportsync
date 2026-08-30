@@ -39,6 +39,9 @@ test('stores encrypted reusable searches and isolates provider scopes', () => {
       results: [{ title: 'UFC.300.Main.Card.1080p', postHash: 'post-1', size: 1234, dlFarm: 'farm' }],
     };
     fixture.index.recordSearch(input);
+    assert.deepEqual(fixture.index.recentSearches(1).map((row) => ({
+      eventId: row.eventId, provider: row.provider, resultCount: row.resultCount,
+    })), [{ eventId: 'ufc:300', provider: 'easynews', resultCount: 1 }]);
     const hit = fixture.index.getSearch(input);
     assert.equal(hit.hit, true);
     assert.equal(hit.results[0].postHash, 'post-1');

@@ -1,4 +1,5 @@
 const express = require('express');
+const fs = require('fs');
 const path = require('path');
 const config = require('./config');
 const { buildManifest } = require('./lib/manifest');
@@ -17,13 +18,10 @@ const nzbdavWebdav = require('./lib/sources/nzbdav-webdav');
 const usenetIndexer = require('./lib/sources/usenet-indexer');
 const nntpClient = require('./lib/sources/nntp-client');
 const nntpPlayback = require('./lib/sources/nntp-playback');
-// 0.24.0: per-provider state modules for the admin /health page.
-const rdDenylist = require('./lib/rd-denylist');
-const tbDenylist = require('./lib/tb-denylist');
-const pmDenylist = require('./lib/pm-denylist');
-const positiveCache = require('./lib/positive-cache');
 const availabilityStore = require('./lib/availability-index');
 const availabilityWarmer = require('./lib/availability-warmer');
+const availabilityScheduler = require('./lib/availability-scheduler');
+const adminDatabase = require('./lib/admin-database');
 // 0.27.0: in-memory log buffer for /admin/logs.
 const logBuffer = require('./lib/log-buffer');
 const security = require('./lib/security');
@@ -758,30 +756,95 @@ function createApp() {
     res.send(JSON.stringify({ rows, stats: logBuffer.counts() }));
   });
 
-  // Admin observability for denylist, legacy positive-cache, and the unified
-  // availability index — everything that used to require SSH + file access.
-  // Each card has wipe buttons for the things that
-  // are safe to nuke (denylists / positive cache; not user data).
-  app.get('/admin/health', requireAdmin, (req, res) => {
+  function databaseSnapshot() {
+    const index = availabilityStore.getDefault();
+    const stats = index.stats();
+    let fileSize = 0;
+    try { fileSize = fs.statSync(stats.file).size; } catch (_) { /* in-memory or unavailable */ }
+    return {
+      stats,
+      fileSize,
+      warm: availabilityWarmer.status(),
+      scheduler: availabilityScheduler.status(),
+      searches: index.recentSearches(25),
+    };
+  }
+
+  app.get('/admin/database', requireAdmin, (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(renderHealthPage(req.user, { flash: req.query.flash || null }));
+    res.setHeader('Cache-Control', 'no-store');
+    let snapshot;
+    try { snapshot = databaseSnapshot(); }
+    catch (error) {
+      snapshot = { stats: {}, warm: availabilityWarmer.status(), scheduler: availabilityScheduler.status(), searches: [], fileSize: 0 };
+      snapshot.flash = 'Database unavailable: ' + security.safeErrorMessage(error);
+    }
+    snapshot.flash = req.query.flash || snapshot.flash || null;
+    res.send(tablerChrome.tablerPage('Database', adminDatabase.renderBody(snapshot), {
+      user: req.user, currentSection: 'database',
+    }));
   });
 
-  app.post('/admin/health/wipe/:kind', requireAdmin, (req, res) => {
-    const kind = String(req.params.kind || '').toLowerCase();
+  app.get('/admin/database/status.json', requireAdmin, (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     try {
-      let msg;
-      switch (kind) {
-        case 'rd-denylist': rdDenylist.wipe(); msg = 'RD denylist wiped.'; break;
-        case 'tb-denylist': tbDenylist.wipe(); msg = 'TB denylist wiped.'; break;
-        case 'pm-denylist': pmDenylist.wipe(); msg = 'PM denylist wiped.'; break;
-        case 'positive-cache': positiveCache.wipe(); msg = 'Positive cache wiped.'; break;
-        case 'availability-index': availabilityStore.getDefault().wipe(); msg = 'Smart availability index wiped.'; break;
-        default: return res.redirect('/admin/health?flash=' + encodeURIComponent('Unknown wipe kind: ' + kind));
-      }
-      res.redirect('/admin/health?flash=' + encodeURIComponent(msg));
-    } catch (err) {
-      res.redirect('/admin/health?flash=' + encodeURIComponent('Wipe failed: ' + err.message));
+      res.send(JSON.stringify(databaseSnapshot()));
+    } catch (error) {
+      res.status(503).send(JSON.stringify({ ok: false, error: security.safeErrorMessage(error) }));
+    }
+  });
+
+  // Preserve old bookmarks without retaining the legacy Health UI or actions.
+  app.get('/admin/health', requireAdmin, (_req, res) => res.redirect(302, '/admin/database'));
+
+  app.post('/admin/database/settings', requireAdmin, (req, res) => {
+    try {
+      settings.setAvailabilityWarm({
+        enabled: req.body.enabled === 'on',
+        windowDays: req.body.windowDays,
+        intervalHours: req.body.intervalHours,
+        maxEventsPerRun: req.body.maxEventsPerRun,
+        startDelaySeconds: req.body.startDelaySeconds,
+      });
+      availabilityScheduler.reconfigure();
+      res.redirect('/admin/database?flash=' + encodeURIComponent('Warmer settings saved and applied.'));
+    } catch (error) {
+      res.redirect('/admin/database?flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(error)));
+    }
+  });
+
+  app.post('/admin/database/settings/reset', requireAdmin, (_req, res) => {
+    settings.resetAvailabilityWarm();
+    availabilityScheduler.reconfigure();
+    res.redirect('/admin/database?flash=' + encodeURIComponent('Warmer settings reset to environment defaults.'));
+  });
+
+  app.post('/admin/database/warm', requireAdmin, (_req, res) => {
+    const alreadyRunning = availabilityWarmer.status().running;
+    availabilityScheduler.runNow('manual', { force: true }).catch((error) => {
+      console.error('[availability] manual warm-up failed:', error.message);
+    });
+    res.redirect('/admin/database?flash=' + encodeURIComponent(alreadyRunning
+      ? 'Background warming is already running.' : 'Background warming started.'));
+  });
+
+  app.post('/admin/database/prune', requireAdmin, (_req, res) => {
+    try {
+      const removed = availabilityStore.getDefault().prune();
+      const total = Object.values(removed).reduce((sum, value) => sum + value, 0);
+      res.redirect('/admin/database?flash=' + encodeURIComponent('Pruned ' + total + ' expired database row(s).'));
+    } catch (error) {
+      res.redirect('/admin/database?flash=' + encodeURIComponent('Prune failed: ' + security.safeErrorMessage(error)));
+    }
+  });
+
+  app.post('/admin/database/wipe', requireAdmin, (_req, res) => {
+    try {
+      availabilityStore.getDefault().wipe();
+      res.redirect('/admin/database?flash=' + encodeURIComponent('Smart Availability database wiped.'));
+    } catch (error) {
+      res.redirect('/admin/database?flash=' + encodeURIComponent('Wipe failed: ' + security.safeErrorMessage(error)));
     }
   });
 
@@ -866,17 +929,6 @@ function createApp() {
     res.send(tablerChrome.tablerPage('Metadata', adminMetadata.renderBody({ flash: req.query.flash || null }), {
       user: req.user, currentSection: 'metadata',
     }));
-  });
-
-  app.post('/admin/health/warm-availability', requireAdmin, (req, res) => {
-    const alreadyRunning = availabilityWarmer.status().running;
-    availabilityWarmer.run({ reason: 'manual', force: true }).catch((error) => {
-      console.error('[availability] manual warm-up failed:', error.message);
-    });
-    const message = alreadyRunning
-      ? 'Recent-event warm-up is already running.'
-      : 'Recent-event warm-up started in the background.';
-    res.redirect('/admin/health?flash=' + encodeURIComponent(message));
   });
 
   app.get('/admin/nuvio-collections', requireAdmin, (req, res) => {
@@ -1327,118 +1379,6 @@ function renderAdminPage(currentUser, opts) {
     + '</script>';
 
   return tablerChrome.tablerPage('Admin', body, { user: currentUser, currentSection: 'admin' });
-}
-
-// 0.24.0: admin observability page. Pure render — no state mutation. State
-// lives in the provider denylists and positive cache.
-function renderHealthPage(currentUser, opts) {
-  opts = opts || {};
-  const flashHtml = opts.flash
-    ? '<div class="alert alert-info alert-dismissible" role="alert">'
-      + '<div>' + escapeHtml(opts.flash) + '</div>'
-      + '<a class="btn-close" data-bs-dismiss="alert"></a>'
-      + '</div>'
-    : '';
-
-  // Helper: Tabler stat card with title + value + sub + optional action button.
-  function statCard(title, valueHtml, subHtml, actionHtml) {
-    return ''
-      + '<div class="col-sm-6 col-lg-4">'
-      +   '<div class="card">'
-      +     '<div class="card-body">'
-      +       '<div class="subheader mb-2">' + title + '</div>'
-      +       '<div class="h2 mb-1">' + valueHtml + '</div>'
-      +       (subHtml ? '<div class="text-secondary small">' + subHtml + '</div>' : '')
-      +       (actionHtml ? '<div class="mt-3">' + actionHtml + '</div>' : '')
-      +     '</div>'
-      +   '</div>'
-      + '</div>';
-  }
-
-  function denyCard(provider, dl) {
-    let s = { total: 0, fresh: 0, stale: 0, hard: 0, soft: 0, ttlDays: 0, softTtlHours: 0 };
-    try { s = dl.stats(); } catch (e) { /* file may not exist yet */ }
-    const kind = provider.toLowerCase() + '-denylist';
-    const value = '<strong>' + s.fresh + '</strong> <span class="text-secondary fs-4">fresh</span>';
-    const sub = s.hard + ' hard, ' + s.soft + ' soft &middot; ' + s.stale + ' stale &middot; hard TTL ' + s.ttlDays + 'd &middot; soft TTL ' + s.softTtlHours + 'h';
-    const action = '<form method="POST" action="/admin/health/wipe/' + kind + '" onsubmit="return confirm(\'Wipe the ' + provider + ' denylist? All ' + s.fresh + ' entries will be removed.\');" class="d-inline">'
-      + '<button type="submit" class="btn btn-sm btn-outline-danger">Wipe</button>'
-      + '</form>';
-    return statCard(provider + ' denylist', value, sub, action);
-  }
-
-  // Positive cache
-  let posS = { totalHashes: 0, freshEntries: 0, byProvider: {}, ttlDays: 0 };
-  try { posS = positiveCache.stats(); } catch (e) { /* */ }
-  const byProvText = ['rd', 'tb', 'pm']
-    .map((p) => p.toUpperCase() + ': ' + (posS.byProvider[p] || 0))
-    .join(' &middot; ');
-  const positiveCardHtml = statCard(
-    'Legacy positive history',
-    '<strong>' + posS.freshEntries + '</strong> <span class="text-secondary fs-4">fresh entr' + (posS.freshEntries === 1 ? 'y' : 'ies') + '</span>',
-    'Imported once into Smart Availability; retained for rollback &middot; ' + posS.totalHashes + ' hash' + (posS.totalHashes === 1 ? '' : 'es') + ' &middot; ' + byProvText,
-    '<form method="POST" action="/admin/health/wipe/positive-cache" onsubmit="return confirm(\'Wipe legacy positive history? The Smart Availability import will not be removed.\');" class="d-inline">'
-      + '<button type="submit" class="btn btn-sm btn-outline-danger">Wipe</button>'
-      + '</form>'
-  );
-
-  let availabilityStats = {
-    releases: 0, eventMatches: 0, freshSearches: 0, freshObservations: 0,
-    searchHits: 0, searchMisses: 0, hitRate: 0, byProvider: {},
-  };
-  try { availabilityStats = availabilityStore.getDefault().stats(); } catch (_) { /* */ }
-  const warmStatus = availabilityWarmer.status();
-  const availabilityProviders = Object.entries(availabilityStats.byProvider || {})
-    .map(([provider, count]) => escapeHtml(provider) + ': ' + count).join(' &middot; ') || 'no observations yet';
-  const warmLast = warmStatus.lastCompletedAt
-    ? new Date(warmStatus.lastCompletedAt).toLocaleString('en-GB') : 'not run yet';
-  const warmSummary = (warmStatus.running ? 'Warm-up running' : 'Warm-up idle')
-    + ' &middot; last: ' + escapeHtml(warmLast)
-    + ' &middot; rolling ' + warmStatus.windowDays + '-day window'
-    + ' &middot; ' + warmStatus.attemptedEvents + '/' + warmStatus.eligibleEvents + ' events last run';
-  const availabilityCardHtml = statCard(
-    'Smart availability index',
-    '<strong>' + availabilityStats.releases + '</strong> <span class="text-secondary fs-4">release' + (availabilityStats.releases === 1 ? '' : 's') + '</span>',
-    availabilityStats.eventMatches + ' event matches &middot; '
-      + availabilityStats.freshSearches + ' fresh searches &middot; '
-      + Math.round(availabilityStats.hitRate * 100) + '% query hit rate<br>'
-      + availabilityProviders + '<br>' + warmSummary,
-    '<form method="POST" action="/admin/health/warm-availability" class="d-inline me-1">'
-      + '<button type="submit" class="btn btn-sm btn-outline-primary">Warm recent events now</button>'
-      + '</form>'
-      + '<form method="POST" action="/admin/health/wipe/availability-index" onsubmit="return confirm(\'Wipe the smart availability index? Provider searches will run again as needed.\');" class="d-inline">'
-      + '<button type="submit" class="btn btn-sm btn-outline-danger">Wipe</button>'
-      + '</form>'
-  );
-
-  // Backup card
-  const backupCardHtml = statCard(
-    'Backup',
-    '<span class="text-secondary fs-3">tar.gz</span>',
-    'Timestamped tar.gz of /app/data, including the smart availability database.',
-    '<a href="/admin/backup" class="btn btn-sm btn-outline-primary">Download backup</a>'
-  );
-
-  const body = ''
-    + '<div class="page-header">'
-    +   '<div class="row align-items-center">'
-    +     '<div class="col">'
-    +       '<h2 class="page-title">Health</h2>'
-    +       '<div class="text-secondary mt-1">Admin observability — provider health and reusable availability knowledge.</div>'
-    +     '</div>'
-    +   '</div>'
-    + '</div>'
-    + flashHtml
-    + '<div class="row row-cards">'
-    +   denyCard('RD', rdDenylist)
-    +   denyCard('TB', tbDenylist)
-    +   denyCard('PM', pmDenylist)
-    +   positiveCardHtml
-    +   availabilityCardHtml
-    +   backupCardHtml
-    + '</div>';
-
-  return tablerChrome.tablerPage('Health', body, { user: currentUser, currentSection: 'health' });
 }
 
 // 0.27.0: in-GUI log viewer. Filters (category / user / substring / level)
