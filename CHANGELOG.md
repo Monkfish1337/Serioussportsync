@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.66.1
+
+### Configuration and playback compatibility hotfix
+
+- Restored configuration saves from installed-app and private webviews that
+  legitimately submit forms with `Origin: null`, while retaining explicit
+  cross-site request rejection and SameSite session cookies.
+- Restored DIY NZB DAV and native NNTP playback for Newznab/Prowlarr download
+  URLs containing provider-issued `apikey` or token query parameters.
+- Restored Prowlarr torrent download-proxy hydration for the same legitimate
+  credential-query URL format while retaining protocol and metadata-host checks.
+- Prevented companion and direct-Prowlarr timeouts or provider failures from
+  being stored as successful empty Smart Availability searches. Genuine empty
+  searches retain their short negative-cache TTL.
+
 ## 0.66.0
 
 ### Rolling availability warm-up

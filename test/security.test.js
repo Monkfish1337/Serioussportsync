@@ -67,6 +67,11 @@ test('cross-site mutations are rejected while same-origin forms are accepted', (
   assert.equal(nextCalled, true);
 
   nextCalled = false;
+  const installedWebview = response();
+  security.csrf({ method: 'POST', headers: { host: 'sports.example', origin: 'null' } }, installedWebview, () => { nextCalled = true; });
+  assert.equal(nextCalled, true);
+
+  nextCalled = false;
   const sandboxedCrossSite = response();
   security.csrf({ method: 'POST', headers: { host: 'sports.example', origin: 'null', 'sec-fetch-site': 'cross-site' } }, sandboxedCrossSite, () => { nextCalled = true; });
   assert.equal(sandboxedCrossSite.statusCode, 403);

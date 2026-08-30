@@ -151,6 +151,7 @@ function listen(app) {
       redirect: 'manual',
       headers: {
         Cookie: cookie,
+        Origin: 'null',
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
@@ -188,7 +189,7 @@ function listen(app) {
         maxStreams: '7',
       }).toString(),
     });
-    assert.strictEqual(save.status, 302);
+    assert.strictEqual(save.status, 302, 'installed-app null-origin form saves successfully');
     assert.strictEqual(save.headers.get('location'), '/account?flash=saved');
     const saved = users.findById(user.id).config;
     assert.strictEqual(saved.torboxEnabled, true);

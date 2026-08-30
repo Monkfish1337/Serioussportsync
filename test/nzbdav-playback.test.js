@@ -61,6 +61,24 @@ test('enforces the NZB response size before buffering', async () => {
   });
 });
 
+test('downloads provider-issued NZB URLs containing credential query parameters', async () => {
+  let requested = '';
+  const body = '<nzb xmlns="http://www.newzbin.com/DTD/2003/nzb"></nzb>';
+  const downloaded = await playback.downloadNzb(
+    'https://indexer.example/api?t=get&id=123&apikey=provider-secret', {
+      fetchImpl: async (url) => {
+        requested = url;
+        return {
+          ok: true, status: 200,
+          headers: { get: () => null },
+          body: Readable.from([body]),
+        };
+      },
+    });
+  assert.equal(new URL(requested).searchParams.get('apikey'), 'provider-secret');
+  assert.equal(downloaded.toString(), body);
+});
+
 test('rejects redirects into cloud metadata services', async () => {
   await assert.rejects(playback.downloadNzb('https://indexer.example/get/1', {
     fetchImpl: async () => ({

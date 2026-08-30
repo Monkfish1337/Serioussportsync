@@ -29,5 +29,10 @@ assert.strictEqual(
   'http://prowlarr:9696/api/v1/search/download?id=1',
   'resolves relative Prowlarr download proxy URLs',
 );
+assert.strictEqual(
+  absoluteDownloadUrl('/api/v1/search/download?id=1&apikey=provider-secret', 'http://prowlarr:9696/'),
+  'http://prowlarr:9696/api/v1/search/download?id=1&apikey=provider-secret',
+  'accepts credential query parameters on server-consumed Prowlarr download URLs',
+);
 
 console.log('OK — Prowlarr magnet and torrent-body hydration helpers verified.');
