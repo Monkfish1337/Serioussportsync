@@ -94,7 +94,8 @@ missing/short secret, occupied port, or unwritable data mount.
 4. Open **Nuvio Collections** if you want grouped Nuvio folders and artwork.
 5. Open **Account** to enable playback services and choose catalog ordering.
 6. Copy or install the private manifest URL from **Account** into Nuvio or Stremio.
-7. Use **Database** to inspect Smart Availability and background warming.
+7. Use **Database** to inspect Smart Availability and choose which services
+   should prepare selected recent events automatically.
 
 Metadata catalogs work without TorBox, Prowlarr, Easynews, Usenet Ultimate,
 NZB DAV, or NNTP. Add one playback path at a time and test it before enabling

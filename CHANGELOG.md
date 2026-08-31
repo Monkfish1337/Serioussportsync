@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.70.0
+
+### Selective automatic preparation
+
+- Kept Smart Availability enabled for every normal interactive pipeline while
+  separating that low-cost search reuse from optional background work.
+- Replaced the blanket warmer controls with plain-language automatic
+  preparation choices. Torrent/TorBox is prepared by default; Usenet and
+  Easynews remain on demand unless explicitly selected.
+- Reduced the default recent-event preparation window from seven days to three
+  and excluded events outside each account's selected catalogs.
+- Confirmed that NZB DAV and native NNTP playback are never submitted, probed,
+  or downloaded in the background; only an opted-in shared search source can
+  be prepared.
+- Fixed failed Companion/direct-Prowlarr discovery being reported as a
+  successful torrent preparation, allowing diagnostics and the per-run circuit
+  breaker to reflect real failures.
+- Added automatic expired-row pruning at the start of preparation runs and
+  surfaced the cleanup count on the Database page.
+- Renamed warmer-facing controls and status text around the user outcome:
+  preparing recent events so links appear faster.
+
 ## 0.69.2
 
 ### Release workflow hotfix

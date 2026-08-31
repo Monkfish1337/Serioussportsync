@@ -173,7 +173,14 @@ module.exports = {
   availabilityWarm: {
     enabled: (process.env.AVAILABILITY_WARM_ENABLED || 'true') !== 'false',
     serveConfirmed: (process.env.AVAILABILITY_SERVE_CONFIRMED || 'true') !== 'false',
-    windowDays: Math.max(1, parseInt(process.env.AVAILABILITY_WARM_WINDOW_DAYS || '7', 10) || 7),
+    // Automatic preparation is intentionally selective. Torrent discovery
+    // and TorBox checks can make an event immediately playable; Usenet and
+    // Easynews keep their database-backed on-demand cache unless explicitly
+    // opted into background work.
+    prepareTorrent: (process.env.AVAILABILITY_PREPARE_TORRENT || 'true') !== 'false',
+    prepareUsenet: (process.env.AVAILABILITY_PREPARE_USENET || 'false') === 'true',
+    prepareEasynews: (process.env.AVAILABILITY_PREPARE_EASYNEWS || 'false') === 'true',
+    windowDays: Math.max(1, parseInt(process.env.AVAILABILITY_WARM_WINDOW_DAYS || '3', 10) || 3),
     intervalHours: Math.max(0.25, parseFloat(process.env.AVAILABILITY_WARM_INTERVAL_HOURS || '6') || 6),
     maxEventsPerRun: Math.max(1, parseInt(process.env.AVAILABILITY_WARM_MAX_EVENTS_PER_RUN || '25', 10) || 25),
     startDelaySeconds: Math.max(5, parseInt(process.env.AVAILABILITY_WARM_START_DELAY_SECONDS || '60', 10) || 60),

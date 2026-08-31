@@ -806,13 +806,16 @@ function createApp() {
       settings.setAvailabilityWarm({
         enabled: req.body.enabled === 'on',
         serveConfirmed: req.body.serveConfirmed === 'on',
+        prepareTorrent: req.body.prepareTorrent === 'on',
+        prepareUsenet: req.body.prepareUsenet === 'on',
+        prepareEasynews: req.body.prepareEasynews === 'on',
         windowDays: req.body.windowDays,
         intervalHours: req.body.intervalHours,
         maxEventsPerRun: req.body.maxEventsPerRun,
         startDelaySeconds: req.body.startDelaySeconds,
       });
       availabilityScheduler.reconfigure();
-      res.redirect('/admin/database?flash=' + encodeURIComponent('Warmer settings saved and applied.'));
+      res.redirect('/admin/database?flash=' + encodeURIComponent('Automatic preparation settings saved and applied.'));
     } catch (error) {
       res.redirect('/admin/database?flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(error)));
     }
@@ -830,7 +833,7 @@ function createApp() {
       console.error('[availability] manual warm-up failed:', error.message);
     });
     res.redirect('/admin/database?flash=' + encodeURIComponent(alreadyRunning
-      ? 'Background warming is already running.' : 'Background warming started.'));
+      ? 'Automatic preparation is already running.' : 'Automatic preparation started.'));
   });
 
   app.post('/admin/database/prune', requireAdmin, (_req, res) => {

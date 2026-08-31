@@ -107,7 +107,7 @@ function listen(app) {
     const database = await fetch(base + '/admin/database', { headers: { Cookie: cookie } });
     assert.strictEqual(database.status, 200, 'Database page is available to admins');
     const databaseHtml = await database.text();
-    for (const expected of ['Database', 'Background warming', 'Recent searches', 'Warmer settings']) {
+    for (const expected of ['Database', 'Automatic preparation', 'Recent searches', 'What should SSS prepare?']) {
       assert.ok(databaseHtml.includes(expected), 'Database page includes ' + expected);
     }
     assert.ok(!databaseHtml.includes('Legacy positive history'), 'legacy Health content is removed');
@@ -122,7 +122,8 @@ function listen(app) {
       method: 'POST', redirect: 'manual',
       headers: { Cookie: cookie, Origin: 'null', 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        enabled: 'on', serveConfirmed: 'on', windowDays: '10', intervalHours: '2',
+        enabled: 'on', serveConfirmed: 'on', prepareTorrent: 'on',
+        windowDays: '10', intervalHours: '2',
         maxEventsPerRun: '30', startDelaySeconds: '45',
       }).toString(),
     });
@@ -130,6 +131,8 @@ function listen(app) {
     assert.ok(String(saveDatabase.headers.get('location')).startsWith('/admin/database?flash='));
     assert.equal(require('../lib/settings').getAvailabilityWarm().windowDays, 10);
     assert.equal(require('../lib/settings').getAvailabilityWarm().serveConfirmed, true);
+    assert.equal(require('../lib/settings').getAvailabilityWarm().prepareTorrent, true);
+    assert.equal(require('../lib/settings').getAvailabilityWarm().prepareUsenet, false);
 
     const legacyHealth = await fetch(base + '/admin/health', {
       redirect: 'manual', headers: { Cookie: cookie },

@@ -18,10 +18,12 @@ test('persists validated warmer settings and restores environment defaults', () 
   const saved = settings.setAvailabilityWarm({
     enabled: false, serveConfirmed: true, windowDays: 14, intervalHours: 1.5,
     maxEventsPerRun: 40, startDelaySeconds: 30,
+    prepareTorrent: true, prepareUsenet: false, prepareEasynews: false,
   });
   assert.deepEqual(saved, {
     enabled: false, serveConfirmed: true, windowDays: 14, intervalHours: 1.5,
     maxEventsPerRun: 40, startDelaySeconds: 30,
+    prepareTorrent: true, prepareUsenet: false, prepareEasynews: false,
   });
   assert.deepEqual(settings.getAvailabilityWarm(), saved);
   assert.throws(() => settings.setAvailabilityWarm({
@@ -30,7 +32,10 @@ test('persists validated warmer settings and restores environment defaults', () 
   }), /Window days/);
   const reset = settings.resetAvailabilityWarm();
   assert.equal(reset.enabled, true);
-  assert.equal(reset.windowDays, 7);
+  assert.equal(reset.windowDays, 3);
+  assert.equal(reset.prepareTorrent, true);
+  assert.equal(reset.prepareUsenet, false);
+  assert.equal(reset.prepareEasynews, false);
 });
 
 test('renders database visibility, live warming and safe maintenance controls', () => {
@@ -52,14 +57,17 @@ test('renders database visibility, live warming and safe maintenance controls', 
     },
     scheduler: {
       nextRunAt: '2026-08-30T22:00:00Z',
-      settings: { enabled: true, serveConfirmed: true, windowDays: 7, intervalHours: 6, maxEventsPerRun: 25, startDelaySeconds: 60 },
+      settings: { enabled: true, serveConfirmed: true,
+        prepareTorrent: true, prepareUsenet: false, prepareEasynews: false,
+        windowDays: 7, intervalHours: 6, maxEventsPerRun: 25, startDelaySeconds: 60 },
     },
     searches: [{ eventId: 'ufc:300', eventTitle: 'UFC 300: Pereira vs Hill', provider: 'torrent', resultCount: 6, searchedAt: Date.now(), expiresAt: Date.now() + 10000 }],
   });
   for (const expected of [
-    'Background warming', 'UFC 300', 'Recent searches', 'ufc:300', 'Pereira vs Hill',
-    'Warmer provider diagnostics', 'Suppressed', 'network timeout',
-    'Serve fresh confirmed results',
+    'Automatic preparation', 'UFC 300', 'Recent searches', 'ufc:300', 'Pereira vs Hill',
+    'Preparation diagnostics', 'Suppressed', 'network timeout',
+    'Use previously confirmed playable results first',
+    'name="prepareTorrent"', 'name="prepareUsenet"', 'name="prepareEasynews"',
     'name="windowDays"', 'name="intervalHours"', 'name="maxEventsPerRun"',
     '/admin/database/prune', '/admin/database/wipe', '/admin/database/status.json',
   ]) assert.match(html, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));

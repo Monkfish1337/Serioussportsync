@@ -19,6 +19,19 @@ test('selects only the rolling seven-day aired-event window', () => {
   assert.deepEqual(selected.map((item) => item.id), ['ufc:today', 'ufc:six-days']);
 });
 
+test('prepares only events present in an account selected catalogs', () => {
+  const ufcEvent = event('selected', '2026-08-27');
+  assert.equal(warmer._test.profileIncludesEvent({
+    id: 'profile-1', config: { catalogs: ['ufc-recent'], catalogDefaultsVersion: 1 },
+  }, ufcEvent), true);
+  assert.equal(warmer._test.profileIncludesEvent({
+    id: 'profile-1', config: { catalogs: ['one-recent'], catalogDefaultsVersion: 1 },
+  }, ufcEvent), false);
+  assert.equal(warmer._test.profileIncludesEvent({
+    id: 'profile-1', config: { catalogs: [] },
+  }, ufcEvent), true);
+});
+
 test('rotates bounded batches through the complete recent window', async () => {
   warmer._test.resetForTests();
   const events = [
@@ -30,6 +43,7 @@ test('rotates bounded batches through the complete recent window', async () => {
     force: true,
     events,
     now: new Date('2026-08-27T18:00:00Z'),
+    windowDays: 7,
     maxEvents: 2,
     profiles: [{ username: 'test', config: {} }],
     prefetch: async ({ event: item }) => { visited.push(item.id); return { ok: true, errors: [] }; },
@@ -81,6 +95,7 @@ test('suppresses a failing provider for the remainder of one warming run', async
       event('three', '2026-08-25'), event('four', '2026-08-24'),
     ],
     now: new Date('2026-08-27T18:00:00Z'),
+    windowDays: 7,
     profiles: [{ id: 'profile-1', username: 'test', config: {} }],
     prefetch: async ({ skipProviders }) => {
       skipHistory.push(skipProviders.slice());

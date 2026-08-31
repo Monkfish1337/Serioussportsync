@@ -63,19 +63,24 @@ are account-scoped and belong on the signed-in **Account** page.
 
 ## Smart Availability
 
-The **Database** page provides live status and lets an administrator adjust
-the normal warmer settings without recreating the container.
+The **Database** page provides live status and lets an administrator choose
+which services prepare recent events without recreating the container. Torrent
+and TorBox preparation is enabled by default; Usenet and Easynews retain normal
+on-demand database caching without background traffic unless opted in.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `AVAILABILITY_DB_FILE` | `./data/availability.sqlite` | SQLite knowledge store. |
 | `AVAILABILITY_WARM_ENABLED` | `true` | Warm recently aired events in the background. |
 | `AVAILABILITY_SERVE_CONFIRMED` | `true` | Serve fresh confirmed results without repeating discovery. |
-| `AVAILABILITY_WARM_WINDOW_DAYS` | `7` | Recently aired event window considered by the warmer. |
+| `AVAILABILITY_PREPARE_TORRENT` | `true` | Prepare torrent discovery and account-scoped TorBox cache checks automatically. |
+| `AVAILABILITY_PREPARE_USENET` | `false` | Opt UU and native indexer searches into automatic preparation. This never submits or downloads an NZB. |
+| `AVAILABILITY_PREPARE_EASYNEWS` | `false` | Opt account-scoped Easynews searches into automatic preparation. |
+| `AVAILABILITY_WARM_WINDOW_DAYS` | `3` | Recently aired event window considered for automatic preparation. |
 | `AVAILABILITY_WARM_INTERVAL_HOURS` | `6` | Time between warmer runs. |
 | `AVAILABILITY_WARM_MAX_EVENTS_PER_RUN` | `25` | Rotating event batch size. |
 | `AVAILABILITY_WARM_START_DELAY_SECONDS` | `60` | Delay after application start. |
-| `AVAILABILITY_WARM_PROVIDER_TIMEOUT_MS` | `15000` | Per-provider background timeout. |
+| `AVAILABILITY_WARM_PROVIDER_TIMEOUT_MS` | `15000` | Search budget supplied to supported background providers. |
 | `AVAILABILITY_WARM_FAILURE_THRESHOLD` | `2` | Consecutive failures before a provider/account pair is skipped for the current run. |
 
 Advanced retention defaults are 6 hours for torrent/TorBox observations, 12

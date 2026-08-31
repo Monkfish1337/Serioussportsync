@@ -20,10 +20,13 @@ checks reuse account-scoped observations, successful playback raises confidence,
 and the original stream rows remain unchanged. Legacy positive-cache knowledge
 is imported without deleting its rollback source.
 
-Phase 2 is implemented in v0.66.0. A bounded background warmer rotates through
-events aired in the last seven days and pre-populates configured Torrent,
-TorBox, UU, native indexer, and Easynews scopes. It runs after catalog refreshes
-and on a schedule, while fresh TTLs prevent duplicate live provider requests.
+Phase 2 was refined in v0.70.0 around visible user benefit. Smart Availability
+continues to cache every interactive provider, while automatic preparation now
+defaults to Torrent/TorBox for events in each account's selected catalogs aired
+in the last three days. Usenet and Easynews background searches are explicit
+opt-ins, playback backends are never pre-submitted, expired data is pruned
+automatically, and real torrent failures reach the diagnostics and circuit
+breaker instead of appearing successful.
 
 Next phases will add provider-priority settings and Smart Play rows for Full
 Event, Main Card, Prelims, and Early Prelims, followed by a short fallback

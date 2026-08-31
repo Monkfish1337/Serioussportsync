@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.69.2-blue.svg" alt="Version 0.69.2"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.70.0-blue.svg" alt="Version 0.70.0"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -73,9 +73,10 @@ returns only the rows that finish within the configured request budget.
 The local Smart Availability Index stores encrypted, normalized discoveries in
 SQLite. Fresh Torrent, UU, native indexer, and Easynews searches are reused;
 TorBox cache observations remain isolated by account credentials. A bounded
-background job rotates through events aired in the last seven days, so the
-knowledge base is populated before a user opens an event. Current stream rows
-and provider toggles remain unchanged for the upcoming Smart Play selector.
+background job prepares Torrent/TorBox results for selected catalogs aired in
+the last three days, so likely playable links are ready before a user opens an
+event. Usenet and Easynews continue to benefit from on-demand search reuse but
+do no background work unless an administrator opts in from **Database**.
 
 | Discovery | Per-user playback | How it works |
 | --- | --- | --- |
@@ -151,8 +152,8 @@ JSON or application code.
 
 - **Admin:** refresh metadata, review catalog state, and configure direct
   Prowlarr or the optional companion scraper.
-- **Database:** inspect stored searches, confirmed availability, provider yield,
-  and background-warming state and settings.
+- **Database:** inspect stored searches and confirmed availability, then choose
+  which services should prepare selected recent events automatically.
 - **Users:** create invites and manage shared deployments.
 - **Metadata:** register reusable event schedules independently of promotions.
   Test saved or unsaved providers and preview normalized events without changing
