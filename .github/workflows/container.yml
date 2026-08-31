@@ -13,6 +13,10 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: monkfish1337/serioussportsync
+  # Compose evaluates required substitutions for every command, including
+  # failure logs and cleanup. This value exists only on the disposable runner.
+  SESSION_SECRET: ci-only-do-not-use-in-prod-0000000000000000000000000000000000
+  ADMIN_USER: ci-admin
 
 jobs:
   publish-and-test:
@@ -64,9 +68,6 @@ jobs:
 
       - name: Verify public image through Compose
         if: github.ref == 'refs/heads/main'
-        env:
-          SESSION_SECRET: ci-only-do-not-use-in-prod-0000000000000000000000000000000000
-          ADMIN_USER: ci-admin
         run: |
           cp .env.example .env
           docker logout ghcr.io

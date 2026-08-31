@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.69.2
+
+### Release workflow hotfix
+
+- Made the disposable CI session values available to every container workflow
+  step so required Compose interpolation also succeeds while collecting logs
+  and removing the public-image smoke-test stack.
+
 ## 0.69.1
 
 ### Fresh-install documentation
