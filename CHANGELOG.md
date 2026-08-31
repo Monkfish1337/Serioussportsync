@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.71.0
+
+### Operations console and availability funnel
+
+- Rebuilt Logs as a responsive operations console with a dense terminal-style
+  view, live pause/resume, selection-safe updates, fast filters, wrapping,
+  one-click copy, plain-text export, auto-scroll and connection feedback.
+- Added colour-coded summaries, warnings, errors and rejection rows so the
+  discovery and filtering path can be understood at a glance.
+- Logged a bounded sample of rejected release titles for every exclusion
+  reason by default, with a persistent Logs switch to show every rejection
+  while diagnosing matching problems.
+- Replaced the ambiguous Recent searches result total with a discovery funnel:
+  `discovered -> matched -> ready`. Existing databases migrate in place and
+  older rows show an outcome-pending state until searched again.
+- Recorded Torrent/TorBox match and immediate-cache counts after filtering, so
+  broad discovery results such as `153 discovered -> 2 matched -> 1 ready` are
+  represented accurately.
+
 ## 0.70.0
 
 ### Selective automatic preparation

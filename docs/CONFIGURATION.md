@@ -56,7 +56,8 @@ should normally be managed from **Metadata**, **Promotions**, and
 | `STREAM_PIPELINE_TIMEOUT_MS` | `8000` | Maximum duration of each interactive playback pipeline. |
 | `STREAM_DISCOVERY_BUDGET_MS` | `5000` | Discovery portion of the pipeline deadline, reserving time for matching and provider checks. |
 | `ALLOW_FOREIGN_LANG` | `false` | Set to `1` to retain foreign-language release candidates. |
-| `LOG_EXCLUDED_TITLES` | `false` | Set to `1` temporarily when diagnosing matching exclusions. |
+| `LOG_EXCLUDED_TITLES` | `false` | Initial default for full rejection detail. It can be changed live and persisted from the Logs page. |
+| `LOG_REJECTION_SAMPLE_LIMIT` | `4` | Rejected titles retained per exclusion reason when full detail is off. |
 
 TorBox, Easynews, Usenet Ultimate, native indexer, NZB DAV, and NNTP settings
 are account-scoped and belong on the signed-in **Account** page.

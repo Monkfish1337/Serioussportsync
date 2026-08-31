@@ -22,6 +22,7 @@ const availabilityStore = require('./lib/availability-index');
 const availabilityWarmer = require('./lib/availability-warmer');
 const availabilityScheduler = require('./lib/availability-scheduler');
 const adminDatabase = require('./lib/admin-database');
+const adminLogs = require('./lib/admin-logs');
 // 0.27.0: in-memory log buffer for /admin/logs.
 const logBuffer = require('./lib/log-buffer');
 const security = require('./lib/security');
@@ -755,6 +756,29 @@ function createApp() {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.send(JSON.stringify({ rows, stats: logBuffer.counts() }));
   });
+  app.get('/admin/logs.txt', requireAdmin, (req, res) => {
+    const rows = logBuffer.filtered({
+      category: req.query.category,
+      user: req.query.user,
+      substring: req.query.substring,
+      level: req.query.level,
+      limit: parseInt(req.query.limit, 10) || 1000,
+    });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="sss-logs-' + stamp + '.log"');
+    res.send(adminLogs.rowsToText(rows));
+  });
+  app.post('/admin/logs/preferences', requireAdmin, (req, res) => {
+    const preferences = settings.setLogPreferences({
+      detailedRejections: req.body.detailedRejections === 'on',
+    });
+    console.log('[admin] detailed rejection logging '
+      + (preferences.detailedRejections ? 'enabled' : 'set to sampled'));
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ ok: true, preferences });
+  });
 
   function databaseSnapshot() {
     const index = availabilityStore.getDefault();
@@ -1388,10 +1412,24 @@ function renderAdminPage(currentUser, opts) {
   return tablerChrome.tablerPage('Admin', body, { user: currentUser, currentSection: 'admin' });
 }
 
-// 0.27.0: in-GUI log viewer. Filters (category / user / substring / level)
+// Operations-console log viewer. The original renderer remains below during
+// the transition for easy rollback, but all routes use this implementation.
+function renderLogsPage(currentUser, q) {
+  const opts = adminLogs.queryOptions(q);
+  const rows = logBuffer.filtered(opts);
+  const body = adminLogs.renderBody({
+    rows,
+    stats: logBuffer.counts(),
+    query: q,
+    preferences: settings.getLogPreferences(),
+  });
+  return tablerChrome.tablerPage('Logs', body, { user: currentUser, currentSection: 'logs' });
+}
+
+// 0.27.0 legacy renderer retained temporarily for rollback comparison.
 // run server-side via logBuffer.filtered(). Tail mode is a small inline JS
 // that polls /admin/logs.json every 3s and re-renders just the table body.
-function renderLogsPage(currentUser, q) {
+function renderLogsPageLegacy(currentUser, q) {
   q = q || {};
   const category   = String(q.category   || 'all');
   const userFilter = String(q.user       || '');

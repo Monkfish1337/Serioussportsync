@@ -173,7 +173,9 @@ JSON or application code.
   promotion filters and possible duplicate detection.
 - **Imports and matching assistant:** preview ICS, CSV, or JSON calendars, then
   derive event-specific search aliases and exclusions from good and bad titles.
-- **Logs:** inspect discovery, filtering, cache checks, and playback resolution.
+- **Logs:** use the live operations console to inspect discovery, filtering,
+  rejection reasons, cache checks, and playback resolution. Pause without
+  losing your place, select or copy visible entries, and export a filtered log.
 
 Source refreshes can replace their event cache without overwriting saved
 promotions, aliases, exclusions, disabled-event decisions, or matching rules.

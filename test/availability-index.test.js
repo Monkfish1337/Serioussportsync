@@ -39,9 +39,15 @@ test('stores encrypted reusable searches and isolates provider scopes', () => {
       results: [{ title: 'UFC.300.Main.Card.1080p', postHash: 'post-1', size: 1234, dlFarm: 'farm' }],
     };
     fixture.index.recordSearch(input);
+    assert.equal(fixture.index.recordSearchOutcome({
+      eventId: input.eventId, provider: input.provider, scope: input.scope,
+      matchedCount: 2, readyCount: 1,
+    }), 1);
     assert.deepEqual(fixture.index.recentSearches(1).map((row) => ({
       eventId: row.eventId, provider: row.provider, resultCount: row.resultCount,
-    })), [{ eventId: 'ufc:300', provider: 'easynews', resultCount: 1 }]);
+      matchedCount: row.matchedCount, readyCount: row.readyCount,
+    })), [{ eventId: 'ufc:300', provider: 'easynews', resultCount: 1,
+      matchedCount: 2, readyCount: 1 }]);
     const hit = fixture.index.getSearch(input);
     assert.equal(hit.hit, true);
     assert.equal(hit.results[0].postHash, 'post-1');
@@ -173,4 +179,33 @@ test('refuses to downgrade a database created by a newer SSS schema', () => {
       file, secret: process.env.SESSION_SECRET,
     }), /newer than supported/);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('upgrades v1 search rows with discovery funnel columns', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sss-availability-v1-'));
+  const file = path.join(dir, 'availability.sqlite');
+  const db = new Database(file);
+  db.exec(`
+    CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+    INSERT INTO meta(key,value) VALUES ('schema_version','1');
+    CREATE TABLE search_runs (
+      search_key TEXT PRIMARY KEY,event_id TEXT NOT NULL,promotion_id TEXT,
+      provider TEXT NOT NULL,scope_hash TEXT NOT NULL,query_hash TEXT NOT NULL,
+      result_count INTEGER NOT NULL DEFAULT 0,searched_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL
+    );
+  `);
+  db.close();
+  const index = createAvailabilityIndex({ file, secret: process.env.SESSION_SECRET });
+  try {
+    assert.equal(index.stats().schemaVersion, 2);
+    index.recordSearch({ eventId: 'aew:test', provider: 'torrent', scope: 'scope',
+      queries: ['AEW Test'], results: [] });
+    assert.equal(index.recordSearchOutcome({ eventId: 'aew:test', provider: 'torrent',
+      scope: 'scope', matchedCount: 2, readyCount: 1 }), 1);
+    assert.deepEqual(index.recentSearches(1).map((row) => [row.matchedCount, row.readyCount]), [[2, 1]]);
+  } finally {
+    index.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
