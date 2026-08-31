@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.69.0-blue.svg" alt="Version 0.69.0"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.69.1-blue.svg" alt="Version 0.69.1"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -21,6 +21,23 @@ compatible clients.
 
 It hosts no media. Every playback connector is optional, self-hosted or
 user-supplied, and remains under the operator's control.
+
+## Start here
+
+For a fresh server, follow the [installation and recovery guide](docs/INSTALLATION.md).
+It covers Docker installation files, secret generation, LAN access, first
+login, verification, updates, backups, rebuilding, and common failures.
+
+The shortest path is:
+
+1. Download `docker-compose.yml` and `.env.example` into a new directory.
+2. Copy `.env.example` to `.env` and set one value: `SESSION_SECRET`.
+3. Set `SSS_BIND_ADDRESS` only if another device must reach the server directly.
+4. Run `docker compose up -d`, create the admin account, then configure optional
+   playback services from **Account**.
+
+The [minimal environment example](.env.example) contains only first-install
+choices. Advanced overrides are kept in the [configuration reference](docs/CONFIGURATION.md).
 
 ## Why SeriousSportSync?
 
@@ -94,59 +111,6 @@ signed, short-lived resolve URLs. Configure the experimental DIY path in the
 open **DIY Usenet pipeline** section on the Account page; it does not disable or
 replace any existing service.
 
-## Quick start with Docker Compose
-
-Create a directory and save the following as <code>docker-compose.yml</code>:
-
-~~~yaml
-services:
-  serioussportsync:
-    image: ghcr.io/monkfish1337/serioussportsync:latest
-    container_name: serioussportsync
-    restart: unless-stopped
-    env_file:
-      - .env
-    ports:
-      - "7000:7000"
-    volumes:
-      - serioussportsync_data:/app/data
-
-volumes:
-  serioussportsync_data:
-~~~
-
-Create <code>.env</code> with a random session secret and your intended
-administrator username:
-
-~~~env
-SESSION_SECRET=replace-with-at-least-32-random-characters
-ADMIN_USER=admin
-~~~
-
-Generate a suitable secret with <code>openssl rand -hex 32</code>, then start
-the stack:
-
-~~~bash
-docker compose up -d
-~~~
-
-Open <code>http://&lt;your-server&gt;:7000/</code>, create the account matching
-<code>ADMIN_USER</code>, configure discovery services under Admin, then use the
-single Account page to save playback services, choose catalogs, and install or
-export your private manifest. There is no second editing URL: sign in and return
-to <code>/account</code> whenever configuration needs to change.
-
-If port 7000 is occupied, change only the host side, for example
-<code>"7010:7000"</code>.
-
-The repository includes ready-to-use [docker-compose.yml](./docker-compose.yml)
-and [.env.example](./.env.example) files with the complete configuration
-surface.
-
-For a Dockge deployment that runs SSS and its private companion image in their
-own stack while retaining an existing Gluetun/Prowlarr/Zilean network, use the
-[standalone Dockge stack](./deploy/dockge/README.md).
-
 ## Updating
 
 ~~~bash
@@ -154,9 +118,10 @@ docker compose pull
 docker compose up -d --remove-orphans
 ~~~
 
-The default Compose port is bound to <code>127.0.0.1</code>. Put Cloudflare
-Tunnel or an authenticated reverse proxy in front instead of exposing port 7000
-directly to the LAN or Internet.
+The default Compose port is bound to <code>127.0.0.1</code>. Set
+<code>SSS_BIND_ADDRESS</code> to the server's LAN IP for trusted LAN access, or
+put a tunnel or authenticated reverse proxy in front. Do not expose port 7000
+directly to the Internet. Preserve <code>SESSION_SECRET</code> across updates.
 
 The named volume preserves accounts, event data, settings, custom promotions,
 Nuvio collection layouts, and matching overrides across container replacements.
@@ -184,8 +149,10 @@ discovery sources need to be combined behind one endpoint.
 The web interface is designed so routine operation does not require editing
 JSON or application code.
 
-- **Dashboard:** refresh metadata, inspect service health, and review state.
-- **Services:** configure direct Prowlarr and the optional companion scraper.
+- **Admin:** refresh metadata, review catalog state, and configure direct
+  Prowlarr or the optional companion scraper.
+- **Database:** inspect stored searches, confirmed availability, provider yield,
+  and background-warming state and settings.
 - **Users:** create invites and manage shared deployments.
 - **Metadata:** register reusable event schedules independently of promotions.
   Test saved or unsaved providers and preview normalized events without changing
@@ -207,14 +174,14 @@ JSON or application code.
   derive event-specific search aliases and exclusions from good and bad titles.
 - **Logs:** inspect discovery, filtering, cache checks, and playback resolution.
 
-Content Studio uses a separate editorial layer under <code>/app/data</code>.
-Source refreshes can replace their event cache without overwriting manual
-events, source-event edits, disabled-event decisions, or matching rules. Changes
-take effect without rebuilding the image.
+Source refreshes can replace their event cache without overwriting saved
+promotions, aliases, exclusions, disabled-event decisions, or matching rules.
+Changes take effect without rebuilding the image.
 
 ## Configuration highlights
 
-See [.env.example](./.env.example) for the annotated full list.
+Start with the short [.env.example](./.env.example). The annotated
+[configuration reference](docs/CONFIGURATION.md) contains advanced variables.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -223,22 +190,11 @@ See [.env.example](./.env.example) for the annotated full list.
 | <code>PUBLIC_URL</code> | auto-detected | Public origin used for private install and resolve URLs |
 | <code>TRUST_PROXY</code> | <code>false</code> | Set to <code>1</code> only when SSS is exclusively behind your trusted reverse proxy/tunnel; enables forwarded client IP, host, protocol, and secure-cookie handling |
 | <code>REFRESH_INTERVAL_HOURS</code> | <code>6</code> | Metadata refresh interval |
-| <code>EVENT_WINDOW_START_DATE</code> | <code>2025-01-01</code> | Earliest catalog date |
-| <code>CONTENT_STUDIO_FILE</code> | <code>./data/content-studio.json</code> | Refresh-safe manual content and editorial decisions |
-| <code>METADATA_SOURCES_FILE</code> | <code>./data/metadata-sources.json</code> | Reusable metadata source definitions and assignments |
-| <code>CUSTOM_PROMOTIONS_FILE</code> | <code>./data/custom-promotions.json</code> | User-created promotion and release-matching rules |
-| <code>NUVIO_COLLECTIONS_FILE</code> | <code>./data/nuvio-collections.json</code> | Nuvio collection title, folders, promotion assignments, and artwork |
 | <code>AVAILABILITY_DB_FILE</code> | <code>./data/availability.sqlite</code> | Encrypted reusable provider searches, event/release matches, card-part classification, and scoped availability observations |
 | <code>AVAILABILITY_WARM_ENABLED</code> | <code>true</code> | Proactively populate recent-event availability in the background |
 | <code>AVAILABILITY_SERVE_CONFIRMED</code> | <code>true</code> | Reuse fresh, account-scoped confirmed results before repeating provider discovery |
-| <code>AVAILABILITY_WARM_WINDOW_DAYS</code> / <code>AVAILABILITY_WARM_MAX_EVENTS_PER_RUN</code> | <code>7</code> / <code>25</code> | Bounded aired-event window and rotating batch size used by the warmer |
-| <code>AVAILABILITY_WARM_INTERVAL_HOURS</code> | <code>6</code> | Warm-up schedule; fresh provider searches are reused rather than repeated. Admins can override warmer settings live from **Database**. |
-| <code>AVAILABILITY_WARM_FAILURE_THRESHOLD</code> | <code>2</code> | Consecutive failures before a provider/account pair is skipped for the remainder of that warm-up run; interactive searches are never suppressed. |
 | <code>COMPANION_URL</code> | none | Optional SeriousSportScraper companion endpoint |
 | <code>PROWLARR_URL</code> / <code>PROWLARR_API_KEY</code> | none | Optional direct Prowlarr discovery |
-| <code>STREAM_MAX_ROWS</code> | <code>20</code> | Maximum stream rows returned per request |
-| <code>STREAM_PIPELINE_TIMEOUT_MS</code> | <code>8000</code> | Maximum time allowed for each playback pipeline |
-| <code>STREAM_DISCOVERY_BUDGET_MS</code> | <code>5000</code> | Search budget that reserves the remainder for filtering and cache checks |
 
 Users configure TorBox, Usenet Ultimate, the DIY Usenet pipeline, Easynews, catalog ordering, and client
 exports together on the signed-in Account page. Each legacy playback pipeline has

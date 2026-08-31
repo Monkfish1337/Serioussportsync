@@ -18,7 +18,7 @@ services:
       COMPANION_URL: "${COMPANION_URL:-}"
       COMPANION_AUTH_TOKEN: "${COMPANION_AUTH_TOKEN:-}"
       # Accounts
-      SESSION_SECRET: "${SESSION_SECRET}"
+      SESSION_SECRET: "${SESSION_SECRET:?Set SESSION_SECRET in .env}"
       ADMIN_USER: "${ADMIN_USER:-}"
     volumes:
       - serioussportsync_data:/app/data
@@ -32,7 +32,7 @@ services:
     ports:
       # Keep direct origin access on this host. Put a reverse proxy or
       # Cloudflare Tunnel in front instead of exposing port 7000 to the LAN.
-      - "127.0.0.1:7000:7000"
+      - "${SSS_BIND_ADDRESS:-127.0.0.1}:${SSS_HOST_PORT:-7000}:7000"
 
 volumes:
   serioussportsync_data:

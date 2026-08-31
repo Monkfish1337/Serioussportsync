@@ -1,4 +1,10 @@
-# Standalone Dockge stack
+# Advanced Dockge migration stack
+
+> This is not the recommended fresh-install path. New users should start with
+> the root [installation guide](../../docs/INSTALLATION.md) and add playback
+> services from the web interface. This template exists for an established
+> homelab that already has the private companion, Gluetun, Prowlarr, Zilean,
+> and the named shared Docker network below.
 
 This stack runs SeriousSportSync and SeriousSportSync Scraper from their GHCR
 images without building either repository on the homelab. It deliberately

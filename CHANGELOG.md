@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.69.1
+
+### Fresh-install documentation
+
+- Rebuilt the GitHub landing page around a clearly signposted fresh-server
+  installation and recovery guide, including Linux and PowerShell commands,
+  LAN binding, first login, verification, updates, backups, rebuilds, and
+  common failures.
+- Reduced `.env.example` from the full internal tuning surface to the single
+  required secret and a few genuinely common deployment choices. Moved the
+  retained advanced settings into a categorized configuration reference.
+- Made the root Compose bind address and host port configurable while
+  preserving the secure loopback default, and fail early when the required
+  session secret is missing.
+- Marked the bundled Dockge stack as an advanced homelab migration rather than
+  a normal install, removed site-specific and retired settings, and restored
+  the safe interactive playback deadline.
+- Added the planned separation of Prowlarr from the companion to the backlog.
+
 ## 0.69.0
 
 ### Background discovery reliability and diagnostics
