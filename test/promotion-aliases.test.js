@@ -46,6 +46,38 @@ test('learns a promotion-date-event search layout from release examples', () => 
   assert.equal(templates[0], '{promotion} {date_spaced} {name}');
 });
 
+test('does not learn an event stage as part of a promotion alias', () => {
+  const result = aliases.derivePromotionAliases('Champions League', [
+    'UEFA.Champions.League.FINAL.2026.05.30.PSG.vs.Arsenal.1080p.HDTV',
+  ]);
+  assert.ok(result.includes('UEFA Champions League'));
+  assert.ok(!result.some((alias) => /\bfinal\b/i.test(alias)));
+});
+
+test('football fixture matching requires both selected teams', () => {
+  const promotion = createGenericPromotion({
+    id: 'ucl-test', name: 'Champions League', source: 'football-data', competitionId: 'CL',
+    searchTitleTemplates: ['{promotion} {date_spaced} {name}'],
+    relevanceKeywords: ['ucl', 'champions league'], promotionAliases: ['UCL', 'Champions League'],
+    requireDateInTitle: false,
+  });
+  const event = { name: 'Bayern München vs PSG', date: '2026-05-06' };
+  assert.equal(promotion.isRelevantStreamTitle('real-madrid-ucl-knockout-stages', event).reason, 'no-home-team');
+  assert.equal(promotion.isRelevantStreamTitle('UCL FINAL 2025-2026 PSG - ARSENAL', event).reason, 'no-home-team');
+  assert.equal(promotion.isRelevantStreamTitle('Bayern München vs PSG 06.05.2026.mkv', event).ok, true);
+});
+
+test('two-digit football dates reject an old repeat fixture', () => {
+  const promotion = createGenericPromotion({
+    id: 'ucl-test', name: 'Champions League', source: 'football-data', competitionId: 'CL',
+    searchTitleTemplates: ['{name}'], relevanceKeywords: ['ucl'], requireDateInTitle: false,
+  });
+  const event = { name: 'Bayern München vs PSG', date: '2026-05-06' };
+  const result = promotion.isRelevantStreamTitle('ICC18 - Bayern München vs PSG 21.07.18', event);
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'wrong-date');
+});
+
 test('removes reject words that contradict promotion identity', () => {
   const rules = aliases.sanitizeMatchingRules(
     'Major League Baseball', ['MLB'], ['major league baseball', 'mlb'], ['mlb', 'network']
@@ -209,6 +241,29 @@ test('editing a legacy embedded MLB promotion does not fall back to TSDB validat
     assert.deepEqual(saved.exclusionKeywords, []);
   } finally {
     customPromotions.update = originalUpdate;
+    require('../lib/metadata-sources').assign = originalAssign;
+    require('../lib/promotions').reload = originalReload;
+  }
+});
+
+test('new football-data promotions automatically require fixture dates', () => {
+  const originalAdd = customPromotions.add;
+  const originalAssign = require('../lib/metadata-sources').assign;
+  const originalReload = require('../lib/promotions').reload;
+  let saved;
+  customPromotions.add = (spec) => { saved = spec; return spec; };
+  require('../lib/metadata-sources').assign = () => null;
+  require('../lib/promotions').reload = () => null;
+  try {
+    adminPromotions.saveFromForm({
+      id: 'ucl-test', name: 'Champions League', source: 'football-data',
+      competitionId: 'CL', promotionAliases: 'UCL', relevanceKeywords: 'ucl',
+      searchTitleTemplates: '{promotion} {date_spaced} {name}', posterShape: 'landscape',
+      requireDateMode: 'auto',
+    });
+    assert.equal(saved.requireDateInTitle, true);
+  } finally {
+    customPromotions.add = originalAdd;
     require('../lib/metadata-sources').assign = originalAssign;
     require('../lib/promotions').reload = originalReload;
   }

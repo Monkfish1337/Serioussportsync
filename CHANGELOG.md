@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.75.0
+
+### End-user-safe promotion matching
+
+- Made both teams a hard requirement for matchup events. Broad competition
+  aliases such as `UCL` can no longer admit a different fixture, including a
+  Real Madrid result or PSG–Arsenal final for Bayern–PSG.
+- Added two-digit date recognition for older release styles such as
+  `21.07.18`, preventing historical repeats from bypassing fixture dates.
+- Stopped event stages such as `FINAL`, `Semi Final`, `Quarter Final`, `Round`,
+  and `Leg` from being learned as promotion aliases. Existing saved aliases
+  are cleaned automatically when promotions load.
+- Football-data schedules now automatically enable exact-date matching for
+  newly created promotions unless the user explicitly changes the advanced
+  preference.
+
+### Usenet searches that finish in time
+
+- Added a provider query planner that ranks exact-date matchup searches and
+  sends a compact set of six variants to Usenet providers instead of blindly
+  forwarding as many as 60 generated permutations.
+- Bounded foreground Easynews to four short, ranked searches with per-query
+  and total deadlines. Usenet Ultimate now receives an inner timeout that
+  completes before SSS's eight-second stream response deadline.
+- Applied the same ranked search plan to background availability warming,
+  reducing unnecessary provider and indexer load.
+- Added a per-promotion option to include non-English releases. Rejection logs
+  now distinguish sports noise, foreign-language filtering, and custom
+  promotion rules instead of reporting every exclusion as generic noise.
+
 ## 0.74.1
 
 ### Complete TorBox result refresh
