@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.74.1
+
+### Complete TorBox result refresh
+
+- Fixed confirmed availability being mistaken for the event's complete result
+  set. One ready database row could previously hide other matched candidates,
+  including a second candidate that had just finished warming.
+- Confirmed rows are now merged with the full stored discovery result. Fresh
+  cached rows remain instant, `warming` candidates are rechecked on every
+  Refresh Links request, and fresh negative observations avoid unnecessary
+  TorBox calls.
+- Added the ONE Friday Fights regression case: three matched candidates with
+  one ready, one newly warmed, and one unavailable must return two playable
+  TorBox rows plus the remaining warm action.
+
 ## 0.74.0
 
 ### User-created metadata providers

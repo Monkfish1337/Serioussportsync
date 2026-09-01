@@ -112,7 +112,7 @@ test('an old warm link starts playback when TorBox has become ready', async () =
   }
 });
 
-test('serves an account-scoped confirmed TorBox row without repeating discovery or cache checks', async () => {
+test('serves an account-scoped confirmed TorBox row while reusing full stored discovery', async () => {
   const index = createAvailabilityIndex({ file: ':memory:', secret: process.env.SESSION_SECRET });
   const originalDefault = availabilityStore.getDefault;
   const originalCompanion = settings.getCompanion;
@@ -154,13 +154,69 @@ test('serves an account-scoped confirmed TorBox row without repeating discovery 
     assert.equal(cacheChecks, 0, 'fresh confirmed state avoids another TorBox cache lookup');
     assert.deepEqual(index.recentSearches(1).map((row) => ({
       discovered: row.resultCount, matched: row.matchedCount, ready: row.readyCount,
-    })), [{ discovered: 1, matched: null, ready: null }],
-    'confirmed-only serving does not replace a full-search funnel with its subset');
+    })), [{ discovered: 1, matched: 1, ready: 1 }],
+    'the stored discovery funnel is retained and receives the current outcome');
   } finally {
     availabilityStore.getDefault = originalDefault;
     settings.getCompanion = originalCompanion;
     settings.getProwlarr = originalProwlarr;
     settings.getAvailabilityWarm = originalAvailability;
+    torbox.checkCachedBatch = originalCheck;
+    index.close();
+  }
+});
+
+test('a confirmed row does not hide another matched candidate that just finished warming', async () => {
+  const index = createAvailabilityIndex({ file: ':memory:', secret: process.env.SESSION_SECRET });
+  const originalDefault = availabilityStore.getDefault;
+  const originalCompanion = settings.getCompanion;
+  const originalProwlarr = settings.getProwlarr;
+  const originalCheck = torbox.checkCachedBatch;
+  const companion = { url: 'http://scraper:8080', authToken: 'token' };
+  const prowlarr = { url: '', apiKey: '' };
+  const candidates = [
+    { title: 'ONE.Friday.Fights.167.1080p.WEB.A', infoHash: '1'.repeat(40), size: 9 },
+    { title: 'ONE.Friday.Fights.167.1080p.WEB.B', infoHash: '2'.repeat(40), size: 8 },
+    { title: 'ONE.Friday.Fights.167.720p.WEB.C', infoHash: '3'.repeat(40), size: 7 },
+  ];
+  const sourceScope = index.scopeFingerprint('torrent', {
+    companionUrl: companion.url, companionToken: companion.authToken,
+    prowlarrUrl: prowlarr.url, prowlarrApiKey: prowlarr.apiKey,
+  });
+  const torboxScope = index.scopeFingerprint('torbox', { apiKey: 'torbox-key' });
+  index.recordSearch({
+    eventId: 'one:167', promotionId: 'one', provider: 'torrent', scope: sourceScope,
+    queries: ['ONE Friday Fights 167'], results: candidates,
+  });
+  index.observe({ provider: 'torbox', scope: torboxScope, state: 'cached', candidate: candidates[0] });
+  index.observe({ provider: 'torbox', scope: torboxScope, state: 'warming', candidate: candidates[1] });
+  index.observe({ provider: 'torbox', scope: torboxScope, state: 'unavailable', candidate: candidates[2] });
+  availabilityStore.getDefault = () => index;
+  settings.getCompanion = () => companion;
+  settings.getProwlarr = () => prowlarr;
+  let checked = [];
+  torbox.checkCachedBatch = async (hashes) => {
+    checked = hashes;
+    return new Set([candidates[1].infoHash]);
+  };
+  try {
+    const rows = await streams.pipelineTorrentTorbox({
+      promo: { id: 'one', isRelevantStreamTitle: () => ({ ok: true }) },
+      event: { id: 'one:167', name: 'ONE Friday Fights 167', date: '2026-08-29', excludePatterns: [] },
+      titles: ['ONE Friday Fights 167'], torboxKey: 'torbox-key', discoveryBudgetMs: 100,
+      urlCtx: { origin: 'http://sss:7000', userId: 'user-1', apiToken: 'token', showWarmRows: true },
+      log: () => {},
+    });
+    assert.deepEqual(checked, [candidates[1].infoHash], 'warming candidate is rechecked; fresh negative is not');
+    assert.equal(rows.filter((row) => /\/resolve\/torbox\//.test(row.url)).length, 2);
+    assert.equal(rows.filter((row) => /\/warm\/torbox\//.test(row.url)).length, 1);
+    assert.deepEqual(index.recentSearches(1).map((row) => ({
+      discovered: row.resultCount, matched: row.matchedCount, ready: row.readyCount,
+    })), [{ discovered: 3, matched: 3, ready: 2 }]);
+  } finally {
+    availabilityStore.getDefault = originalDefault;
+    settings.getCompanion = originalCompanion;
+    settings.getProwlarr = originalProwlarr;
     torbox.checkCachedBatch = originalCheck;
     index.close();
   }
