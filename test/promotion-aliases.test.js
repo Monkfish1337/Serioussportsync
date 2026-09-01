@@ -96,17 +96,24 @@ test('saved aliases generate queries and participate in relevance matching', () 
   assert.equal(promotion.isRelevantStreamTitle('F1.2026.Dutch.Grand.Prix.1080p', event).ok, true);
 });
 
-test('promotions form emits valid browser JavaScript for the alias assistant', () => {
-  const html = adminPromotions.renderBody({});
+test('promotions wizard emits valid browser JavaScript and keeps expert tools optional', () => {
+  const listHtml = adminPromotions.renderBody({});
+  assert.match(listHtml, /Create promotion/);
+  assert.match(listHtml, /id="promotionWizard" hidden/);
+  const html = adminPromotions.renderBody({ create: true });
   const script = html.match(/<script>([\s\S]*?)<\/script>/);
   assert.ok(script);
   assert.doesNotThrow(() => new Function(script[1])); // eslint-disable-line no-new-func
+  assert.equal((html.match(/data-wizard-panel=/g) || []).length, 5);
+  assert.match(html, /What should users see/);
+  assert.match(html, /Where do event names and dates come from/);
+  assert.match(html, /Add real release titles/);
+  assert.match(html, /Official website/);
+  assert.match(html, /Advanced search patterns/);
   assert.match(html, /id="deriveAliases"/);
   assert.match(html, /name="promotionAliases"/);
   assert.match(html, /name="exclusionKeywords"/);
   assert.match(html, /id="previewMatching"/);
-  assert.match(html, /Help SSS recognize releases/);
-  assert.match(html, /Add it under Metadata/);
   assert.match(html, /name="sourceRef"/);
   assert.match(html, /Preview refresh/);
   assert.match(html, /source-preview/);

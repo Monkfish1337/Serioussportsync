@@ -61,6 +61,8 @@ test('warming replaces a stale negative observation so Refresh Links rechecks To
     const stillWarming = await streams.pipelineTorrentTorbox(pipelineInput);
     assert.equal(checks, 2, 'an immediate Refresh Links action rechecks TorBox');
     assert.match(stillWarming[0].url, /\/warm\/torbox\//);
+    assert.match(stillWarming[0].name, /Refresh Links when ready/);
+    assert.match(stillWarming[0].title, /Check TorBox dashboard, then Refresh Links when complete/);
     assert.equal(index.availabilityFor({
       provider: 'torbox', scope: torboxScope, candidates: [candidate],
     }).get(index.releaseId(candidate)).state, 'warming',

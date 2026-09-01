@@ -90,7 +90,9 @@ missing/short secret, occupied port, or unwritable data mount.
 
 1. Create the account whose username matches `ADMIN_USER`.
 2. Open **Metadata** and refresh or inspect the event sources.
-3. Open **Promotions** to enable, create, or test sports catalogs.
+3. Open **Promotions** and use **Create promotion**. The guided setup can link
+   a saved schedule or create one from a provider ID or recognised official
+   website, then learn matching rules from example release titles.
 4. Open **Nuvio Collections** if you want grouped Nuvio folders and artwork.
 5. Open **Account** to enable playback services and choose catalog ordering.
 6. Copy or install the private manifest URL from **Account** into Nuvio or Stremio.

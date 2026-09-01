@@ -1038,6 +1038,7 @@ function createApp() {
     res.setHeader('Cache-Control', 'no-store');
     const body = adminPromotions.renderBody({
       editId: String(req.query.edit || '').trim() || null,
+      create: req.query.create === '1',
       flash:  req.query.flash || null,
     });
     res.send(tablerChrome.tablerPage('Promotions', body, { user: req.user, currentSection: 'promotions' }));
@@ -1051,8 +1052,12 @@ function createApp() {
       res.redirect('/admin/nuvio-collections?promotion=' + encodeURIComponent(spec.id)
         + '&flash=' + encodeURIComponent('Created "' + spec.name + '".' + repaired + ' Choose its Nuvio folder and artwork below, then refresh it from Promotions.'));
     } catch (err) {
-      res.redirect('/admin/promotions?flash=' + encodeURIComponent('Create failed: ' + err.message));
+      res.redirect('/admin/promotions?create=1&flash=' + encodeURIComponent('Create failed: ' + err.message) + '#promotionWizard');
     }
+  });
+
+  app.get('/admin/promotions/new', requireAdmin, (req, res) => {
+    res.redirect(302, '/admin/promotions?create=1#promotionWizard');
   });
 
   // Retired expert tools now converge on the unified Promotions workflow.
@@ -1085,6 +1090,11 @@ function createApp() {
     res.send(JSON.stringify(out));
   });
 
+  app.post('/admin/promotions/source-preview', requireAdmin, async (req, res) => {
+    const out = await adminPromotions.previewWizardSource(req.body || {});
+    res.status(out.ok ? 200 : 422).json(out);
+  });
+
   app.post('/admin/promotions/preview-matching', requireAdmin, (req, res) => {
     const out = adminPromotions.previewMatching(req.body || {});
     res.status(out.ok ? 200 : 400);
@@ -1109,7 +1119,7 @@ function createApp() {
       res.redirect('/admin/promotions?flash=' + encodeURIComponent('Updated "' + id + '".' + repaired));
     } catch (err) {
       res.redirect('/admin/promotions?edit=' + encodeURIComponent(id)
-        + '&flash=' + encodeURIComponent('Update failed: ' + err.message));
+        + '&flash=' + encodeURIComponent('Update failed: ' + err.message) + '#promotionWizard');
     }
   });
 

@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.73.0
+
+### Guided promotion creation
+
+- Rebuilt promotion creation as a five-step wizard covering the user-facing
+  name, event schedule, real release examples, optional artwork, and a final
+  plain-language review.
+- Let users link a saved schedule or create a reusable schedule from a
+  TheSportsDB, MLB, ONE Championship, football-data.org, or TMDB provider in
+  the same workflow. Recognised official schedule URLs can be pasted directly.
+- Added a non-destructive schedule test with normalised sample events before a
+  new promotion can continue, with credentials redacted from failures.
+- Kept indexer release discovery and automatic alias/search-pattern learning in
+  the guided path, while moving manual matching, pipeline, football, and date
+  controls under clearly labelled Advanced sections.
+- Made promotion and newly created schedule persistence transactional: if the
+  promotion is invalid, the unused schedule is removed instead of being left
+  behind.
+
+### Clearer TorBox warming
+
+- Updated warm result rows to tell users to check the TorBox dashboard and use
+  Nuvio's **Refresh Links** once caching completes.
+
 ## 0.72.1
 
 ### TorBox warm refresh hotfix

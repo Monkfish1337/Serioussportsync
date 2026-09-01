@@ -8,18 +8,24 @@ const path = require('path');
 const config = require('../config');
 
 const originalFile = config.metadataSourcesFile;
+const originalCustomFile = config.customPromotionsFile;
 const testFile = path.join(os.tmpdir(), 'sss-metadata-sources-' + process.pid + '.json');
+const testCustomFile = path.join(os.tmpdir(), 'sss-wizard-promotions-' + process.pid + '.json');
 config.metadataSourcesFile = testFile;
+config.customPromotionsFile = testCustomFile;
 const sources = require('../lib/metadata-sources');
 const promotions = require('../lib/promotions');
 const chrome = require('../lib/tabler-chrome');
 const adminMetadata = require('../lib/admin-metadata');
 const metadataPreview = require('../lib/metadata-preview');
 const mlb = require('../lib/sources/mlb');
+const adminPromotions = require('../lib/admin-promotions');
 
 test.after(() => {
   config.metadataSourcesFile = originalFile;
+  config.customPromotionsFile = originalCustomFile;
   try { fs.unlinkSync(testFile); } catch (_) {}
+  try { fs.unlinkSync(testCustomFile); } catch (_) {}
 });
 
 test('seeds all current built-in metadata source assignments', () => {
@@ -80,6 +86,44 @@ test('retired expert UI modules have been deleted while data layers remain', () 
 test('rejects incomplete or duplicate source definitions', () => {
   assert.throws(() => sources.add({ id: 'bad-source', name: 'Bad', type: 'tmdb', tvIds: 'abc' }), /numeric/);
   assert.throws(() => sources.add({ id: 'tsdb-nfl', name: 'Duplicate', type: 'onefc' }), /already exists/);
+});
+
+test('wizard accepts provider IDs and recognises supported official websites', () => {
+  const provider = adminPromotions.wizardSourceDefinition({
+    sourceMode: 'provider', id: 'wizard-nfl', name: 'NFL',
+    sourceType: 'thesportsdb', leagueId: '4391',
+  });
+  assert.equal(provider.ok, true);
+  assert.deepEqual(provider.definition.source, { type: 'thesportsdb', leagueId: '4391' });
+  assert.equal(provider.definition.id, 'wizard-nfl-schedule');
+
+  assert.deepEqual(adminPromotions.websiteSource('https://watch.onefc.com/upcoming-events'), {
+    ok: true, type: 'onefc', detected: 'ONE Championship official schedule',
+  });
+  assert.deepEqual(adminPromotions.websiteSource('https://www.mlb.com/schedule'), {
+    ok: true, type: 'mlb', detected: 'MLB official schedule',
+  });
+  assert.match(adminPromotions.websiteSource('https://example.com/events').error, /does not yet have a schedule adapter/);
+});
+
+test('wizard creates and assigns a reusable source in the same save', () => {
+  const saved = adminPromotions.saveFromForm({
+    sourceMode: 'provider', id: 'wizard-league', name: 'Wizard League',
+    sourceType: 'thesportsdb', leagueId: '9876', posterShape: 'landscape',
+    searchTitleTemplates: '{name}\n{name} {year}',
+  });
+  assert.equal(saved.sourceRef, 'wizard-league-schedule');
+  assert.deepEqual(sources.find(saved.sourceRef).source, { type: 'thesportsdb', leagueId: '9876' });
+  assert.equal(sources.assignmentFor('wizard-league'), saved.sourceRef);
+  assert.ok(promotions.all.some((promotion) => promotion.id === 'wizard-league'));
+});
+
+test('wizard rolls back a newly created source when promotion validation fails', () => {
+  assert.throws(() => adminPromotions.saveFromForm({
+    sourceMode: 'provider', id: 'x', name: 'Broken', sourceType: 'onefc',
+    searchTitleTemplates: '{name}', posterShape: 'landscape',
+  }), /id must/);
+  assert.equal(sources.find('x-schedule'), null);
 });
 
 test('creates a no-key MLB source and exposes Metadata navigation', () => {
