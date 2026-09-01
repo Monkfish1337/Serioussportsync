@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.73.0-blue.svg" alt="Version 0.73.0"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.74.0-blue.svg" alt="Version 0.74.0"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -155,15 +155,16 @@ JSON or application code.
 - **Database:** inspect stored searches and confirmed availability, then choose
   which services should prepare selected recent events automatically.
 - **Users:** create invites and manage shared deployments.
-- **Metadata:** register reusable event schedules independently of promotions.
-  Test saved or unsaved providers and preview normalized events without changing
-  assignments or stored catalogs. The official MLB schedule requires no API key.
-- **Promotions:** a five-step wizard asks for the name, event schedule, real
-  release examples, and optional artwork, then shows a plain-language review.
-  Link an existing schedule or create one from a provider ID or recognised
-  official website without leaving the wizard. SSS derives matching aliases
-  and search patterns from examples; detailed filters, pipeline controls, and
-  source tools remain available under **Advanced**. Conflicting reject words
+- **Metadata:** create and test reusable event providers independently of
+  promotions. Use a ready-made adapter or connect a public JSON/API schedule by
+  mapping its event-list, name, date, ID, venue, and artwork fields—without
+  writing code. Preview normalized events without changing assignments or
+  stored catalogs. The official MLB schedule requires no API key.
+- **Promotions:** a five-step wizard asks for the name, saved event provider,
+  real release examples, and optional artwork, then shows a plain-language
+  review. Create and test providers in Metadata, then select them here. SSS
+  derives matching aliases and search patterns from examples; detailed filters,
+  pipeline controls, and source tools remain available under **Advanced**. Conflicting reject words
   are repaired rather than silently excluding valid results. The built-in
   indexer finder can search Newznab/NZBHydra or Prowlarr directly, filter and
   sort titles, and add examples without the companion service.

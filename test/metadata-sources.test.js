@@ -19,7 +19,9 @@ const chrome = require('../lib/tabler-chrome');
 const adminMetadata = require('../lib/admin-metadata');
 const metadataPreview = require('../lib/metadata-preview');
 const mlb = require('../lib/sources/mlb');
+const jsonFeed = require('../lib/sources/json-feed');
 const adminPromotions = require('../lib/admin-promotions');
+const { setFreshStreamHeaders } = require('../addon');
 
 test.after(() => {
   config.metadataSourcesFile = originalFile;
@@ -132,9 +134,58 @@ test('creates a no-key MLB source and exposes Metadata navigation', () => {
   assert.ok(chrome.ADMIN_SECTIONS.some((item) => item.id === 'metadata'));
   const html = adminMetadata.renderBody({});
   assert.match(html, /MLB official schedule/);
+  assert.match(html, /Provider creator/);
+  assert.match(html, /Custom JSON\/API schedule/);
   const script = html.match(/<script>([\s\S]*?)<\/script>/);
   assert.ok(script);
   assert.doesNotThrow(() => new Function(script[1])); // eslint-disable-line no-new-func
+});
+
+test('creates and maps a user-defined JSON API provider without executing code', async () => {
+  const created = sources.add({
+    id: 'custom-fights', name: 'Custom fight schedule', type: 'json-feed',
+    url: 'https://events.example/api/schedule', arrayPath: 'payload.events',
+    idField: 'event.id', nameField: 'event.title', dateField: 'starts.at',
+    venueField: 'location.name', posterField: 'images.poster',
+  });
+  assert.equal(created.source.type, 'json-feed');
+  const mapped = jsonFeed.mapEvents({ payload: { events: [{
+    event: { id: 167, title: 'ONE Friday Fights 167' },
+    starts: { at: '2026-08-28T12:30:00Z' }, location: { name: 'Lumpinee Stadium' },
+    images: { poster: 'https://img.example/167.jpg' },
+  }] } }, created.source);
+  assert.deepEqual(mapped[0], {
+    sourceId: '167', name: 'ONE Friday Fights 167', date: '2026-08-28', time: '12:30:00',
+    venue: 'Lumpinee Stadium', description: null, poster: 'https://img.example/167.jpg',
+    source: { type: 'json-feed', sourceId: '167' },
+  });
+
+  const preview = await metadataPreview.preview(created, {
+    adapters: { jsonFeed: { fetchAll: async () => mapped } },
+  });
+  assert.equal(preview.ok, true);
+  assert.equal(preview.events[0].name, 'ONE Friday Fights 167');
+});
+
+test('custom provider validation blocks cloud metadata URLs and executable paths', () => {
+  assert.throws(() => sources.add({
+    id: 'cloud-feed', name: 'Cloud feed', type: 'json-feed',
+    url: 'http://169.254.169.254/latest', nameField: 'name', dateField: 'date',
+  }), /cloud metadata/);
+  assert.throws(() => sources.add({
+    id: 'code-feed', name: 'Code feed', type: 'json-feed',
+    url: 'https://events.example/api', nameField: 'constructor.constructor()', dateField: 'date',
+  }), /dotted field path/);
+});
+
+test('stream refresh headers always rotate to prevent a bodyless 304', () => {
+  const first = {}, second = {};
+  setFreshStreamHeaders({ setHeader: (key, value) => { first[key] = value; } });
+  setFreshStreamHeaders({ setHeader: (key, value) => { second[key] = value; } });
+  assert.match(first.ETag, /^"sss-stream-/);
+  assert.notEqual(first.ETag, second.ETag);
+  assert.equal(first.Pragma, 'no-cache');
+  assert.equal(first.Expires, '0');
 });
 
 test('normalizes an official MLB fixture into a generic event record', () => {
@@ -178,10 +229,10 @@ test('previews normalized source events without saving or assigning them', async
   assert.equal(fs.readFileSync(testFile, 'utf8'), before);
 });
 
-test('metadata page exposes draft and saved-source preview controls', () => {
+test('metadata page exposes provider creation plus draft and saved-source preview controls', () => {
   const html = adminMetadata.renderBody({});
   assert.match(html, /metadata-sources\/preview/);
-  assert.match(html, /Test &amp; preview/);
+  assert.match(html, /Test provider &amp; show events/);
   const script = html.match(/<script>([\s\S]*?)<\/script>/);
   assert.ok(script);
   assert.doesNotThrow(() => new Function(script[1])); // eslint-disable-line no-new-func

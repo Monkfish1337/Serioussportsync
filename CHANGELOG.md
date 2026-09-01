@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.74.0
+
+### User-created metadata providers
+
+- Moved provider creation clearly into Metadata. Promotions now selects a
+  tested saved provider and links back to the creator instead of presenting a
+  fixed list of shipped adapters as the creation workflow.
+- Added a no-code custom JSON/API provider. Users can enter a public schedule
+  endpoint and map dotted paths for its event list, name, date, stable ID,
+  time, venue, description, and artwork.
+- Added read-only preview and normalized sample events before a custom provider
+  is saved. Responses are bounded, redirects are revalidated, cloud metadata
+  addresses are blocked, and no user-supplied JavaScript is evaluated.
+- Connected custom providers to both preview and production event refreshes so
+  they can be assigned to any compatible user-created promotion.
+
+### Reliable Nuvio link refresh
+
+- Prevented Express-generated conditional `304` responses on account stream
+  lookups. Every Refresh Links request now receives a complete, freshly built
+  response, avoiding the case where Nuvio clears a warmed row and receives no
+  replacement body.
+
 ## 0.73.0
 
 ### Guided promotion creation

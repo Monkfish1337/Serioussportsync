@@ -90,13 +90,14 @@ missing/short secret, occupied port, or unwritable data mount.
 
 1. Create the account whose username matches `ADMIN_USER`.
 2. Open **Metadata** and refresh or inspect the event sources.
-3. Open **Promotions** and use **Create promotion**. The guided setup can link
-   a saved schedule or create one from a provider ID or recognised official
-   website, then learn matching rules from example release titles.
-4. Open **Nuvio Collections** if you want grouped Nuvio folders and artwork.
-5. Open **Account** to enable playback services and choose catalog ordering.
-6. Copy or install the private manifest URL from **Account** into Nuvio or Stremio.
-7. Use **Database** to inspect Smart Availability and choose which services
+3. Open **Metadata** to choose a ready-made event provider or create one from a
+   public JSON/API schedule. Test it and check the sample events before saving.
+4. Open **Promotions** and use **Create promotion**. Select the saved provider,
+   then let SSS learn matching rules from example release titles.
+5. Open **Nuvio Collections** if you want grouped Nuvio folders and artwork.
+6. Open **Account** to enable playback services and choose catalog ordering.
+7. Copy or install the private manifest URL from **Account** into Nuvio or Stremio.
+8. Use **Database** to inspect Smart Availability and choose which services
    should prepare selected recent events automatically.
 
 Metadata catalogs work without TorBox, Prowlarr, Easynews, Usenet Ultimate,

@@ -16,6 +16,9 @@
 
 Custom sources can also use MLB's official public Stats API schedule. It needs
 no API key and supplies game IDs, dates, teams, venues, status, and start times.
+The Metadata provider creator can also consume a public JSON/API schedule. It
+uses declarative dotted field mappings for the event array, name, date, ID,
+time, venue, description, and artwork; it never evaluates user-supplied code.
 
 ONE's adapter discovers the current Next.js build identifier from the official
 site, then reads its public upcoming and past event data. Wikipedia remains a
@@ -24,9 +27,8 @@ also contains Wikipedia year-page and list-page primary adapters, although no
 currently enabled built-in promotion selects either as its primary source.
 
 Custom promotions select a named source definition. TheSportsDB,
-football-data.org, TMDB, the official ONE feed, and official MLB schedule are
-supported in the source registry. The refresh dispatcher still owns a hardcoded
-branch for every adapter.
+football-data.org, TMDB, the official ONE feed, official MLB schedule, and
+user-created JSON/API feeds are supported in the source registry.
 
 ## Target model
 

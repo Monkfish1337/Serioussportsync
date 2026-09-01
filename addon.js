@@ -1,11 +1,19 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const config = require('./config');
 const { buildManifest } = require('./lib/manifest');
 const { handleCatalog } = require('./lib/catalog');
 const { handleMeta } = require('./lib/meta');
 const { handleStream, resolvePlay, warmTorbox } = require('./lib/streams');
+
+function setFreshStreamHeaders(res) {
+  res.setHeader('ETag', '"sss-stream-' + Date.now().toString(36) + '-'
+    + crypto.randomBytes(4).toString('hex') + '"');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+}
 const store = require('./lib/store');
 const settings = require('./lib/settings');
 const { runRefresh: runEventsRefresh } = require('./scripts/refresh');
@@ -472,6 +480,11 @@ function createApp() {
         });
         // Availability may change seconds after a TorBox warm. Nuvio's Refresh
         // Links action must reach SSS instead of replaying a five-minute cache.
+        // Express otherwise generates a stable ETag and can turn a real refresh
+        // into a bodyless 304 after Nuvio has cleared its displayed rows. Give
+        // every completed lookup a unique validator so refresh always receives
+        // the newly built stream list.
+        setFreshStreamHeaders(res);
         // Stream responses are account-specific and should not be shared.
         send(res, result, { cacheControl: 'private, no-store' });
       } catch (err) {
@@ -2022,4 +2035,4 @@ function parseExtra(segment) {
   return out;
 }
 
-module.exports = { createApp };
+module.exports = { createApp, setFreshStreamHeaders };

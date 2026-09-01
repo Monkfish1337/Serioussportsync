@@ -108,7 +108,8 @@ test('promotions wizard emits valid browser JavaScript and keeps expert tools op
   assert.match(html, /What should users see/);
   assert.match(html, /Where do event names and dates come from/);
   assert.match(html, /Add real release titles/);
-  assert.match(html, /Official website/);
+  assert.match(html, /Create provider in Metadata/);
+  assert.doesNotMatch(html, /name="sourceMode" value="provider"/);
   assert.match(html, /Advanced search patterns/);
   assert.match(html, /id="deriveAliases"/);
   assert.match(html, /name="promotionAliases"/);

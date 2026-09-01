@@ -26,6 +26,8 @@ try { footballData = require('../lib/sources/football-data'); } catch (e) { foot
 // apply. Same lazy-require pattern as football-data.
 let tmdb = null;
 try { tmdb = require('../lib/sources/tmdb'); } catch (e) { tmdb = null; }
+let jsonFeed = null;
+try { jsonFeed = require('../lib/sources/json-feed'); } catch (e) { jsonFeed = null; }
 
 // Generic asymmetric window. Promotions can override by exposing
 // .eventScope(ev) which returns true for events they want kept.
@@ -184,6 +186,9 @@ async function refreshPromotion(promotion, log) {
       });
       raw.push(...episodes);
     }
+  } else if (promotion.source.type === 'json-feed') {
+    if (!jsonFeed) throw new Error('Custom JSON/API provider module is unavailable');
+    raw = await jsonFeed.fetchAll(promotion.source, { log });
   } else {
     log('  unknown source type: ' + promotion.source.type);
     return { ok: false };
@@ -198,7 +203,8 @@ function normalizeRecord(raw, promotion) {
   if (promotion.source.type === 'football-data') return transform.fromFootballData(raw, promotion);
   if (promotion.source.type === 'tmdb') return transform.fromTmdb(raw, promotion);
   if (promotion.source.type === 'wikipedia' || promotion.source.type === 'onefc'
-      || promotion.source.type === 'mlb' || promotion.source.type === 'wikipedia-list') {
+      || promotion.source.type === 'mlb' || promotion.source.type === 'wikipedia-list'
+      || promotion.source.type === 'json-feed') {
     return transform.fromWiki(raw, promotion);
   }
   return null;
