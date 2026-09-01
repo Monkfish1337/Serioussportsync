@@ -5,7 +5,7 @@ const config = require('./config');
 const { buildManifest } = require('./lib/manifest');
 const { handleCatalog } = require('./lib/catalog');
 const { handleMeta } = require('./lib/meta');
-const { handleStream, resolvePlay } = require('./lib/streams');
+const { handleStream, resolvePlay, warmTorbox } = require('./lib/streams');
 const store = require('./lib/store');
 const settings = require('./lib/settings');
 const { runRefresh: runEventsRefresh } = require('./scripts/refresh');
@@ -470,10 +470,13 @@ function createApp() {
           apiToken: req.params.apiToken,
           origin: publicOriginFromReq(req),
         });
-        send(res, result, { cacheControl: req.query.debug ? 'no-store' : 'public, max-age=300' });
+        // Availability may change seconds after a TorBox warm. Nuvio's Refresh
+        // Links action must reach SSS instead of replaying a five-minute cache.
+        // Stream responses are account-specific and should not be shared.
+        send(res, result, { cacheControl: 'private, no-store' });
       } catch (err) {
         console.error('[stream] user-route handler error:', err);
-        send(res, { streams: [] });
+        send(res, { streams: [] }, { cacheControl: 'private, no-store' });
       }
     });
 
@@ -551,7 +554,6 @@ function createApp() {
     // /resolve), then redirects to a tiny placeholder MP4 so Stremio's
     // player has something to display. Rate-limited per-user to keep TB
     // 429-safe under button-mashing.
-    const torboxResolverLib = require('./lib/sources/torbox-resolver');
     const warmRateLimit = require('./lib/warm-rate-limit');
     r.get('/warm/:provider/:eventId/:infoHash', async (req, res) => {
       const { provider, eventId, infoHash } = req.params;
@@ -577,39 +579,31 @@ function createApp() {
         return res.status(404).send('Unsupported warm provider.');
       }
 
-      // Rate-limit gate.
-      const rl = warmRateLimit.check(userId);
-      if (!rl.ok) {
-        log('rate-limited; retry in ' + rl.retryAfterSec + 's');
-        res.setHeader('Retry-After', String(rl.retryAfterSec));
-        return res.redirect(302, '/assets/warm-rate-limited.mp4');
-      }
-
-      // Hash sanity check.
-      if (!/^[a-f0-9]{40}$/i.test(String(infoHash || ''))) {
-        log('bad hash');
-        return res.redirect(302, '/assets/warm-failed.mp4');
-      }
-      const hash = String(infoHash).toLowerCase();
-
-      // Pull the user's TorBox key.
       const creds = req.userAccount.config || {};
-      const torboxKey = (creds.torboxApiKey || '').trim();
-      if (!torboxKey) {
-        log('no torbox key on user — cannot warm');
-        return res.redirect(302, '/assets/warm-failed.mp4');
-      }
-
-      // Side-effectful add. We don't poll — fire-and-forget is the contract
-      // (see placeholder MP4 explanation in the README).
+      res.setHeader('Cache-Control', 'private, no-store');
       try {
-        const magnet = torboxResolverLib.buildMagnet(hash);
-        await torboxResolverLib.createTorrent(magnet, torboxKey, log);
-        log('queued ' + hash.slice(0, 10) + '… on user TorBox');
-        res.setHeader('Cache-Control', 'no-store');
-        return res.redirect(302, '/assets/warm-added.mp4');
+        const result = await warmTorbox({
+          eventId, infoHash, creds, username, log,
+          // An already-ready stale row becomes playback before consuming the
+          // add-torrent rate limit.
+          beforeSubmit: () => warmRateLimit.check(userId),
+        });
+        if (result.url) {
+          log('warm link became playable; redirecting now');
+          return res.redirect(302, result.url);
+        }
+        if (result.error === 'rate-limited') {
+          log('rate-limited; retry in ' + result.retryAfterSec + 's');
+          res.setHeader('Retry-After', String(result.retryAfterSec));
+          return res.redirect(302, '/assets/warm-rate-limited.mp4');
+        }
+        if (result.queued || result.waiting) {
+          return res.redirect(302, '/assets/warm-added.mp4');
+        }
+        log('warm failed: ' + (result.error || 'unknown'));
+        return res.redirect(302, '/assets/warm-failed.mp4');
       } catch (err) {
-        log('createTorrent error: ' + err.message);
+        log('warm error: ' + err.message);
         return res.redirect(302, '/assets/warm-failed.mp4');
       }
     });

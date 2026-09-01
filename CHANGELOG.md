@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.72.1
+
+### TorBox warm refresh hotfix
+
+- Made account-scoped stream responses private and non-cacheable so Nuvio's
+  **Refresh Links** action always reaches SSS after a TorBox warm.
+- Replaced a candidate's remembered `unavailable` state with `warming` as soon
+  as SSS successfully submits it, allowing each refresh to recheck TorBox
+  instead of waiting for the negative-cache TTL.
+- Made existing warm links self-healing: clicking a stale **Warm to TorBox**
+  row after the torrent becomes ready now resolves directly to playback.
+- Stopped reporting a warm submission as successful when TorBox did not return
+  a torrent ID, and kept transitional file-list readiness refreshable.
+
 ## 0.72.0
 
 ### Structured debug console

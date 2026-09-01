@@ -10,7 +10,105 @@ const availabilityStore = require('../lib/availability-index');
 const settings = require('../lib/settings');
 const torbox = require('../lib/sources/torbox-resolver');
 const companionClient = require('../lib/sources/companion-scraper');
-const { _test: streams } = require('../lib/streams');
+const { warmTorbox, _test: streams } = require('../lib/streams');
+
+test('warming replaces a stale negative observation so Refresh Links rechecks TorBox', async () => {
+  const index = createAvailabilityIndex({ file: ':memory:', secret: process.env.SESSION_SECRET });
+  const originalDefault = availabilityStore.getDefault;
+  const originalCompanion = settings.getCompanion;
+  const originalProwlarr = settings.getProwlarr;
+  const originalCheck = torbox.checkCachedBatch;
+  const originalCreate = torbox.createTorrent;
+  const candidate = {
+    title: 'ONE.Friday.Fights.168.1080p.WEB-DL', infoHash: 'f'.repeat(40), size: 4_000_000_000,
+  };
+  const companion = { url: 'http://scraper:8080', authToken: 'token' };
+  const prowlarr = { url: '', apiKey: '' };
+  const sourceScope = index.scopeFingerprint('torrent', {
+    companionUrl: companion.url, companionToken: companion.authToken,
+    prowlarrUrl: prowlarr.url, prowlarrApiKey: prowlarr.apiKey,
+  });
+  const torboxScope = index.scopeFingerprint('torbox', { apiKey: 'torbox-key' });
+  index.recordSearch({
+    eventId: 'one:168', promotionId: 'one', provider: 'torrent', scope: sourceScope,
+    queries: ['ONE Friday Fights 168'], results: [candidate],
+  });
+  index.observe({ provider: 'torbox', scope: torboxScope, state: 'unavailable', candidate });
+  availabilityStore.getDefault = () => index;
+  settings.getCompanion = () => companion;
+  settings.getProwlarr = () => prowlarr;
+  let checks = 0;
+  torbox.checkCachedBatch = async () => (++checks < 3 ? new Set() : new Set([candidate.infoHash]));
+  torbox.createTorrent = async () => 91;
+  try {
+    const warmed = await warmTorbox({
+      eventId: 'one:168', infoHash: candidate.infoHash,
+      creds: { torboxApiKey: 'torbox-key' }, username: 'demo',
+      beforeSubmit: () => ({ ok: true }), log: () => {},
+    });
+    assert.equal(warmed.queued, true);
+    assert.equal(index.availabilityFor({
+      provider: 'torbox', scope: torboxScope, candidates: [candidate],
+    }).get(index.releaseId(candidate)).state, 'warming');
+
+    const pipelineInput = {
+      promo: { id: 'one', isRelevantStreamTitle: () => ({ ok: true }) },
+      event: { id: 'one:168', name: 'ONE Friday Fights 168', date: '2026-09-01', excludePatterns: [] },
+      titles: ['ONE Friday Fights 168'], torboxKey: 'torbox-key', discoveryBudgetMs: 100,
+      urlCtx: { origin: 'http://sss:7000', userId: 'user-1', apiToken: 'token', showWarmRows: true },
+      log: () => {},
+    };
+    const stillWarming = await streams.pipelineTorrentTorbox(pipelineInput);
+    assert.equal(checks, 2, 'an immediate Refresh Links action rechecks TorBox');
+    assert.match(stillWarming[0].url, /\/warm\/torbox\//);
+    assert.equal(index.availabilityFor({
+      provider: 'torbox', scope: torboxScope, candidates: [candidate],
+    }).get(index.releaseId(candidate)).state, 'warming',
+    'an early refresh must not recreate the negative-cache state');
+
+    const rows = await streams.pipelineTorrentTorbox(pipelineInput);
+    assert.equal(checks, 3, 'a later Refresh Links action rechecks TorBox again');
+    assert.equal(rows.length, 1);
+    assert.match(rows[0].url, /\/resolve\/torbox\/one%3A168\//);
+  } finally {
+    availabilityStore.getDefault = originalDefault;
+    settings.getCompanion = originalCompanion;
+    settings.getProwlarr = originalProwlarr;
+    torbox.checkCachedBatch = originalCheck;
+    torbox.createTorrent = originalCreate;
+    index.close();
+  }
+});
+
+test('an old warm link starts playback when TorBox has become ready', async () => {
+  const index = createAvailabilityIndex({ file: ':memory:', secret: process.env.SESSION_SECRET });
+  const originalDefault = availabilityStore.getDefault;
+  const originalCheck = torbox.checkCachedBatch;
+  const originalResolve = torbox.resolveCached;
+  const originalCreate = torbox.createTorrent;
+  const hash = '9'.repeat(40);
+  availabilityStore.getDefault = () => index;
+  torbox.checkCachedBatch = async () => new Set([hash]);
+  torbox.resolveCached = async () => 'https://play.example/video.mkv';
+  let submitted = false;
+  let rateLimited = false;
+  torbox.createTorrent = async () => { submitted = true; return 1; };
+  try {
+    const result = await warmTorbox({
+      eventId: 'one:168', infoHash: hash, creds: { torboxApiKey: 'torbox-key' },
+      beforeSubmit: () => { rateLimited = true; return { ok: false }; }, log: () => {},
+    });
+    assert.equal(result.url, 'https://play.example/video.mkv');
+    assert.equal(submitted, false);
+    assert.equal(rateLimited, false, 'ready playback bypasses the add-torrent rate limiter');
+  } finally {
+    availabilityStore.getDefault = originalDefault;
+    torbox.checkCachedBatch = originalCheck;
+    torbox.resolveCached = originalResolve;
+    torbox.createTorrent = originalCreate;
+    index.close();
+  }
+});
 
 test('serves an account-scoped confirmed TorBox row without repeating discovery or cache checks', async () => {
   const index = createAvailabilityIndex({ file: ':memory:', secret: process.env.SESSION_SECRET });
