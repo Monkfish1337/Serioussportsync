@@ -58,6 +58,7 @@ should normally be managed from **Metadata**, **Promotions**, and
 | `ALLOW_FOREIGN_LANG` | `false` | Set to `1` to retain foreign-language release candidates. |
 | `LOG_EXCLUDED_TITLES` | `false` | Initial default for full rejection detail. It can be changed live and persisted from the Logs page. |
 | `LOG_REJECTION_SAMPLE_LIMIT` | `4` | Rejected titles retained per exclusion reason when full detail is off. |
+| `LOG_BUFFER_MAX_BYTES` | `5242880` | Maximum memory used by the live structured log buffer before its oldest entries are discarded. |
 
 TorBox, Easynews, Usenet Ultimate, native indexer, NZB DAV, and NNTP settings
 are account-scoped and belong on the signed-in **Account** page.

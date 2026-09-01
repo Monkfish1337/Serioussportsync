@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.70.0-blue.svg" alt="Version 0.70.0"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.72.0-blue.svg" alt="Version 0.72.0"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -173,9 +173,12 @@ JSON or application code.
   promotion filters and possible duplicate detection.
 - **Imports and matching assistant:** preview ICS, CSV, or JSON calendars, then
   derive event-specific search aliases and exclusions from good and bad titles.
-- **Logs:** use the live operations console to inspect discovery, filtering,
-  rejection reasons, cache checks, and playback resolution. Pause without
-  losing your place, select or copy visible entries, and export a filtered log.
+- **Logs:** use the structured live operations console to inspect discovery,
+  filtering, rejection reasons, cache checks, playback resolution and timings.
+  Every stream request receives a traceable request ID; expand a row to inspect
+  counts, query variants and decisions. Pause without losing your place, use
+  regular or regex search, filter multiple levels, copy individual or visible
+  entries, and export either readable `.log` or structured `.ndjson` output.
 
 Source refreshes can replace their event cache without overwriting saved
 promotions, aliases, exclusions, disabled-event decisions, or matching rules.

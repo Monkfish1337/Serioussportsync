@@ -736,39 +736,69 @@ function createApp() {
     res.redirect('/admin/promotions?flash=' + encodeURIComponent('Refresh started for "' + p.name + '" — other promotions untouched. Check server logs for progress.'));
   });
 
-  // 0.27.0: in-GUI log viewer. /admin/logs renders the page with filter
-  // inputs + the latest matching rows; /admin/logs.json is a JSON endpoint
-  // for the tail-mode auto-refresh (polled every 3s by the page's inline JS).
+  const logQuery = (req, extra) => Object.assign({
+    category: req.query.category,
+    user: req.query.user,
+    substring: req.query.substring,
+    regex: req.query.regex === 'on' || req.query.regex === 'true',
+    level: req.query.level,
+    limit: parseInt(req.query.limit, 10) || 1000,
+  }, extra || {});
+
+  // Structured operations console: snapshot + SSE tail + text/NDJSON export.
   app.get('/admin/logs', requireAdmin, (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
     res.send(renderLogsPage(req.user, req.query));
   });
   app.get('/admin/logs.json', requireAdmin, (req, res) => {
-    const rows = logBuffer.filtered({
-      category: req.query.category,
-      user: req.query.user,
-      substring: req.query.substring,
-      level: req.query.level,
-      limit: parseInt(req.query.limit, 10) || 1000,
-    });
+    const rows = logBuffer.filtered(logQuery(req, { sinceId: req.query.sinceId }));
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.send(JSON.stringify({ rows, stats: logBuffer.counts() }));
   });
-  app.get('/admin/logs.txt', requireAdmin, (req, res) => {
-    const rows = logBuffer.filtered({
-      category: req.query.category,
-      user: req.query.user,
-      substring: req.query.substring,
-      level: req.query.level,
-      limit: parseInt(req.query.limit, 10) || 1000,
+  app.get('/admin/logs/stream', requireAdmin, (req, res) => {
+    const query = logQuery(req, { sinceId: req.query.sinceId, limit: 5000 });
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    if (res.flushHeaders) res.flushHeaders();
+    let lastId = Number(query.sinceId) || 0;
+    const sendRow = (row) => {
+      if (!row || row.id <= lastId || !logBuffer.matches(row, Object.assign({}, query, { sinceId: null }))) return;
+      lastId = row.id;
+      res.write('id: ' + row.id + '\ndata: ' + JSON.stringify(row) + '\n\n');
+    };
+    for (const row of logBuffer.filtered(query)) sendRow(row);
+    logBuffer.bus.on('line', sendRow);
+    const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 15000);
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      logBuffer.bus.off('line', sendRow);
     });
+  });
+  app.get('/admin/logs.txt', requireAdmin, (req, res) => {
+    const rows = logBuffer.filtered(logQuery(req));
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="sss-logs-' + stamp + '.log"');
     res.send(adminLogs.rowsToText(rows));
+  });
+  app.get('/admin/logs.ndjson', requireAdmin, (req, res) => {
+    const rows = logBuffer.filtered(logQuery(req));
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="sss-logs-' + stamp + '.ndjson"');
+    res.send(rows.map((row) => JSON.stringify(row)).join('\n') + (rows.length ? '\n' : ''));
+  });
+  app.post('/admin/logs/clear', requireAdmin, (req, res) => {
+    logBuffer.clear();
+    console.warn('[admin] retained operations logs cleared', { module: 'admin', user: req.user.username });
+    res.json({ ok: true, stats: logBuffer.counts() });
   });
   app.post('/admin/logs/preferences', requireAdmin, (req, res) => {
     const preferences = settings.setLogPreferences({

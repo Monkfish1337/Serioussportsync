@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.72.0
+
+### Structured debug console
+
+- Upgraded Logs into a structured, live debug console inspired by mature
+  self-hosted media tooling, while keeping the default view readable for normal
+  operation.
+- Added trace, debug, info, warning, error and fatal level filters; category,
+  account, plain-text and regex search; true server-sent live updates; pause,
+  auto-scroll and jump-to-latest controls.
+- Added expandable structured details, request IDs and stream context so one
+  playback attempt can be followed through its query variants, pipeline
+  durations, discovery totals, rejection decisions and cache outcomes.
+- Added per-entry copy, copy-visible, readable `.log` and machine-readable
+  `.ndjson` downloads, plus a guarded clear action and persistent display
+  preferences.
+- Bounded the in-memory log store by both entry count and bytes, and redacted
+  secret-bearing structured fields before they reach the browser or exports.
+
 ## 0.71.0
 
 ### Operations console and availability funnel
