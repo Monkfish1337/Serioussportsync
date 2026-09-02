@@ -95,7 +95,8 @@ missing/short secret, occupied port, or unwritable data mount.
 3. Open **Metadata** to choose a ready-made event provider or create one from a
    public JSON/API schedule. Test it and check the sample events before saving.
 4. Open **Promotions** and use **Create promotion**. Select the saved provider,
-   then let SSS learn matching rules from example release titles.
+   choose a sample event, and use **Alias Research** to find and classify real
+   release titles through the playback services already configured on the account.
 5. Open **Nuvio Collections** if you want grouped Nuvio folders and artwork.
 6. Open **Account** to enable playback services and choose catalog ordering.
 7. Copy or install the private manifest URL from **Account** into Nuvio or Stremio.

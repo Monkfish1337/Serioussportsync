@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.77.0
+
+- Added admin-only Alias Research to the Promotion Wizard. Select a real event
+  and SSS searches the account's configured DIY indexer, Usenet Ultimate, and
+  Easynews services without downloading or submitting anything.
+- Groups sanitised release metadata into matched, needs-review, and rejected
+  results, with the current matching decision shown for every title.
+- Shows per-provider status and the exact generated search queries, then offers
+  one-click application of confirmed examples and conservatively derived rules.
+- Provider credentials, manifest identifiers, download URLs, NZB URLs, Easynews
+  playback data, and raw network errors are excluded from browser responses.
+- Possible matches require explicit review and are never silently used to teach
+  one-click aliases.
+
 ## 0.76.4
 
 - Fixed provider query planning overriding a promotion's strongest curated

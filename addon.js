@@ -1126,6 +1126,14 @@ function createApp() {
     res.status(out.ok ? 200 : 422).json(out);
   });
 
+  app.post('/admin/promotions/alias-research', requireAdmin, async (req, res) => {
+    const out = await adminPromotions.researchAliases(
+      (req.user && req.user.config) || {}, req.body || {}
+    );
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(out.ok ? 200 : 422).json(out);
+  });
+
   app.post('/admin/promotions/:id/update', requireAdmin, (req, res) => {
     const id = req.params.id;
     try {

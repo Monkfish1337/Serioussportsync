@@ -147,6 +147,8 @@ test('promotions wizard emits valid browser JavaScript and keeps expert tools op
   assert.match(html, /name="promotionAliases"/);
   assert.match(html, /name="exclusionKeywords"/);
   assert.match(html, /id="previewMatching"/);
+  assert.match(html, /id="researchAliases"/);
+  assert.match(html, /alias-research/);
   assert.match(html, /name="sourceRef"/);
   assert.match(html, /Preview refresh/);
   assert.match(html, /source-preview/);
@@ -220,6 +222,55 @@ test('release finder explains when native indexer settings are absent', async ()
   const result = await adminPromotions.searchReleaseExamples({}, { query: 'MLB' });
   assert.equal(result.ok, false);
   assert.match(result.error, /DIY Discover/);
+});
+
+test('alias research combines configured sources, explains decisions, and strips secrets', async () => {
+  const result = await adminPromotions.researchAliases({
+    diySearchKind: 'prowlarr', diySearchName: 'Prowlarr',
+    diySearchUrl: 'http://prowlarr:9696', diySearchApiKey: 'native-secret',
+    uuManifestUrl: 'http://usenet-ultimate:1337/stremio/private-config/manifest.json',
+    easynewsUsername: 'alice', easynewsPassword: 'easynews-secret',
+  }, {
+    name: 'UEFA Champions League', eventName: 'LASK vs Celtic FC', eventDate: '2026-08-25',
+    query: 'UEFA Champions League 2026.08.25 LASK vs Celtic',
+    promotionAliases: 'UEFA Champions League\nUCL',
+    relevanceKeywords: 'uefa champions league, ucl',
+    searchTitleTemplates: '{promotion} {date_dotted} {name}', requireDateInTitle: '1',
+  }, {
+    nativeSearch: async (queries, provider, options) => {
+      assert.ok(queries.length > 0 && queries.length <= 3);
+      assert.equal(provider.apiKey, 'native-secret');
+      assert.equal(options.maxQueries, 3);
+      return { ok: true, results: [{
+        title: 'UEFA.Champions.League.2026.08.25.LASK.vs.Celtic.FC.1080p.WEB',
+        indexer: 'NZBGeek', size: 8 * 1024 ** 3, nzbUrl: 'https://secret/native.nzb',
+      }] };
+    },
+    uuSearch: async () => ({ ok: true, results: [{
+      title: 'UEFA.Champions.League.2026.08.25.LASK.vs.Celts.720p',
+      indexer: 'DrunkenSlug', nzbUrl: 'https://secret/uu.nzb',
+    }] }),
+    easynewsSearch: async (_queries, options) => {
+      assert.equal(options.password, 'easynews-secret');
+      return { ok: false, error: 'network timeout at https://members.easynews.com/private?token=secret', results: [] };
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.counts, { discovered: 2, matched: 1, possible: 1, rejected: 0 });
+  assert.equal(result.groups.matched[0].reason, 'matched');
+  assert.match(result.groups.possible[0].reason, /away-team/);
+  assert.equal(result.providers.find((provider) => provider.id === 'easynews').error, 'Timed out or unavailable');
+  assert.ok(result.suggested.aliases.length > 0);
+  assert.doesNotMatch(JSON.stringify(result), /native-secret|easynews-secret|private-config|secret\/.*nzb|members\.easynews/);
+});
+
+test('alias research requires an event and at least one configured source', async () => {
+  assert.match((await adminPromotions.researchAliases({}, { name: 'UCL' })).error, /event/i);
+  const result = await adminPromotions.researchAliases({}, {
+    name: 'UCL', eventName: 'LASK vs Celtic', eventDate: '2026-08-25',
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.error, /Account/);
 });
 
 test('editing a legacy embedded MLB promotion does not fall back to TSDB validation', () => {
