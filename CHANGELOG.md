@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.76.3
+
+- Corrected the module scope of the automatic team-identity fallback so legacy
+  cached events and optional API-Football events receive the same suffix-free
+  query generation as freshly refreshed UEFA events.
+
 ## 0.76.2
 
 ### Automatic UEFA release identities
