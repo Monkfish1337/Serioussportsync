@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.78.0
+
+- Rebuild Promotion Wizard Alias Research around broad, rule-independent event queries so a new promotion can discover naming conventions before its aliases exist.
+- Allow explicit research requests to use Companion's longer research window without increasing playback latency.
+- Search up to six focused variants across configured DIY Usenet, Usenet Ultimate, Easynews, and Companion sources.
+- Add user-confirmed release training and a sanitized, copyable research report containing queries, source counts, titles, and matching decisions—never credentials, hashes, trackers, or download links.
+
 ## 0.77.1
 
 - Added SSS Companion as an Alias Research source, covering the torrent

@@ -238,9 +238,12 @@ test('alias research combines configured sources, explains decisions, and strips
     searchTitleTemplates: '{promotion} {date_dotted} {name}', requireDateInTitle: '1',
   }, {
     nativeSearch: async (queries, provider, options) => {
-      assert.ok(queries.length > 0 && queries.length <= 3);
+      assert.ok(queries.length > 0 && queries.length <= 6);
+      assert.ok(queries.includes('LASK vs Celtic FC'));
+      assert.ok(queries.includes('LASK vs Celtic'));
       assert.equal(provider.apiKey, 'native-secret');
-      assert.equal(options.maxQueries, 3);
+      assert.equal(options.maxQueries, 6);
+      assert.equal(options.timeoutMs, 30000);
       return { ok: true, results: [{
         title: 'UEFA.Champions.League.2026.08.25.LASK.vs.Celtic.FC.1080p.WEB',
         indexer: 'NZBGeek', size: 8 * 1024 ** 3, nzbUrl: 'https://secret/native.nzb',
@@ -257,7 +260,9 @@ test('alias research combines configured sources, explains decisions, and strips
     companionConfig: { url: 'http://companion:8080', authToken: 'companion-secret' },
     companionSearch: async (input) => {
       assert.equal(input.throwOnFailure, true);
-      assert.ok(input.searchTitles.length > 0 && input.searchTitles.length <= 3);
+      assert.equal(input.researchMode, true);
+      assert.equal(input.budgetMs, 45000);
+      assert.ok(input.searchTitles.length > 0 && input.searchTitles.length <= 6);
       return [{
         title: 'UEFA.Champions.League.2026.08.25.LASK.vs.Celtic.FC.2160p.WEB',
         infoHash: 'a'.repeat(40), magnetTrackers: ['https://tracker.secret/announce'],
@@ -271,6 +276,8 @@ test('alias research combines configured sources, explains decisions, and strips
   assert.match(result.groups.possible[0].reason, /away-team/);
   assert.equal(result.providers.find((provider) => provider.id === 'easynews').error, 'Timed out or unavailable');
   assert.ok(result.suggested.aliases.length > 0);
+  assert.match(result.report, /SeriousSportSync alias research/);
+  assert.match(result.report, /LASK vs Celtic FC/);
   assert.equal(result.providers.find((provider) => provider.id === 'companion').count, 1);
   assert.doesNotMatch(JSON.stringify(result), /native-secret|easynews-secret|companion-secret|private-config|secret\/.*nzb|members\.easynews|infoHash|magnetTrackers|tracker\.secret/);
 });
