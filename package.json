@@ -37,6 +37,9 @@
                          "node-fetch":  "^2.7.0",
                          "https-proxy-agent":  "^7.0.2"
                      },
+    "overrides": {
+                     "qs": "6.16.0"
+                 },
     "engines":  {
                     "node":  ">=22"
                 }
