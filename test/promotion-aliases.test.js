@@ -258,6 +258,9 @@ test('alias research combines configured sources, explains decisions, and strips
       return { ok: false, error: 'network timeout at https://members.easynews.com/private?token=secret', results: [] };
     },
     companionConfig: { url: 'http://companion:8080', authToken: 'companion-secret' },
+    intelligenceSearch: async ({ queries }) => ({ ok: true, results: [{
+      title: 'UCL.2026.08.25.LASK.vs.Celtic.1080p', indexer: 'Release Intelligence',
+    }].filter(() => queries.length > 0) }),
     companionSearch: async (input) => {
       assert.equal(input.throwOnFailure, true);
       assert.equal(input.researchMode, true);
@@ -271,7 +274,7 @@ test('alias research combines configured sources, explains decisions, and strips
     },
   });
   assert.equal(result.ok, true);
-  assert.deepEqual(result.counts, { discovered: 3, matched: 2, possible: 1, rejected: 0 });
+  assert.deepEqual(result.counts, { discovered: 4, matched: 2, possible: 2, rejected: 0 });
   assert.equal(result.groups.matched[0].reason, 'matched');
   assert.match(result.groups.possible[0].reason, /away-team/);
   assert.equal(result.providers.find((provider) => provider.id === 'easynews').error, 'Timed out or unavailable');
@@ -279,7 +282,48 @@ test('alias research combines configured sources, explains decisions, and strips
   assert.match(result.report, /SeriousSportSync alias research/);
   assert.match(result.report, /LASK vs Celtic FC/);
   assert.equal(result.providers.find((provider) => provider.id === 'companion').count, 1);
+  assert.equal(result.providers.find((provider) => provider.id === 'release-intelligence').count, 1);
   assert.doesNotMatch(JSON.stringify(result), /native-secret|easynews-secret|companion-secret|private-config|secret\/.*nzb|members\.easynews|infoHash|magnetTrackers|tracker\.secret/);
+});
+
+test('shipped promotions expose a dedicated matching lab with valid browser JavaScript', () => {
+  const list = adminPromotions.renderBody({});
+  assert.match(list, /Improve matching/);
+  const html = adminPromotions.renderMatchingLab('ufc');
+  assert.ok(html);
+  assert.match(html, /Matching Lab/);
+  assert.match(html, /Save matching override/);
+  const script = html.match(/<script>([\s\S]*?)<\/script>/);
+  assert.ok(script);
+  assert.doesNotThrow(() => new Function(script[1])); // eslint-disable-line no-new-func
+});
+
+test('matching overrides extend a shipped promotion and restore its base behavior', () => {
+  const promotionOverrides = require('../lib/promotion-overrides');
+  const promotionsModule = require('../lib/promotions');
+  const originalFind = promotionOverrides.find;
+  const fake = {
+    id: 'test-built-in', name: 'Champions League', isCustom: false, uuMaxQueries: 3,
+    searchTitles: () => ['Built in query'],
+    isRelevantStreamTitle: () => ({ ok: false, reason: 'base-rejected' }),
+  };
+  promotionOverrides.find = () => ({
+    promotionId: fake.id, promotionAliases: ['UCL'], relevanceKeywords: ['ucl'],
+    exclusionKeywords: ['highlights'],
+    searchTitleTemplates: ['{promotion} {date_dotted} {name}'], requireDateInTitle: true,
+  });
+  try {
+    promotionsModule._applyPromotionMatchingOverrides([fake]);
+    const event = { name: 'Arsenal vs Atletico Madrid', date: '2026-08-25' };
+    assert.ok(fake.searchTitles(event).some((query) => query.startsWith('UCL ')));
+    assert.equal(fake.isRelevantStreamTitle('UCL.2026.08.25.Arsenal.vs.Atletico.Madrid.1080p', event).ok, true);
+    assert.match(fake.isRelevantStreamTitle('UCL.2026.08.25.Arsenal.vs.Atletico.Madrid.Highlights', event).reason, /excluded/);
+    promotionOverrides.find = () => null;
+    promotionsModule._applyPromotionMatchingOverrides([fake]);
+    assert.deepEqual(fake.searchTitles(event), ['Built in query']);
+  } finally {
+    promotionOverrides.find = originalFind;
+  }
 });
 
 test('alias research requires an event and at least one configured source', async () => {

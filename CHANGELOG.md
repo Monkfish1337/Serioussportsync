@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.79.0
+
+- Add Companion Release Intelligence as a first-class Alias Research source, using recent title-only metadata before live event searches.
+- Open shipped/read-only promotions through a dedicated Matching Lab with catalog-event selection, research, confirmation, rule generation, and safe report copying.
+- Persist matching overlays separately from shipped promotion definitions so user aliases, templates, exclusions, and date rules survive image upgrades without replacing bespoke promotion logic.
+- Mark tuned built-in promotions in the Promotions list and allow one-click restoration of shipped matching rules.
+
 ## 0.78.0
 
 - Rebuild Promotion Wizard Alias Research around broad, rule-independent event queries so a new promotion can discover naming conventions before its aliases exist.

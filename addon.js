@@ -1072,6 +1072,35 @@ function createApp() {
     }
   });
 
+  app.get('/admin/promotions/:id/research', requireAdmin, (req, res) => {
+    const body = adminPromotions.renderMatchingLab(String(req.params.id || ''), {
+      flash: req.query.flash || null,
+    });
+    if (!body) return res.redirect(303, '/admin/promotions?flash=' + encodeURIComponent(
+      'Matching Lab is available for shipped promotions. Custom promotions can be researched from Edit.'));
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(tablerChrome.tablerPage('Promotion Matching Lab', body, { user: req.user, currentSection: 'promotions' }));
+  });
+
+  app.post('/admin/promotions/:id/matching-override', requireAdmin, (req, res) => {
+    const id = String(req.params.id || '');
+    try {
+      adminPromotions.saveMatchingOverride(id, req.body || {});
+      res.redirect(303, '/admin/promotions/' + encodeURIComponent(id) + '/research?flash=' + encodeURIComponent(
+        'Matching override saved and activated.'));
+    } catch (error) {
+      res.redirect(303, '/admin/promotions/' + encodeURIComponent(id) + '/research?flash=' + encodeURIComponent(
+        'Save failed: ' + error.message));
+    }
+  });
+
+  app.post('/admin/promotions/:id/matching-override/reset', requireAdmin, (req, res) => {
+    const id = String(req.params.id || '');
+    adminPromotions.resetMatchingOverride(id);
+    res.redirect(303, '/admin/promotions?flash=' + encodeURIComponent('Restored shipped matching rules for "' + id + '".'));
+  });
+
   app.get('/admin/promotions/new', requireAdmin, (req, res) => {
     res.redirect(302, '/admin/promotions?create=1#promotionWizard');
   });

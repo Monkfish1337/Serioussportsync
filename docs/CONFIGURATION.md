@@ -52,6 +52,7 @@ should normally be managed from **Metadata**, **Promotions**, and
 | `COMPANION_AUTH_TOKEN` | none | Shared authentication token for the companion. |
 | `COMPANION_TIMEOUT_MS` | `30000` | Hard client timeout for companion requests. The smaller per-request discovery budget still applies. |
 | `COMPANION_RESEARCH_TIMEOUT_MS` | `60000` | Hard client timeout for explicit Promotion Wizard research only; it does not affect playback. |
+| `PROMOTION_OVERRIDES_FILE` | `data/promotion-overrides.json` | Optional path for upgrade-safe matching overlays applied to shipped promotions. |
 | `PROWLARR_URL` / `PROWLARR_API_KEY` | none | Optional direct Prowlarr discovery bootstrap. These can be saved in Admin instead. |
 | `ZILEAN_URL` | none | Optional direct Zilean endpoint for legacy/bootstrap discovery. |
 | `STREAM_MAX_ROWS` | `20` | Maximum rows returned for an event. |
