@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.76.4
+
+- Fixed provider query planning overriding a promotion's strongest curated
+  release query with a shorter nickname variant.
+- Reduced the shipped Champions League UU search from eight variants to three
+  focused variants. UU/Prowlarr can now return completed hits before SSS's
+  stream deadline instead of losing the whole response while slower searches
+  are still running.
+- Added regression coverage using the observed LASK vs Celtic query ordering.
+
 ## 0.76.3
 
 - Corrected the module scope of the automatic team-identity fallback so legacy
