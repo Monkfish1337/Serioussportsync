@@ -31,10 +31,11 @@ test.after(() => {
 });
 
 test('seeds all current built-in metadata source assignments', () => {
-  assert.equal(sources.list().length, 10);
+  assert.equal(sources.list().length, 11);
   assert.deepEqual(sources.resolve('one', {}).source, { type: 'onefc' });
   assert.deepEqual(sources.resolve('f1', {}).source, { type: 'thesportsdb', leagueId: '4370' });
   assert.deepEqual(sources.resolve('ucl', {}).source, { type: 'uefa', competitionId: '1' });
+  assert.deepEqual(sources.resolve('mlb', {}).source, { type: 'mlb' });
 });
 
 test('creates a reusable source and assigns it to a promotion', () => {
@@ -64,6 +65,13 @@ test('preserves a pre-existing custom ucl promotion over the new shipped default
     const preserved = promotions.all.find((item) => item.id === 'ucl');
     assert.equal(preserved.isCustom, true);
     assert.deepEqual(preserved.source, { type: 'football-data', competitionId: 'CL' });
+    const event = { name: 'Celje vs Slovan Bratislava', date: '2026-08-26' };
+    assert.equal(preserved.torrentSearchTitles(event).length, 3);
+    assert.match(preserved.searchTitles(event)[0], /^UEFA Champions League 2026\.08\.26/);
+    assert.equal(preserved.isRelevantStreamTitle(
+      'UEFA.Champions.League.2026.08.26.Celje.vs.Slovan.Bratislava.720p.WEB.h264-ULTRA',
+      event
+    ).ok, true);
   } finally {
     customPromotions.remove('ucl');
     promotions.reload();
@@ -154,7 +162,7 @@ test('wizard rolls back a newly created source when promotion validation fails',
 });
 
 test('creates a no-key MLB source and exposes Metadata navigation', () => {
-  const created = sources.add({ id: 'mlb-official', name: 'Official MLB schedule', type: 'mlb' });
+  const created = sources.add({ id: 'mlb-secondary', name: 'Secondary MLB schedule', type: 'mlb' });
   assert.deepEqual(created.source, { type: 'mlb' });
   assert.ok(chrome.ADMIN_SECTIONS.some((item) => item.id === 'metadata'));
   const html = adminMetadata.renderBody({});

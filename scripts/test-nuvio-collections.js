@@ -112,7 +112,7 @@ const migratedManifest = buildManifest({
 });
 assert.deepStrictEqual(
   migratedManifest.catalogs.map((catalog) => catalog.id),
-  ['motd-upcoming', 'motd', 'manutd-upcoming', 'manutd-recent'],
+  ['motd-upcoming', 'motd', 'manutd-upcoming', 'manutd-recent', 'mlb-upcoming', 'mlb-recent'],
   'legacy private manifests receive the new catalogs automatically',
 );
 assert.ok(

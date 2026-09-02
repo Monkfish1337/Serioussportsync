@@ -64,6 +64,7 @@ choices. Advanced overrides are kept in the [configuration reference](docs/CONFI
 | Boxing | Cards from major promoters |
 | Manchester United | Upcoming and recent fixtures across all football-data.org competitions |
 | UEFA Champions League | Official UEFA fixtures with full team identities and release-aware searches; no API key required |
+| MLB | Official no-key schedule with release-aware regular-season date and `Away @ Home` searches |
 | Custom promotions | Official UEFA, API-Football, official MLB, TSDB, football-data.org, TMDB, ONE, or custom JSON/API catalogs created in the admin UI |
 
 ## Playback integrations
