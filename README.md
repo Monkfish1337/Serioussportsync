@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.77.0-blue.svg" alt="Version 0.77.0"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.77.1-blue.svg" alt="Version 0.77.1"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -165,8 +165,8 @@ JSON or application code.
 - **Promotions:** a five-step wizard asks for the name, saved event provider,
   real release examples, and optional artwork, then shows a plain-language
   review. Create and test providers in Metadata, then select them here. SSS
-  can research a selected event through configured DIY indexers, Usenet Ultimate,
-  and Easynews, explain every match or rejection, and apply confirmed examples
+  can research a selected event through SSS Companion's TorBox discovery sources,
+  configured DIY indexers, Usenet Ultimate, and Easynews, explain every match or rejection, and apply confirmed examples
   without exposing credentials or download links. It derives matching aliases
   and search patterns from examples; detailed filters,
   pipeline controls, and source tools remain available under **Advanced**. Conflicting reject words

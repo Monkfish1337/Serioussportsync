@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.77.1
+
+- Added SSS Companion as an Alias Research source, covering the torrent
+  discoveries that feed the TorBox pipeline alongside the existing Usenet
+  research providers.
+- Companion results remain research-only: Alias Research does not query the
+  TorBox cache, warm content, or start playback.
+- Info hashes, magnet trackers, authentication tokens, and all download data
+  are stripped before results reach the browser.
+
 ## 0.77.0
 
 - Added admin-only Alias Research to the Promotion Wizard. Select a real event

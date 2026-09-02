@@ -254,23 +254,34 @@ test('alias research combines configured sources, explains decisions, and strips
       assert.equal(options.password, 'easynews-secret');
       return { ok: false, error: 'network timeout at https://members.easynews.com/private?token=secret', results: [] };
     },
+    companionConfig: { url: 'http://companion:8080', authToken: 'companion-secret' },
+    companionSearch: async (input) => {
+      assert.equal(input.throwOnFailure, true);
+      assert.ok(input.searchTitles.length > 0 && input.searchTitles.length <= 3);
+      return [{
+        title: 'UEFA.Champions.League.2026.08.25.LASK.vs.Celtic.FC.2160p.WEB',
+        infoHash: 'a'.repeat(40), magnetTrackers: ['https://tracker.secret/announce'],
+        size: 20 * 1024 ** 3, publishDate: '2026-08-26T00:00:00Z',
+      }];
+    },
   });
   assert.equal(result.ok, true);
-  assert.deepEqual(result.counts, { discovered: 2, matched: 1, possible: 1, rejected: 0 });
+  assert.deepEqual(result.counts, { discovered: 3, matched: 2, possible: 1, rejected: 0 });
   assert.equal(result.groups.matched[0].reason, 'matched');
   assert.match(result.groups.possible[0].reason, /away-team/);
   assert.equal(result.providers.find((provider) => provider.id === 'easynews').error, 'Timed out or unavailable');
   assert.ok(result.suggested.aliases.length > 0);
-  assert.doesNotMatch(JSON.stringify(result), /native-secret|easynews-secret|private-config|secret\/.*nzb|members\.easynews/);
+  assert.equal(result.providers.find((provider) => provider.id === 'companion').count, 1);
+  assert.doesNotMatch(JSON.stringify(result), /native-secret|easynews-secret|companion-secret|private-config|secret\/.*nzb|members\.easynews|infoHash|magnetTrackers|tracker\.secret/);
 });
 
 test('alias research requires an event and at least one configured source', async () => {
   assert.match((await adminPromotions.researchAliases({}, { name: 'UCL' })).error, /event/i);
   const result = await adminPromotions.researchAliases({}, {
     name: 'UCL', eventName: 'LASK vs Celtic', eventDate: '2026-08-25',
-  });
+  }, { companionConfig: {} });
   assert.equal(result.ok, false);
-  assert.match(result.error, /Account/);
+  assert.match(result.error, /Configure/);
 });
 
 test('editing a legacy embedded MLB promotion does not fall back to TSDB validation', () => {
