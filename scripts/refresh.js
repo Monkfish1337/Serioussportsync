@@ -21,6 +21,8 @@ try { wikiList = require('../lib/sources/wikipedia-list'); } catch (e) { wikiLis
 // it don't pay the require cost on cold start.
 let footballData = null;
 try { footballData = require('../lib/sources/football-data'); } catch (e) { footballData = null; }
+let apiFootball = null;
+try { apiFootball = require('../lib/sources/api-football'); } catch (e) { apiFootball = null; }
 // 0.42.13: TMDB parallel source for TV-style sports shows (Match of the Day,
 // ITV highlights, boxing analysis shows) where football-data / TSDB don't
 // apply. Same lazy-require pattern as football-data.
@@ -158,6 +160,30 @@ async function refreshPromotion(promotion, log) {
         log,
       });
     }
+  } else if (promotion.source.type === 'api-football') {
+    if (!apiFootball) throw new Error('API-Football source module is unavailable; promotion was not refreshed');
+    const settings = require('../lib/settings');
+    const configured = settings.getApiFootball();
+    if (!configured.apiKey) {
+      log('  api-football: no API key configured (set in Admin or API_FOOTBALL_API_KEY) — skipping ' + promotion.id);
+      return { ok: true };
+    }
+    const today = new Date(); today.setUTCHours(0, 0, 0, 0);
+    const from = new Date(today); from.setUTCDate(from.getUTCDate() - Math.max(0, config.eventWindowDaysBack | 0));
+    const to = new Date(today); to.setUTCDate(to.getUTCDate() + Math.max(0, config.eventWindowDaysAhead | 0));
+    const dateFrom = from.toISOString().slice(0, 10);
+    const dateTo = to.toISOString().slice(0, 10);
+    const seasons = apiFootball.seasonsForRange(dateFrom, dateTo);
+    log('  api-football competition: ' + promotion.source.leagueId + ' seasons: ' + seasons.join(', ')
+      + ' range: ' + dateFrom + ' to ' + dateTo);
+    raw = await apiFootball.fetchAll({
+      leagueId: promotion.source.leagueId,
+      seasons,
+      dateFrom,
+      dateTo,
+      apiKey: configured.apiKey,
+      log,
+    });
   } else if (promotion.source.type === 'tmdb') {
     // 0.42.13: TMDB TV show. Fetches all episodes with air dates. Each becomes
     // an event whose date drives DARKSPORT-style search title generation.
@@ -201,6 +227,7 @@ function normalizeRecord(raw, promotion) {
   if (!promotion || !promotion.source) return null;
   if (promotion.source.type === 'thesportsdb') return transform.fromTsdb(raw, promotion);
   if (promotion.source.type === 'football-data') return transform.fromFootballData(raw, promotion);
+  if (promotion.source.type === 'api-football') return transform.fromApiFootball(raw, promotion);
   if (promotion.source.type === 'tmdb') return transform.fromTmdb(raw, promotion);
   if (promotion.source.type === 'wikipedia' || promotion.source.type === 'onefc'
       || promotion.source.type === 'mlb' || promotion.source.type === 'wikipedia-list'

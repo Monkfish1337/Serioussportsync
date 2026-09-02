@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.75.0-blue.svg" alt="Version 0.75.0"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.76.0-blue.svg" alt="Version 0.76.0"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -46,7 +46,7 @@ choices. Advanced overrides are kept in the [configuration reference](docs/CONFI
 - Search each event using promotion-aware names, dates, rounds, sessions, and matchups.
 - Reject interviews, countdown shows, wrong years, wrong rounds, and unrelated releases.
 - Give every account its own private install URL, drag-ordered catalogs, and playback credentials.
-- Add simple TSDB-backed sports and tune matching rules from the admin interface.
+- Add provider-backed sports and tune matching rules from the admin interface.
 - Reuse encrypted provider searches and account-scoped availability observations
   instead of repeating the same work whenever an event is opened.
 - Deploy and update with Docker Compose while preserving state in a named volume.
@@ -63,7 +63,8 @@ choices. Advanced overrides are kept in the [configuration reference](docs/CONFI
 | MotoGP | Race, qualifying, sprint, and per-round sessions |
 | Boxing | Cards from major promoters |
 | Manchester United | Upcoming and recent fixtures across all football-data.org competitions |
-| Custom promotions | Official MLB, TSDB, football-data.org, TMDB, or ONE-backed catalogs created in the admin UI |
+| UEFA Champions League | API-Football fixtures with UCL team identities and release-aware searches |
+| Custom promotions | API-Football, official MLB, TSDB, football-data.org, TMDB, ONE, or custom JSON/API catalogs created in the admin UI |
 
 ## Playback integrations
 
@@ -159,7 +160,8 @@ JSON or application code.
   promotions. Use a ready-made adapter or connect a public JSON/API schedule by
   mapping its event-list, name, date, ID, venue, and artwork fields—without
   writing code. Preview normalized events without changing assignments or
-  stored catalogs. The official MLB schedule requires no API key.
+  stored catalogs. API-Football is the preferred football adapter and powers
+  the shipped Champions League promotion; the official MLB schedule requires no API key.
 - **Promotions:** a five-step wizard asks for the name, saved event provider,
   real release examples, and optional artwork, then shows a plain-language
   review. Create and test providers in Metadata, then select them here. SSS

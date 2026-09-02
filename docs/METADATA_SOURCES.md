@@ -13,6 +13,7 @@
 | MotoGP | TheSportsDB | league `4407` |
 | Match of the Day | TMDB | TV shows `224` and `3231` |
 | Man United | football-data.org | team `66` |
+| UEFA Champions League | API-Football | competition `2` |
 
 Custom sources can also use MLB's official public Stats API schedule. It needs
 no API key and supplies game IDs, dates, teams, venues, status, and start times.
@@ -26,7 +27,7 @@ description/artwork enrichment source for eligible promotions. The repository
 also contains Wikipedia year-page and list-page primary adapters, although no
 currently enabled built-in promotion selects either as its primary source.
 
-Custom promotions select a named source definition. TheSportsDB,
+Custom promotions select a named source definition. API-Football, TheSportsDB,
 football-data.org, TMDB, the official ONE feed, official MLB schedule, and
 user-created JSON/API feeds are supported in the source registry.
 
@@ -42,7 +43,7 @@ from promotions. A source definition contains:
 - credential reference, never a plaintext credential;
 - enabled state and last validation/refresh result.
 
-Implementation status: the registry, nine seeded definitions, dedicated
+Implementation status: the registry, ten seeded definitions, dedicated
 Metadata page, reusable source creation, official MLB adapter, promotion
 reassignment, external validation, and normalized sample preview are
 implemented. Preview is read-only and never replaces stored events. Existing
@@ -72,7 +73,7 @@ Move refresh dispatch behind a registry with a common contract:
 - `transform(record, promotion)` selects the existing normalizer;
 - `redact(config)` removes secrets from logs and admin responses.
 
-Initial adapters: TheSportsDB, official ONE, official MLB, football-data.org, TMDB,
+Initial adapters: API-Football, TheSportsDB, official ONE, official MLB, football-data.org, TMDB,
 Wikipedia year pages, and Wikipedia list pages. The official ONE adapter can be
 reused by another promotion only when its feed contains events that promotion
 can safely filter; the UI must explain this rather than presenting every source
@@ -80,7 +81,7 @@ as universally compatible.
 
 ## Migration and safety
 
-- Seed the nine current assignments as system source definitions.
+- Seed the ten current assignments as system source definitions.
 - Allow system definitions and built-in promotion assignments to be overridden,
   while retaining a one-click reset to shipped defaults.
 - Migrate existing custom promotion source fields to source definitions without

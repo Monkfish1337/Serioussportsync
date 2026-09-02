@@ -15,6 +15,7 @@ fs.writeFileSync(file, JSON.stringify({
   prowlarr: { url: 'http://prowlarr:9696', apiKey: 'legacy-prowlarr-secret' },
   companion: { url: 'http://scraper:8080', authToken: 'legacy-companion-secret' },
   footballData: { apiKey: 'legacy-football-secret' },
+  apiFootball: { apiKey: 'legacy-api-football-secret' },
 }), 'utf8');
 
 const settings = require('../lib/settings');
@@ -23,15 +24,18 @@ test('migrates and encrypts admin source credentials at rest', () => {
   assert.equal(settings.getProwlarr().apiKey, 'legacy-prowlarr-secret');
   assert.equal(settings.getCompanion().authToken, 'legacy-companion-secret');
   assert.equal(settings.getFootballData().apiKey, 'legacy-football-secret');
+  assert.equal(settings.getApiFootball().apiKey, 'legacy-api-football-secret');
   const migrated = fs.readFileSync(file, 'utf8');
-  assert.doesNotMatch(migrated, /legacy-(?:prowlarr|companion|football)-secret/);
+  assert.doesNotMatch(migrated, /legacy-(?:prowlarr|companion|football|api-football)-secret/);
 
   settings.setProwlarr({ url: 'http://prowlarr:9696', apiKey: 'new-prowlarr-secret' });
   settings.setCompanion({ url: 'http://scraper:8080', authToken: 'new-companion-secret' });
   settings.setFootballData({ apiKey: 'new-football-secret' });
+  settings.setApiFootball({ apiKey: 'new-api-football-secret' });
   assert.equal(settings.getProwlarr().apiKey, 'new-prowlarr-secret');
   assert.equal(settings.getCompanion().authToken, 'new-companion-secret');
   assert.equal(settings.getFootballData().apiKey, 'new-football-secret');
+  assert.equal(settings.getApiFootball().apiKey, 'new-api-football-secret');
   const saved = fs.readFileSync(file, 'utf8');
-  assert.doesNotMatch(saved, /new-(?:prowlarr|companion|football)-secret/);
+  assert.doesNotMatch(saved, /new-(?:prowlarr|companion|football|api-football)-secret/);
 });

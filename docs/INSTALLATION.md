@@ -90,6 +90,8 @@ missing/short secret, occupied port, or unwritable data mount.
 
 1. Create the account whose username matches `ADMIN_USER`.
 2. Open **Metadata** and refresh or inspect the event sources.
+   To populate the shipped UEFA Champions League catalog, save an API-Football
+   key in **Admin** first; its free plan is sufficient for initial testing.
 3. Open **Metadata** to choose a ready-made event provider or create one from a
    public JSON/API schedule. Test it and check the sample events before saving.
 4. Open **Promotions** and use **Create promotion**. Select the saved provider,

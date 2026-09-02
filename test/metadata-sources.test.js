@@ -31,9 +31,10 @@ test.after(() => {
 });
 
 test('seeds all current built-in metadata source assignments', () => {
-  assert.equal(sources.list().length, 9);
+  assert.equal(sources.list().length, 10);
   assert.deepEqual(sources.resolve('one', {}).source, { type: 'onefc' });
   assert.deepEqual(sources.resolve('f1', {}).source, { type: 'thesportsdb', leagueId: '4370' });
+  assert.deepEqual(sources.resolve('ucl', {}).source, { type: 'api-football', leagueId: '2' });
 });
 
 test('creates a reusable source and assigns it to a promotion', () => {
@@ -49,6 +50,27 @@ test('creates a reusable source and assigns it to a promotion', () => {
   sources.assign('f1', '');
   promotions.reload();
   assert.equal(sources.assignmentFor('f1'), 'tsdb-f1');
+});
+
+test('preserves a pre-existing custom ucl promotion over the new shipped default', () => {
+  const customPromotions = require('../lib/custom-promotions');
+  customPromotions.add({
+    id: 'ucl', name: 'My Champions League', idPrefix: 'ucl',
+    source: 'football-data', competitionId: 'CL', posterShape: 'landscape',
+    searchTitleTemplates: ['{name}'], relevanceKeywords: ['ucl'],
+  }, new Set(promotions.all.filter((item) => item.id !== 'ucl').map((item) => item.id)));
+  try {
+    promotions.reload();
+    const preserved = promotions.all.find((item) => item.id === 'ucl');
+    assert.equal(preserved.isCustom, true);
+    assert.deepEqual(preserved.source, { type: 'football-data', competitionId: 'CL' });
+  } finally {
+    customPromotions.remove('ucl');
+    promotions.reload();
+  }
+  const shipped = promotions.all.find((item) => item.id === 'ucl');
+  assert.equal(shipped.isCustom, false);
+  assert.deepEqual(shipped.source, { type: 'api-football', leagueId: '2' });
 });
 
 test('retired expert tools are absent from the admin sidebar', () => {
@@ -136,9 +158,38 @@ test('creates a no-key MLB source and exposes Metadata navigation', () => {
   assert.match(html, /MLB official schedule/);
   assert.match(html, /Provider creator/);
   assert.match(html, /Custom JSON\/API schedule/);
+  assert.match(html, /API-Football competition/);
   const script = html.match(/<script>([\s\S]*?)<\/script>/);
   assert.ok(script);
   assert.doesNotThrow(() => new Function(script[1])); // eslint-disable-line no-new-func
+});
+
+test('creates and previews an API-Football competition source', async () => {
+  const created = sources.add({
+    id: 'api-football-epl', name: 'API-Football · Premier League',
+    type: 'api-football', apiFootballLeagueId: '39',
+  });
+  assert.deepEqual(created.source, { type: 'api-football', leagueId: '39' });
+  const result = await metadataPreview.preview(created, {
+    now: new Date('2026-09-02T12:00:00Z'),
+    credentials: { apiFootballApiKey: 'test-key' },
+    adapters: { apiFootball: {
+      lookupLeague: async () => ({ league: { id: 39, name: 'Premier League' } }),
+      seasonsForRange: () => ['2026'],
+      fetchAll: async (input) => {
+        assert.equal(input.leagueId, '39');
+        assert.deepEqual(input.seasons, ['2026']);
+        return [{
+          fixture: { id: 123, date: '2026-09-05T15:00:00+00:00', venue: { name: 'Stadium', city: 'London' } },
+          league: { id: 39, name: 'Premier League', country: 'England', season: 2026, round: 'Regular Season - 4', logo: 'https://img/league.png' },
+          teams: { home: { id: 1, name: 'Arsenal', logo: 'https://img/arsenal.png' }, away: { id: 2, name: 'Liverpool', logo: 'https://img/liverpool.png' } },
+        }];
+      },
+    } },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.events[0].name, 'Arsenal vs Liverpool');
+  assert.equal(result.events[0].date, '2026-09-05');
 });
 
 test('creates and maps a user-defined JSON API provider without executing code', async () => {

@@ -60,6 +60,14 @@ module.exports = {
     apiKey: process.env.FOOTBALL_DATA_API_KEY || '',
   },
 
+  // API-Football is the preferred structured football schedule provider.
+  // It supplies stable fixture/team IDs, competition rounds, UTC dates and
+  // crests across all plans. Users bring their own key; the free allowance is
+  // sufficient to test a small number of competitions.
+  apiFootball: {
+    apiKey: process.env.API_FOOTBALL_API_KEY || '',
+  },
+
   // 0.42.13 — TMDB source. For TV-style sports shows (Match of the Day, ITV
   // highlights, boxing analysis shows, etc.) where football-data / TSDB don't
   // apply. Each show is identified by its numeric TMDB TV show ID; refresh

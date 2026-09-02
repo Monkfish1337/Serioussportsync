@@ -962,6 +962,9 @@ function createApp() {
       settings.setFootballData({
         apiKey: String(b.footballDataApiKey || ''),
       });
+      settings.setApiFootball({
+        apiKey: String(b.apiFootballApiKey || ''),
+      });
       res.redirect('/admin?flash=' + encodeURIComponent('Sources saved.'));
     } catch (err) {
       res.redirect('/admin?flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(err)));
@@ -1353,6 +1356,7 @@ function renderAdminPage(currentUser, opts) {
   // 0.38.1: football-data.org API key field on /admin Sources so admins can
   // save/rotate the key without editing docker-compose.yml.
   const _fd = settings.getFootballData();
+  const _apiFootball = settings.getApiFootball();
 
   const body = ''
     + '<div class="page-header">'
@@ -1393,6 +1397,11 @@ function renderAdminPage(currentUser, opts) {
     +       '<h4 class="mb-2">football-data.org</h4>'
     +       '<p class="text-secondary small mb-3">API key for the football-data.org parallel source — used by custom promotions whose source is set to football-data (FIFA WC, EPL, Champions League, etc.). Free tier covers ~10 req/min. Sign up at <a href="https://www.football-data.org/client/register" target="_blank" rel="noopener" class="link-primary">football-data.org/client/register</a>. Saving here overrides the FOOTBALL_DATA_API_KEY env var.</p>'
     +       secretField('football-data.org API key', 'footballDataApiKey', _fd.apiKey, 'paste your football-data.org token')
+
+    +       '<hr class="my-4">'
+    +       '<h4 class="mb-2">API-Football</h4>'
+    +       '<p class="text-secondary small mb-3">Preferred football schedule provider for the shipped Champions League promotion and API-Football providers created in Metadata. The free plan is sufficient for testing. Create a key at <a href="https://dashboard.api-football.com/register" target="_blank" rel="noopener" class="link-primary">dashboard.api-football.com</a>. Saving here overrides <code>API_FOOTBALL_API_KEY</code>.</p>'
+    +       secretField('API-Football API key', 'apiFootballApiKey', _apiFootball.apiKey, 'paste your API-Football key')
 
     +       '<hr class="my-4">'
     +       '<button class="btn btn-primary" type="submit">Save sources</button>'

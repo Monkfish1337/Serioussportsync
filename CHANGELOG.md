@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.76.0
+
+### API-Football metadata source
+
+- Added API-Football as a first-class reusable metadata provider with an
+  encrypted API key, provider creation, read-only event preview, production
+  refresh support, quota-aware season selection, and clear authentication or
+  provider error reporting.
+- Preserved API-Football fixture IDs, team IDs, full team names, competition
+  rounds, venues, crests, and league artwork in normalized SSS events. Full
+  team names are used for display and search rather than a provider's shortened
+  label becoming the only event identity.
+- Kept every existing football-data.org source and assignment intact. Users
+  can select either provider for new or existing promotions.
+
+### Shipped UEFA Champions League promotion
+
+- Added UEFA Champions League as a default promotion backed by API-Football
+  competition `2`, with upcoming and recent catalogs and a seeded Metadata
+  source that can be previewed or reassigned normally.
+- Preserved an existing user-created promotion whose internal ID is already
+  `ucl`; the shipped default yields to it instead of replacing its settings.
+- Applied the existing UCL team identity preset automatically and prioritized
+  exact scene-style queries such as `UEFA Champions League 2026.05.05 Arsenal
+  vs Atletico Madrid` before broader alias variants.
+- Required both selected teams and the fixture date, while rejecting women's,
+  youth, U19, and highlights releases before playback rows are created.
+
 ## 0.75.0
 
 ### End-user-safe promotion matching

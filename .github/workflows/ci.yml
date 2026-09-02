@@ -80,6 +80,7 @@ jobs:
               './lib/settings',
               './lib/redact',
               './lib/sources/thesportsdb',
+              './lib/sources/api-football',
               './lib/sources/prowlarr',
               './lib/sources/zilean',
               './lib/sources/realdebrid',

@@ -17,6 +17,8 @@ services:
       # a direct Prowlarr connection can also be saved in the admin panel.
       COMPANION_URL: "${COMPANION_URL:-}"
       COMPANION_AUTH_TOKEN: "${COMPANION_AUTH_TOKEN:-}"
+      # Optional; may instead be saved from Admin after first sign-in.
+      API_FOOTBALL_API_KEY: "${API_FOOTBALL_API_KEY:-}"
       # Accounts
       SESSION_SECRET: "${SESSION_SECRET:?Set SESSION_SECRET in .env}"
       ADMIN_USER: "${ADMIN_USER:-}"

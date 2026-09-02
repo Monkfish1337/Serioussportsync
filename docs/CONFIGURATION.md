@@ -31,6 +31,7 @@ development only. It must never be used for a real deployment.
 | `TSDB_API_KEY` | `123` | TheSportsDB API key. Replace with your own key when available. |
 | `TSDB_SEASONS` | `auto` | Derive relevant seasons from the event window, or use a comma-separated list. |
 | `FOOTBALL_DATA_API_KEY` | none | Optional football-data.org key for assigned metadata sources. |
+| `API_FOOTBALL_API_KEY` | none | API-Football key used by the shipped UEFA Champions League promotion and assigned API-Football sources. It can also be saved in Admin. |
 | `TMDB_API_KEY` | none | Optional TMDB key for assigned television-style metadata sources. |
 | `EVENT_WINDOW_DAYS_BACK` | `30` | Number of previous days retained in the catalog. |
 | `EVENT_WINDOW_DAYS_AHEAD` | `90` | Number of future days retained in the catalog. |
