@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.76.0-blue.svg" alt="Version 0.76.0"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.76.1-blue.svg" alt="Version 0.76.1"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -63,8 +63,8 @@ choices. Advanced overrides are kept in the [configuration reference](docs/CONFI
 | MotoGP | Race, qualifying, sprint, and per-round sessions |
 | Boxing | Cards from major promoters |
 | Manchester United | Upcoming and recent fixtures across all football-data.org competitions |
-| UEFA Champions League | API-Football fixtures with UCL team identities and release-aware searches |
-| Custom promotions | API-Football, official MLB, TSDB, football-data.org, TMDB, ONE, or custom JSON/API catalogs created in the admin UI |
+| UEFA Champions League | Official UEFA fixtures with full team identities and release-aware searches; no API key required |
+| Custom promotions | Official UEFA, API-Football, official MLB, TSDB, football-data.org, TMDB, ONE, or custom JSON/API catalogs created in the admin UI |
 
 ## Playback integrations
 

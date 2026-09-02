@@ -23,6 +23,8 @@ let footballData = null;
 try { footballData = require('../lib/sources/football-data'); } catch (e) { footballData = null; }
 let apiFootball = null;
 try { apiFootball = require('../lib/sources/api-football'); } catch (e) { apiFootball = null; }
+let uefa = null;
+try { uefa = require('../lib/sources/uefa'); } catch (e) { uefa = null; }
 // 0.42.13: TMDB parallel source for TV-style sports shows (Match of the Day,
 // ITV highlights, boxing analysis shows) where football-data / TSDB don't
 // apply. Same lazy-require pattern as football-data.
@@ -184,6 +186,23 @@ async function refreshPromotion(promotion, log) {
       apiKey: configured.apiKey,
       log,
     });
+  } else if (promotion.source.type === 'uefa') {
+    if (!uefa) throw new Error('Official UEFA source module is unavailable; promotion was not refreshed');
+    const today = new Date(); today.setUTCHours(0, 0, 0, 0);
+    const from = new Date(today); from.setUTCDate(from.getUTCDate() - Math.max(0, config.eventWindowDaysBack | 0));
+    const to = new Date(today); to.setUTCDate(to.getUTCDate() + Math.max(0, config.eventWindowDaysAhead | 0));
+    const dateFrom = from.toISOString().slice(0, 10);
+    const dateTo = to.toISOString().slice(0, 10);
+    const seasons = uefa.seasonsForRange(dateFrom, dateTo);
+    log('  uefa official competition: ' + promotion.source.competitionId + ' seasons: ' + seasons.join(', ')
+      + ' range: ' + dateFrom + ' to ' + dateTo + ' (no API key required)');
+    raw = await uefa.fetchAll({
+      competitionId: promotion.source.competitionId,
+      seasons,
+      dateFrom,
+      dateTo,
+      log,
+    });
   } else if (promotion.source.type === 'tmdb') {
     // 0.42.13: TMDB TV show. Fetches all episodes with air dates. Each becomes
     // an event whose date drives DARKSPORT-style search title generation.
@@ -228,6 +247,7 @@ function normalizeRecord(raw, promotion) {
   if (promotion.source.type === 'thesportsdb') return transform.fromTsdb(raw, promotion);
   if (promotion.source.type === 'football-data') return transform.fromFootballData(raw, promotion);
   if (promotion.source.type === 'api-football') return transform.fromApiFootball(raw, promotion);
+  if (promotion.source.type === 'uefa') return transform.fromUefa(raw, promotion);
   if (promotion.source.type === 'tmdb') return transform.fromTmdb(raw, promotion);
   if (promotion.source.type === 'wikipedia' || promotion.source.type === 'onefc'
       || promotion.source.type === 'mlb' || promotion.source.type === 'wikipedia-list'

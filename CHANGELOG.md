@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.76.1
+
+### Official UEFA Champions League metadata
+
+- Replaced the shipped Champions League dependency on API-Football with the
+  public fixture feed used by UEFA.com. The default catalog now needs no API
+  key, account, subscription, or free-plan season entitlement.
+- Added Official UEFA as a reusable Metadata provider. It supports numeric UEFA
+  competition IDs, read-only previews, production refreshes, current European
+  season selection, bounded pagination, and event-window filtering.
+- Preserved official match and team IDs, full English club identities, kickoff
+  times, rounds, venues, crests, and stadium artwork. API-Football remains
+  available as an optional provider for users whose plan covers their season.
+- Corrected the generic football alias ranking so each curated release-friendly
+  club name is searched before longer formal variants. UEFA's `Atleti` identity
+  now produces `Atletico Madrid`, `Atletico de Madrid`, `Atlético de Madrid`,
+  and `Atleti` matching without a one-off event fix.
+- Updated installation, Metadata, and Admin guidance to stop implying that the
+  API-Football free plan includes current Champions League seasons.
+
 ## 0.76.0
 
 ### API-Football metadata source

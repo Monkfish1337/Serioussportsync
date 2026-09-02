@@ -60,10 +60,9 @@ module.exports = {
     apiKey: process.env.FOOTBALL_DATA_API_KEY || '',
   },
 
-  // API-Football is the preferred structured football schedule provider.
-  // It supplies stable fixture/team IDs, competition rounds, UTC dates and
-  // crests across all plans. Users bring their own key; the free allowance is
-  // sufficient to test a small number of competitions.
+  // Optional API-Football provider for custom metadata sources. Current-season
+  // access depends on the user's API-Football plan. The shipped Champions
+  // League catalog instead uses UEFA's official no-key fixture feed.
   apiFootball: {
     apiKey: process.env.API_FOOTBALL_API_KEY || '',
   },

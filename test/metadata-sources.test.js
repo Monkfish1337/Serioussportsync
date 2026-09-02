@@ -34,7 +34,7 @@ test('seeds all current built-in metadata source assignments', () => {
   assert.equal(sources.list().length, 10);
   assert.deepEqual(sources.resolve('one', {}).source, { type: 'onefc' });
   assert.deepEqual(sources.resolve('f1', {}).source, { type: 'thesportsdb', leagueId: '4370' });
-  assert.deepEqual(sources.resolve('ucl', {}).source, { type: 'api-football', leagueId: '2' });
+  assert.deepEqual(sources.resolve('ucl', {}).source, { type: 'uefa', competitionId: '1' });
 });
 
 test('creates a reusable source and assigns it to a promotion', () => {
@@ -70,7 +70,7 @@ test('preserves a pre-existing custom ucl promotion over the new shipped default
   }
   const shipped = promotions.all.find((item) => item.id === 'ucl');
   assert.equal(shipped.isCustom, false);
-  assert.deepEqual(shipped.source, { type: 'api-football', leagueId: '2' });
+  assert.deepEqual(shipped.source, { type: 'uefa', competitionId: '1' });
 });
 
 test('retired expert tools are absent from the admin sidebar', () => {
@@ -127,6 +127,9 @@ test('wizard accepts provider IDs and recognises supported official websites', (
   assert.deepEqual(adminPromotions.websiteSource('https://www.mlb.com/schedule'), {
     ok: true, type: 'mlb', detected: 'MLB official schedule',
   });
+  assert.deepEqual(adminPromotions.websiteSource('https://www.uefa.com/uefachampionsleague/fixtures-results/#/d/2026-09-08'), {
+    ok: true, type: 'uefa', competitionId: '1', detected: 'Official UEFA Champions League schedule',
+  });
   assert.match(adminPromotions.websiteSource('https://example.com/events').error, /does not yet have a schedule adapter/);
 });
 
@@ -159,6 +162,7 @@ test('creates a no-key MLB source and exposes Metadata navigation', () => {
   assert.match(html, /Provider creator/);
   assert.match(html, /Custom JSON\/API schedule/);
   assert.match(html, /API-Football competition/);
+  assert.match(html, /UEFA official competition/);
   const script = html.match(/<script>([\s\S]*?)<\/script>/);
   assert.ok(script);
   assert.doesNotThrow(() => new Function(script[1])); // eslint-disable-line no-new-func
@@ -190,6 +194,35 @@ test('creates and previews an API-Football competition source', async () => {
   assert.equal(result.ok, true);
   assert.equal(result.events[0].name, 'Arsenal vs Liverpool');
   assert.equal(result.events[0].date, '2026-09-05');
+});
+
+test('creates and previews an official UEFA competition without credentials', async () => {
+  const created = sources.add({
+    id: 'uefa-europa', name: 'Official UEFA · Europa League',
+    type: 'uefa', uefaCompetitionId: '3',
+  });
+  assert.deepEqual(created.source, { type: 'uefa', competitionId: '3' });
+  const result = await metadataPreview.preview(created, {
+    now: new Date('2026-09-02T12:00:00Z'),
+    adapters: { uefa: {
+      seasonsForRange: () => ['2027'],
+      fetchAll: async (input) => {
+        assert.equal(input.competitionId, '3');
+        assert.deepEqual(input.seasons, ['2027']);
+        return [{
+          id: '2049554', seasonYear: '2027',
+          kickOffTime: { date: '2026-09-08', dateTime: '2026-09-08T19:00:00Z' },
+          competition: { id: '3', code: 'UEL', metaData: { name: 'UEFA Europa League' } },
+          round: { metaData: { name: 'League Phase' } },
+          homeTeam: { id: '1', internationalName: 'B. Dortmund', translations: { displayOfficialName: { EN: 'Borussia Dortmund' } } },
+          awayTeam: { id: '2', internationalName: 'Atleti', translations: { displayOfficialName: { EN: 'Atlético de Madrid' } } },
+        }];
+      },
+    } },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.events[0].name, 'Borussia Dortmund vs Atlético de Madrid');
+  assert.equal(result.events[0].date, '2026-09-08');
 });
 
 test('creates and maps a user-defined JSON API provider without executing code', async () => {

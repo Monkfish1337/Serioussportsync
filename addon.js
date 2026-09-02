@@ -1400,7 +1400,7 @@ function renderAdminPage(currentUser, opts) {
 
     +       '<hr class="my-4">'
     +       '<h4 class="mb-2">API-Football</h4>'
-    +       '<p class="text-secondary small mb-3">Preferred football schedule provider for the shipped Champions League promotion and API-Football providers created in Metadata. The free plan is sufficient for testing. Create a key at <a href="https://dashboard.api-football.com/register" target="_blank" rel="noopener" class="link-primary">dashboard.api-football.com</a>. Saving here overrides <code>API_FOOTBALL_API_KEY</code>.</p>'
+    +       '<p class="text-secondary small mb-3">Optional key for API-Football providers created in Metadata. Current-season access depends on your API-Football plan; its free plan may be limited to historical seasons. The shipped Champions League provider now uses UEFA directly and needs no key. Create a key at <a href="https://dashboard.api-football.com/register" target="_blank" rel="noopener" class="link-primary">dashboard.api-football.com</a>. Saving here overrides <code>API_FOOTBALL_API_KEY</code>.</p>'
     +       secretField('API-Football API key', 'apiFootballApiKey', _apiFootball.apiKey, 'paste your API-Football key')
 
     +       '<hr class="my-4">'

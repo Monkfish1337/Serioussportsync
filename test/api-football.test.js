@@ -32,8 +32,8 @@ test('normalizes API-Football using full team names and stable identities', () =
 
 test('shipped Champions League promotion prioritizes the observed Usenet naming', () => {
   const promotion = promotions.all.find((item) => item.id === 'ucl');
-  assert.equal(promotion.source.type, 'api-football');
-  assert.equal(promotion.source.leagueId, '2');
+  assert.equal(promotion.source.type, 'uefa');
+  assert.equal(promotion.source.competitionId, '1');
   const event = { name: 'Arsenal vs Atletico Madrid', date: '2026-05-05' };
   const queries = promotion.searchTitles(event);
   assert.equal(queries[0], 'UEFA Champions League 2026.05.05 Arsenal vs Atletico Madrid');
