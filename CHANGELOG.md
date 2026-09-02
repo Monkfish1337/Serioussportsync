@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.76.2
+
+### Automatic UEFA release identities
+
+- Derived search and matching identities from every name supplied by UEFA,
+  including official, display, international, short, and team-code forms.
+- Added provider-neutral removal of common football registration prefixes and
+  suffixes such as `FC`, `CF`, `AFC`, `FK`, `NK`, `GNK`, `PFC`, `SK`, `SC`,
+  and `BC`. Newly qualifying clubs now work without maintaining a seasonal
+  hardcoded alias list.
+- Added accent and punctuation folding for scene names such as `Bodø/Glimt` →
+  `Bodo Glimt`, while retaining the authoritative Unicode identity for display.
+- Fed dynamic team identities into both query generation and strict two-team
+  candidate matching. Curated aliases still take priority for non-obvious
+  identities such as PSG, Bayern, Inter, and Atlético Madrid.
+- Added UCL search variants for round/leg labels, `DD.MM.YYYY`, and final-style
+  `FINAL DD-MM-YYYY` naming observed in real indexer results.
+- Compared the supplied manual Usenet sample against live UEFA fixtures: 44 of
+  45 unique 2026 men's releases matched exactly one fixture with zero ambiguous
+  matches. The remaining title had no corresponding fixture in UEFA's schedule.
+
 ## 0.76.1
 
 ### Official UEFA Champions League metadata
