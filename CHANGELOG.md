@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.81.4
+
+### Automatic work is bounded to a rolling window
+
+- Added an **Automatic window** setting, default 14 days. Automatic preparation
+  and automatic warming both stop for fixtures older than this.
+- TorBox keeps a cached copy for at least 30 days, so an older fixture is
+  either still cached — in which case warming it achieves nothing — or has aged
+  out with nobody watching. Either way the per-scan budget belongs to current
+  fixtures.
+- Matches now carry the fixture date, so age is judged against the event rather
+  than the release. Records stored before this release fall back to the release
+  date, which matching already guarantees is within a day of the fixture.
+- Upcoming fixtures are always inside the window.
+- The manual Prepare and Warm to TorBox buttons ignore the limit entirely, so
+  an old fixture can still be fetched deliberately.
+- The scan panel reports how many matched releases sit outside the window.
+
+## 0.81.3
+
+### Match diagnostics export
+
+- Added a downloadable match diagnostics report to the Sport-Video page, as CSV
+  for spreadsheet analysis or JSON for the full detail.
+- Covers every catalog event in a chosen window, filtered to one promotion or
+  across all of them: the event's aliases, its provider team identities, the
+  search queries SSS generated for it, every Sport-Video release within a day
+  of it, and the decision made about each.
+- Rejections now carry the stage and the reason — `release-filter:sports-noise`,
+  `event-exclusion`, or the promotion's own verdict such as `no-away-team-alias`
+  — instead of a release simply being absent from the matched list.
+- Events with no nearby release are reported explicitly rather than omitted, so
+  a supply gap is distinguishable from a matching failure. That distinction is
+  the point: the first run of this report showed Champions League matching every
+  release the source actually had, with the misses being fixtures the source had
+  never published.
+- Records whether each release is prepared, its info hash, and when it was
+  auto-warmed, so the export cross-references against a TorBox library.
+- Read-only: no network calls, no TorBox lookups, no state writes. Torrent URLs
+  are never included, and CSV cells beginning with `=`, `+`, `-` or `@` are
+  prefixed so a release title cannot execute as a spreadsheet formula.
+
 ## 0.81.2
 
 ### Discovery now uses the site's own search index

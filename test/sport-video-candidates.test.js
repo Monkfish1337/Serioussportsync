@@ -86,3 +86,62 @@ test('stays silent while the source is disabled', async () => {
     settings.getSportVideo = original;
   }
 });
+
+// TorBox holds a cached copy for at least 30 days, so re-preparing and
+// re-warming an old fixture buys nothing: it is either still cached and needs
+// no warming, or has aged out with nobody watching. Automatic work therefore
+// stops at a configurable age; the manual buttons do not.
+function daysAgo(count) {
+  return new Date(Date.now() - count * 86400000).toISOString().slice(0, 10);
+}
+
+test('measures a match by its fixture date, falling back to the release date', () => {
+  assert.equal(sportVideo.matchAgeDays({
+    date: daysAgo(30), matches: [{ eventDate: daysAgo(3) }],
+  }), 3);
+  // Records written before 0.81.4 carry no eventDate; matching guarantees the
+  // release date is within a day of the fixture.
+  assert.equal(sportVideo.matchAgeDays({ date: daysAgo(9), matches: [{}] }), 9);
+  // An upcoming fixture is never outside the window.
+  assert.ok(sportVideo.matchAgeDays({
+    date: daysAgo(-4), matches: [{ eventDate: daysAgo(-4) }],
+  }) < 0);
+  assert.equal(sportVideo.matchAgeDays({ date: '', matches: [] }), Infinity);
+});
+
+test('stops warming automatically once a fixture leaves the window', async () => {
+  const match = (age) => [{
+    eventId: 'ucl:' + age, eventTitle: 'x', eventDate: daysAgo(age), promotion: 'ucl',
+  }];
+  const releases = [
+    { id: 'fresh', title: 'Fresh', infoHash: 'a'.repeat(40), date: daysAgo(2), matches: match(2) },
+    { id: 'stale', title: 'Stale', infoHash: 'b'.repeat(40), date: daysAgo(40), matches: match(40) },
+  ];
+  const original = settings.getSportVideo;
+  const submitted = [];
+  settings.getSportVideo = () => ({
+    enabled: true, autoWarmPromotions: ['ucl'], autoWarmPerScan: 10, autoWarmWindowDays: 14,
+  });
+  const streams = require('../lib/streams');
+  const users = require('../lib/users');
+  const originalWarm = streams.warmTorbox;
+  const originalList = users.listUsers;
+  const originalFind = users.findById;
+  users.listUsers = () => [{ id: 'u1' }];
+  users.findById = () => ({ id: 'u1', username: 'tester', config: { torboxApiKey: 'k' } });
+  streams.warmTorbox = async ({ infoHash }) => { submitted.push(infoHash); return { ok: true, queued: true }; };
+  try {
+    const result = await sportVideo.autoWarmMatched(releases, {});
+    assert.deepEqual(submitted, ['a'.repeat(40)]);
+    assert.equal(result.warmed, 1);
+    // The in-window record is stamped so a later scan does not resubmit it;
+    // the out-of-window one is left untouched for a manual warm.
+    assert.ok(releases[0].autoWarmedAt);
+    assert.equal(releases[1].autoWarmedAt, undefined);
+  } finally {
+    settings.getSportVideo = original;
+    streams.warmTorbox = originalWarm;
+    users.listUsers = originalList;
+    users.findById = originalFind;
+  }
+});

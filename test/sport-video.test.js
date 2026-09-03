@@ -68,7 +68,7 @@ test('matches a source release to the existing MLB event rules', () => {
     title: 'Atlanta Braves at Washington Nationals 02.09.2026', date: '2026-09-02',
   }, [event], promotions);
   assert.deepEqual(matches, [{
-    eventId: 'mlb:123', eventTitle: event.name, promotion: 'mlb',
+    eventId: 'mlb:123', eventTitle: event.name, eventDate: event.date, promotion: 'mlb',
   }]);
 });
 

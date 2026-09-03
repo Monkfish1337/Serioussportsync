@@ -33,6 +33,7 @@ const adminDatabase = require('./lib/admin-database');
 const adminLogs = require('./lib/admin-logs');
 const adminSportVideo = require('./lib/admin-sport-video');
 const sportVideo = require('./lib/sources/sport-video');
+const matchDiagnostics = require('./lib/match-diagnostics');
 const torboxResolver = require('./lib/sources/torbox-resolver');
 // 0.27.0: in-memory log buffer for /admin/logs.
 const logBuffer = require('./lib/log-buffer');
@@ -909,6 +910,7 @@ function createApp() {
         intervalHours: req.body.intervalHours, startDelaySeconds: req.body.startDelaySeconds,
         maxDetailsPerScan: req.body.maxDetailsPerScan, archivePages: req.body.archivePages,
         autoWarmPromotions: req.body.autoWarmPromotions, autoWarmPerScan: req.body.autoWarmPerScan,
+        autoWarmWindowDays: req.body.autoWarmWindowDays,
         categories: req.body.categories,
       });
       sportVideo.startScheduler();
@@ -936,6 +938,46 @@ function createApp() {
     } catch (error) {
       res.redirect('/admin/sport-video?flash=' + encodeURIComponent(
         'Re-match failed: ' + security.safeErrorMessage(error)));
+    }
+  });
+
+  // Match diagnostics export. Replays the matching decision for every event in
+  // the window and every release within a day of it, keeping the reason each
+  // one was rejected. Read-only, admin-only, and never includes torrent URLs.
+  function diagnosticsReport(req) {
+    return matchDiagnostics.diagnose({
+      promotionId: String(req.query.promotion || '').trim(),
+      days: Number(req.query.days) || 60,
+    });
+  }
+
+  app.get('/admin/sport-video/diagnostics.csv', requireAdmin, (req, res) => {
+    try {
+      const report = diagnosticsReport(req);
+      const stamp = report.generatedAt.slice(0, 10);
+      const scope = (report.promotionFilter || 'all').replace(/[^A-Za-z0-9_-]/g, '');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('Content-Disposition',
+        'attachment; filename="sss-match-diagnostics-' + scope + '-' + stamp + '.csv"');
+      res.send(matchDiagnostics.toCsv(report));
+    } catch (error) {
+      res.status(500).send('Diagnostics export failed: ' + security.safeErrorMessage(error));
+    }
+  });
+
+  app.get('/admin/sport-video/diagnostics.json', requireAdmin, (req, res) => {
+    try {
+      const report = diagnosticsReport(req);
+      const stamp = report.generatedAt.slice(0, 10);
+      const scope = (report.promotionFilter || 'all').replace(/[^A-Za-z0-9_-]/g, '');
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('Content-Disposition',
+        'attachment; filename="sss-match-diagnostics-' + scope + '-' + stamp + '.json"');
+      res.send(JSON.stringify(report, null, 2));
+    } catch (error) {
+      res.status(500).send(JSON.stringify({ ok: false, error: security.safeErrorMessage(error) }));
     }
   });
 
