@@ -145,3 +145,56 @@ test('stops warming automatically once a fixture leaves the window', async () =>
     users.findById = originalFind;
   }
 });
+
+// The store is read on the request path — once when an event is opened and
+// again when a row is played. After discovery moved to the full search index
+// the file reached ~1.5 MB, making an uncached read a ~11ms synchronous parse
+// on every stream request.
+test('reads the store once and serves repeats from cache', () => {
+  seed([{
+    id: 'cached', title: 'Cached release', date: '2026-09-02', infoHash: 'c'.repeat(40),
+    matches: [{ eventId: 'mlb:123', eventTitle: 'x', eventDate: '2026-09-02', promotion: 'mlb' }],
+  }]);
+  sportVideo.invalidate();
+
+  const realReadFileSync = fs.readFileSync;
+  let reads = 0;
+  fs.readFileSync = function counted(target, ...rest) {
+    if (String(target) === process.env.SPORT_VIDEO_FILE) reads += 1;
+    return realReadFileSync.call(this, target, ...rest);
+  };
+  try {
+    for (let i = 0; i < 25; i += 1) sportVideo.load();
+    assert.equal(reads, 1, 'expected one read for 25 loads, got ' + reads);
+
+    // An edit made outside the process must still be picked up.
+    const raw = realReadFileSync(process.env.SPORT_VIDEO_FILE, 'utf8');
+    fs.writeFileSync(process.env.SPORT_VIDEO_FILE, raw + ' ');
+    sportVideo.load();
+    assert.equal(reads, 2, 'an external edit should force a re-read');
+  } finally {
+    fs.readFileSync = realReadFileSync;
+    sportVideo.invalidate();
+  }
+});
+
+test('migrates stored state forward instead of relying on read-site fallbacks', () => {
+  const migrated = sportVideo.migrateState({
+    version: 1,
+    releases: [
+      { id: 'a', title: 'A', date: '2026-08-26', matches: [{ eventId: 'ucl:1', promotion: 'ucl' }] },
+      { id: 'b', title: 'B', date: '2026-08-27' },
+    ],
+  });
+  assert.equal(migrated.version, sportVideo.STATE_VERSION);
+  // A pre-0.81.4 match gains the fixture date the age window needs.
+  assert.equal(migrated.releases[0].matches[0].eventDate, '2026-08-26');
+  // A record with no matches array at all is normalised rather than left to
+  // whichever read site touches it first.
+  assert.deepEqual(migrated.releases[1].matches, []);
+  assert.equal(migrated.releases[1].indexTitle, '');
+  assert.equal(migrated.releases[1].fromIndex, false);
+  // Already-current state is returned untouched.
+  const current = { version: sportVideo.STATE_VERSION, releases: [] };
+  assert.equal(sportVideo.migrateState(current), current);
+});

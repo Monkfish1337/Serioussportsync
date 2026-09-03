@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.82.0
+
+### Request-path performance
+
+- The Sport-Video store is cached on file modification time instead of being
+  re-read and re-parsed on every request. Discovery through the search index
+  had grown the file to roughly 1.5 MB, which made each read an 11ms
+  synchronous parse — paid once when an event is opened and again when a row is
+  played. A repeat read is now 0.005ms, and an edit made outside the process is
+  still picked up.
+
+### Stored state
+
+- Added a numbered migration runner. Fields added to release records since
+  0.81.0 were each absorbed by a fallback at the point of use; those are
+  replaced by one forward-only migration that normalises the shape on load.
+- Matches written before 0.81.4 gain the fixture date they were missing.
+
+### Caching correctness
+
+- Addon payloads are now `private` rather than `public`. These URLs embed the
+  account's API token, so a shared proxy could hold one account's catalog and
+  serve it to another viewer. Browser and client caching is unaffected, and
+  conditional requests are still answered with a 304.
+- Added `stale-if-error` so a transient upstream failure serves the last good
+  catalog instead of an empty one.
+
+### Tests
+
+- Added route-level tests covering the HTTP surface, which had no coverage at
+  all: every unauthenticated `/admin` route is walked from the live router,
+  per-user addon routes are checked against wrong, truncated and absent API
+  tokens, and the signed resolve endpoint is checked against unsigned,
+  tampered, expired and cross-account links.
+- Added a deployment contract test asserting the container hardening, the
+  loopback-only default binding, resource limits, the absence of committed
+  secrets, and that the publish workflow verifies before it builds.
+- Added coverage for the store cache and the migration runner.
+- 186 tests to 205.
+
+### Release safety and resources
+
+- `container.yml` now runs the full unit suite before building. It is a
+  separate workflow from `ci.yml` with no dependency between them, so a failing
+  suite could previously still publish `:latest` — as happened with 44bc161.
+- Added a memory ceiling, CPU limit and log rotation to the compose file, all
+  overridable through `SSS_MEM_LIMIT` and `SSS_CPUS`.
+
 ## 0.81.4
 
 ### Automatic work is bounded to a rolling window

@@ -24,6 +24,18 @@ services:
       ADMIN_USER: "${ADMIN_USER:-}"
     volumes:
       - serioussportsync_data:/app/data
+    # A runaway scan holds the whole release store plus a ~1.5 MB search index
+    # in memory. Without a ceiling that competes with the indexers and *arr
+    # stack usually sharing this host. Both are overridable for a small box.
+    mem_limit: ${SSS_MEM_LIMIT:-1g}
+    cpus: ${SSS_CPUS:-2}
+    # Container logs are unbounded by default and this process is deliberately
+    # chatty about matching decisions.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777

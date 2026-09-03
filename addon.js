@@ -157,9 +157,17 @@ function createApp() {
   // Branded artwork (UFC/WWE upcoming logo cards, etc). Public, no auth.
   app.use('/assets', express.static(path.join(__dirname, 'public'), { maxAge: '7d' }));
 
+  // Default caching for addon payloads.
+  //
+  // These URLs live under /u/:userId/:apiToken/, so the path itself is a
+  // credential. `public` invited any shared proxy between SSS and the client to
+  // store one account's catalog and hand it to another viewer; `private` keeps
+  // the browser or client cache while forbidding shared ones. Express still
+  // emits an ETag and answers conditional requests with a 304, so repeat views
+  // stay cheap.
   function send(res, payload, opts) {
     const o = opts || {};
-    res.setHeader('Cache-Control', o.cacheControl || 'public, max-age=3600');
+    res.setHeader('Cache-Control', o.cacheControl || 'private, max-age=3600, stale-if-error=600');
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.send(JSON.stringify(payload));
   }
