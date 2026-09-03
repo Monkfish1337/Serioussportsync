@@ -29,10 +29,33 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      # npm exits 1 both for real advisories and for its advisory endpoint
+      # being unreachable, and run #180 was blocked by a registry 503 rather
+      # than by anything in this repository. Retry on infrastructure errors and
+      # warn if they persist; a genuine vulnerability still fails the build.
+      - name: Production dependency audit
+        run: |
+          for attempt in 1 2 3; do
+            output=$(npm audit --omit=dev --audit-level=moderate 2>&1) && exit 0
+            if printf '%s' "$output" | grep -qiE 'audit endpoint|Service Unavailable|ENOTFOUND|ETIMEDOUT|EAI_AGAIN|socket hang up'; then
+              echo "::warning::npm audit advisory endpoint unavailable (attempt $attempt/3)"
+              sleep 20
+            else
+              printf '%s\n' "$output"
+              echo "::error::production dependency vulnerabilities found"
+              exit 1
+            fi
+          done
+          echo "::warning::npm audit skipped - advisory endpoint unreachable after 3 attempts"
+
+      # The publish job runs independently of ci.yml, so a red suite there
+      # cannot stop an image shipping. This job verifies for itself before it
+      # builds.
       - name: Verify before publishing
         run: |
-          npm ci --no-audit --no-fund
-          npm audit --omit=dev --audit-level=moderate
           npm run test:unit
           npm run test:nuvio
           npm run test:account
@@ -77,10 +100,15 @@ jobs:
           docker compose up -d --wait --wait-timeout 120
           curl --fail --show-error --retry 5 --retry-delay 2 http://127.0.0.1:7000/health
 
+      # Diagnostics and cleanup must never be what turns a run red. Both failed
+      # in #180 only because .env is created by the step that had already been
+      # skipped, turning one real error into three.
       - name: Show container logs on failure
         if: failure() && github.ref == 'refs/heads/main'
+        continue-on-error: true
         run: docker compose logs --no-color
 
       - name: Stop test stack
         if: always() && github.ref == 'refs/heads/main'
+        continue-on-error: true
         run: docker compose down --volumes --remove-orphans
