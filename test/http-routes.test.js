@@ -263,3 +263,30 @@ test('failed sign-ins are rate limited per client', async () => {
   }
   assert.ok(limited, 'repeated failed sign-ins should eventually be refused');
 });
+
+// A promotion added before its first refresh answers its catalog with an empty
+// list. Caching that for an hour is how a newly added promotion ends up
+// registered in the client — visible in Nuvio's home layout — with a
+// permanently blank row, while every older catalog works. NFL and NBA hit
+// exactly this after 0.84.0.
+test('an empty catalog or meta miss is never cached as an answer', async () => {
+  const user = await makeUser('emptycatalog');
+  const prefix = '/u/' + user.id + '/' + user.apiToken;
+  const manifest = await (await get(prefix + '/manifest.json')).json();
+  const catalog = manifest.catalogs[0];
+  assert.ok(catalog, 'expected at least one catalog in the manifest');
+
+  // This fixture's store is empty, so every catalog is a legitimate miss.
+  const response = await get(prefix + '/catalog/' + catalog.type + '/' + catalog.id + '.json');
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.metas.length, 0, 'fixture store should be empty');
+  assert.match(response.headers.get('cache-control') || '', /no-cache/,
+    'an empty catalog must be revalidated, got: ' + response.headers.get('cache-control'));
+
+  const miss = await get(prefix + '/meta/' + catalog.type + '/nfl%3Anot-a-real-event.json');
+  assert.equal(miss.status, 200);
+  assert.equal((await miss.json()).meta, null);
+  assert.match(miss.headers.get('cache-control') || '', /no-cache/,
+    'a meta miss must be revalidated, got: ' + miss.headers.get('cache-control'));
+});

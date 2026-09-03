@@ -474,15 +474,29 @@ function createApp() {
         { cacheControl: 'private, no-cache' });
     });
 
+    // An empty result is almost always a transient state — a promotion added
+    // before its first refresh, a catalog whose window has not been filled yet
+    // — and caching it for an hour is how a newly added promotion ends up
+    // registered in the client with a permanently blank row. Cache what we
+    // have; never cache what we do not.
+    function sendCatalog(res, payload) {
+      const empty = !payload || !Array.isArray(payload.metas) || payload.metas.length === 0;
+      send(res, payload, empty ? { cacheControl: 'private, no-cache' } : undefined);
+    }
+
     r.get('/catalog/:type/:id.json', (req, res) => {
-      send(res, handleCatalog({ type: req.params.type, id: req.params.id, extra: {} }));
+      sendCatalog(res, handleCatalog({ type: req.params.type, id: req.params.id, extra: {} }));
     });
     r.get('/catalog/:type/:id/:extra.json', (req, res) => {
-      send(res, handleCatalog({ type: req.params.type, id: req.params.id, extra: parseExtra(req.params.extra) }));
+      sendCatalog(res, handleCatalog({
+        type: req.params.type, id: req.params.id, extra: parseExtra(req.params.extra),
+      }));
     });
 
     r.get('/meta/:type/:id.json', (req, res) => {
-      send(res, handleMeta({ type: req.params.type, id: decodeURIComponent(req.params.id) }));
+      const payload = handleMeta({ type: req.params.type, id: decodeURIComponent(req.params.id) });
+      // Same reasoning: a miss must not be remembered as an answer.
+      send(res, payload, (payload && payload.meta) ? undefined : { cacheControl: 'private, no-cache' });
     });
 
     r.get('/stream/:type/:id.json', async (req, res) => {

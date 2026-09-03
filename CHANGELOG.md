@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.85.1
+
+### A newly added promotion could show a permanently blank row
+
+- Catalog and meta responses were cached for an hour regardless of content, so
+  a client that asked for a catalog before its promotion's first refresh cached
+  the empty answer and kept showing an empty row for the next hour. The catalog
+  was registered in the client and served correctly by the addon — NFL and NBA
+  hit exactly this after 0.84.0, while every older catalog worked.
+- An empty catalog and a meta miss are now revalidated instead of cached. A
+  populated response still carries the full hour.
+
 ## 0.85.0
 
 Four defects reported against 0.84.0.
