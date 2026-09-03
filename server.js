@@ -12,6 +12,7 @@ const store = require('./lib/store');
 const { runRefresh } = require('./scripts/refresh');
 const availabilityStore = require('./lib/availability-index');
 const availabilityScheduler = require('./lib/availability-scheduler');
+const sportVideo = require('./lib/sources/sport-video');
 
 // SESSION_SECRET hard-fail (0.22.2). A missing or short shared secret would
 // make session, resolve-signature, and encrypted-provider protections unsafe.
@@ -107,6 +108,7 @@ function scheduleBackgroundWork(currentCount) {
     available: Boolean(availabilityIndex),
     log: (message) => console.log('[availability] ' + message),
   });
+  sportVideo.startScheduler();
 
 }
 
@@ -122,6 +124,7 @@ function triggerAvailabilityWarm(reason) {
 function shutdown(signal) {
   console.log(`[serioussportsync] ${signal} received, shutting down`);
   availabilityScheduler.stop();
+  sportVideo.stopScheduler();
   server.close(() => {
     try { if (availabilityIndex) availabilityIndex.close(); } catch (_) { /* already closed */ }
     process.exit(0);

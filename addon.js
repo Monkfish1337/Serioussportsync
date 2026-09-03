@@ -31,6 +31,9 @@ const availabilityWarmer = require('./lib/availability-warmer');
 const availabilityScheduler = require('./lib/availability-scheduler');
 const adminDatabase = require('./lib/admin-database');
 const adminLogs = require('./lib/admin-logs');
+const adminSportVideo = require('./lib/admin-sport-video');
+const sportVideo = require('./lib/sources/sport-video');
+const torboxResolver = require('./lib/sources/torbox-resolver');
 // 0.27.0: in-memory log buffer for /admin/logs.
 const logBuffer = require('./lib/log-buffer');
 const security = require('./lib/security');
@@ -856,6 +859,98 @@ function createApp() {
       res.send(JSON.stringify(databaseSnapshot()));
     } catch (error) {
       res.status(503).send(JSON.stringify({ ok: false, error: security.safeErrorMessage(error) }));
+    }
+  });
+
+  async function sportVideoSnapshot(user) {
+    const state = sportVideo.load();
+    const releases = (state.releases || []).slice(0, 200);
+    const torboxKey = String(user && user.config && user.config.torboxApiKey || '').trim();
+    let cached = new Set();
+    if (torboxKey) {
+      const hashes = Array.from(new Set(releases.map((record) => String(record.infoHash || '').toLowerCase())
+        .filter((hash) => /^[a-f0-9]{40}$/.test(hash))));
+      if (hashes.length) {
+        cached = await torboxResolver.checkCachedBatch(hashes, torboxKey,
+          (message) => console.log('[sport-video] ' + message));
+      }
+    }
+    return {
+      config: settings.getSportVideo(), status: sportVideo.status(), releases,
+      cached, torboxConfigured: Boolean(torboxKey),
+    };
+  }
+
+  app.get('/admin/sport-video', requireAdmin, async (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    let snapshot;
+    try { snapshot = await sportVideoSnapshot(req.user); }
+    catch (error) {
+      snapshot = {
+        config: settings.getSportVideo(), status: sportVideo.status(),
+        releases: sportVideo.load().releases.slice(0, 200), cached: new Set(),
+        torboxConfigured: Boolean(req.user.config && req.user.config.torboxApiKey),
+        flash: 'TorBox availability check failed: ' + security.safeErrorMessage(error),
+      };
+    }
+    snapshot.flash = req.query.flash || snapshot.flash || null;
+    res.send(tablerChrome.tablerPage('Sport-Video', adminSportVideo.renderBody(snapshot), {
+      user: req.user, currentSection: 'sport-video',
+    }));
+  });
+
+  app.post('/admin/sport-video/settings', requireAdmin, (req, res) => {
+    try {
+      settings.setSportVideo({
+        enabled: req.body.enabled === 'on', autoScan: req.body.autoScan === 'on',
+        intervalHours: req.body.intervalHours, startDelaySeconds: req.body.startDelaySeconds,
+        maxDetailsPerScan: req.body.maxDetailsPerScan, categories: req.body.categories,
+      });
+      sportVideo.startScheduler();
+      res.redirect('/admin/sport-video?flash=' + encodeURIComponent('Sport-Video settings saved and applied.'));
+    } catch (error) {
+      res.redirect('/admin/sport-video?flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(error)));
+    }
+  });
+
+  app.post('/admin/sport-video/scan', requireAdmin, (_req, res) => {
+    const alreadyRunning = sportVideo.status().running;
+    sportVideo.scan().catch(() => {});
+    res.redirect('/admin/sport-video?flash=' + encodeURIComponent(alreadyRunning
+      ? 'A Sport-Video scan is already running.' : 'Sport-Video scan started. Refresh this page for results.'));
+  });
+
+  app.post('/admin/sport-video/prepare/:id', requireAdmin, async (req, res) => {
+    try {
+      const record = await sportVideo.prepare(String(req.params.id || ''));
+      res.redirect('/admin/sport-video?flash=' + encodeURIComponent('Prepared torrent identity for ' + record.title + '.'));
+    } catch (error) {
+      res.redirect('/admin/sport-video?flash=' + encodeURIComponent('Preparation failed: ' + security.safeErrorMessage(error)));
+    }
+  });
+
+  app.post('/admin/sport-video/warm/:id', requireAdmin, async (req, res) => {
+    try {
+      let record = sportVideo.load().releases.find((item) => item.id === String(req.params.id || ''));
+      if (!record) throw new Error('Sport-Video release not found');
+      if (!record.infoHash) record = await sportVideo.prepare(record.id);
+      const match = Array.isArray(record.matches) && record.matches[0];
+      if (!match) throw new Error('Release is not matched to a current SSS event');
+      const warmRateLimit = require('./lib/warm-rate-limit');
+      const result = await warmTorbox({
+        eventId: match.eventId, infoHash: record.infoHash,
+        creds: req.user.config || {}, username: req.user.username,
+        beforeSubmit: () => warmRateLimit.check(req.user.id),
+      });
+      let message = 'TorBox could not accept this release.';
+      if (result.url || result.ready) message = 'Release is already ready on TorBox. Open the matched event and refresh its links.';
+      else if (result.queued || result.waiting) message = 'Release is warming on TorBox. Check the TorBox dashboard, then refresh the matched event links.';
+      else if (result.error === 'rate-limited') message = 'Too many TorBox warm requests. Wait ' + result.retryAfterSec + ' seconds and try again.';
+      else if (result.error) message = 'TorBox warm failed: ' + result.error;
+      res.redirect('/admin/sport-video?flash=' + encodeURIComponent(message));
+    } catch (error) {
+      res.redirect('/admin/sport-video?flash=' + encodeURIComponent('TorBox warm failed: ' + security.safeErrorMessage(error)));
     }
   });
 

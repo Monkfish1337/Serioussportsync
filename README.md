@@ -69,6 +69,11 @@ choices. Advanced overrides are kept in the [configuration reference](docs/CONFI
 
 ## Playback integrations
 
+The optional **Sport-Video** source discovers curated, event-specific torrent releases from the
+public Sport-Video catalogue, matches them to current SSS events, and checks them against each
+user's TorBox account. It runs alongside Companion and Prowlarr. Discovery never adds content to
+TorBox automatically; an uncached release is only submitted when a user selects **Warm to TorBox**.
+
 Playback is optional. SeriousSportSync can combine multiple pipelines and
 returns only the rows that finish within the configured request budget.
 
