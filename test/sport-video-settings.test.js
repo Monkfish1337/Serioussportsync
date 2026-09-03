@@ -21,6 +21,8 @@ test('Sport-Video is opt-in with conservative automatic scan defaults', () => {
   assert.equal(value.intervalHours, 6);
   assert.equal(value.maxDetailsPerScan, 50);
   assert.equal(value.archivePages, 12);
+  assert.deepEqual(value.autoWarmPromotions, []);
+  assert.equal(value.autoWarmPerScan, 5);
   assert.ok(value.categories.includes('baseball'));
   assert.ok(value.categories.includes('football'));
 });
@@ -33,8 +35,15 @@ test('validates and persists bounded Sport-Video scan controls', () => {
   });
   assert.deepEqual(value, {
     enabled: true, autoScan: false, intervalHours: 12, startDelaySeconds: 120,
-    maxDetailsPerScan: 25, archivePages: 20, categories: ['baseball', 'football'],
+    maxDetailsPerScan: 25, archivePages: 20, autoWarmPromotions: [], autoWarmPerScan: 5,
+    categories: ['baseball', 'football'],
   });
+  // Auto-warm is opt-in per promotion and de-duplicates its selection.
+  assert.deepEqual(settings.setSportVideo({
+    enabled: true, autoScan: false, intervalHours: 12, startDelaySeconds: 120,
+    maxDetailsPerScan: 25, archivePages: 20, autoWarmPerScan: 3,
+    autoWarmPromotions: ['ucl', 'ufc', 'ucl', ''], categories: ['football'],
+  }).autoWarmPromotions, ['ucl', 'ufc']);
   assert.equal(settings.setSportVideo({
     enabled: true, autoScan: false, intervalHours: 12, startDelaySeconds: 120,
     maxDetailsPerScan: 25, archivePages: 0, categories: ['baseball'],

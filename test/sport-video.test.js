@@ -196,3 +196,105 @@ test('ranks a source that reports pixel geometry instead of a scene token', () =
   assert.equal(list[0], geometry);
   assert.match(streams._test.buildTorboxRow(geometry, 'https://example/resolve').name, /1080p/);
 });
+
+// The site's search box is client-side and backed by one static index of every
+// page. Reading it is a single request that covers the whole catalogue, which
+// is why 0.81.2 stopped depending on how many listing pages a scan can afford.
+const SEARCH_INDEX_SAMPLE = [
+  '// search index for WYSIWYG Web Builder',
+  'var database_length = 0;',
+  'function SearchDatabase()',
+  '{',
+  '   database_length = 0;',
+  '   this[database_length++] = new SearchPage("start.html", "Sport Video", "kw", "desc");',
+  '   this[database_length++] = new SearchPage("august2026-3.html", "August 2026 page 3", "kw", "desc");',
+  '   this[database_length++] = new SearchPage("AALS260826.html", "AEK Athens vs Levski Sofia 26.08.2026 UEFA Champions League Football torrent download free", "kw", "desc");',
+  '   this[database_length++] = new SearchPage("NYYLAA020926.html", "New York Yankees at Los Angeles Angels 02.09.2026 Torrent MLB 2026 Live Stream Video Free Download baseball", "kw", "desc");',
+  '   this[database_length++] = new SearchPage("NODATE.html", "Premier League Highlights Show", "kw", "desc");',
+  '   return this;',
+  '}',
+].join('\r\n');
+
+test('reads every page from the static search index the site search uses', () => {
+  const entries = sportVideo.parseSearchIndex(SEARCH_INDEX_SAMPLE);
+  // Navigation, month-listing and undated pages are not releases.
+  assert.deepEqual(entries.map((entry) => entry.title), [
+    'AEK Athens vs Levski Sofia 26.08.2026',
+    'New York Yankees at Los Angeles Angels 02.09.2026',
+  ]);
+  const [ucl, mlb] = entries;
+  assert.equal(ucl.date, '2026-08-26');
+  assert.equal(ucl.detailUrl, 'https://sport-video.org.ua/AALS260826.html');
+  assert.equal(ucl.category, 'football');
+  assert.match(ucl.indexTitle, /UEFA Champions League/);
+  assert.equal(mlb.category, 'baseball');
+  assert.equal(mlb.date, '2026-09-02');
+});
+
+test('trims the index marketing tail without losing the event identity', () => {
+  assert.equal(
+    sportVideo.cleanIndexTitle('AEK Athens vs Levski Sofia 26.08.2026 UEFA Champions League Football torrent download free'),
+    'AEK Athens vs Levski Sofia 26.08.2026');
+  assert.equal(sportVideo.cleanIndexTitle('No date here at all'), 'No date here at all');
+});
+
+// Regression for the release that prompted the rewrite: it is present on the
+// site and its fixture is in the Champions League catalog, so discovery must
+// connect the two.
+test('matches the Champions League release the crawl kept missing', () => {
+  const entries = sportVideo.parseSearchIndex(SEARCH_INDEX_SAMPLE);
+  const record = entries.find((entry) => /AEK Athens/.test(entry.title));
+  const event = {
+    id: 'ucl:2026-aek-levski', name: 'AEK Athens vs Levski Sofia', date: '2026-08-26',
+  };
+  assert.equal(sportVideo.rematchReleases([record], [event], promotions), 1);
+  assert.equal(record.matches[0].eventId, event.id);
+  assert.equal(record.matches[0].promotion, 'ucl');
+});
+
+test('accepts the competition name the index title carries but the card title does not', () => {
+  // A promotion that identifies its events by keyword rather than by team —
+  // the shape where a bare "Team A vs Team B date" card title cannot pass.
+  const stub = {
+    getByEventId: () => ({
+      id: 'stub',
+      isRelevantStreamTitle(title) {
+        return /champions league/i.test(title)
+          ? { ok: true } : { ok: false, reason: 'no-keyword-match' };
+      },
+    }),
+  };
+  const event = { id: 'stub:1', name: 'AEK Athens vs Levski Sofia', date: '2026-08-26' };
+  const record = {
+    title: 'AEK Athens vs Levski Sofia 26.08.2026',
+    indexTitle: 'AEK Athens vs Levski Sofia 26.08.2026 UEFA Champions League Football',
+    date: '2026-08-26',
+  };
+  assert.equal(sportVideo.matchRelease(record, [event], stub).length, 1);
+  // Without the index title there is no keyword evidence and it must not match.
+  assert.deepEqual(
+    sportVideo.matchRelease({ title: record.title, date: record.date }, [event], stub), []);
+});
+
+test('only compares a release against fixtures inside its own date window', () => {
+  const record = { title: 'AEK Athens vs Levski Sofia 26.08.2026', date: '2026-08-26' };
+  const farAway = {
+    id: 'ucl:other', name: 'AEK Athens vs Levski Sofia', date: '2026-11-26',
+  };
+  assert.equal(sportVideo.rematchReleases([record], [farAway], promotions), 0);
+  assert.equal(record.matchExclusion, undefined);
+});
+
+test('never warms automatically until a promotion is explicitly selected', async () => {
+  const original = settings.getSportVideo;
+  settings.getSportVideo = () => ({ enabled: true, autoWarmPromotions: [], autoWarmPerScan: 5 });
+  try {
+    const result = await sportVideo.autoWarmMatched([{
+      infoHash: 'e'.repeat(40), title: 'anything',
+      matches: [{ eventId: 'ucl:1', eventTitle: 'x', promotion: 'ucl' }],
+    }], {});
+    assert.deepEqual(result, { attempted: 0, warmed: 0, ready: 0 });
+  } finally {
+    settings.getSportVideo = original;
+  }
+});

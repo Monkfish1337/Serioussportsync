@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.81.2
+
+### Discovery now uses the site's own search index
+
+- Sport-Video's search box is client-side, backed by one static index of every
+  page on the site. Reading that file is a single request that returns about
+  1,860 dated releases — against roughly 300 reachable from the seven per-sport
+  pages and ~700 from the bounded archive crawl 0.81.1 added.
+- Discovery reads that index first and falls back to the listing crawl only
+  when it cannot be read or returns implausibly few entries, so a change to the
+  site's search degrades coverage instead of ending discovery.
+- Conditional requests: an unchanged index costs a 304 rather than a megabyte.
+- Index titles carry the competition ("… 26.08.2026 UEFA Champions League"),
+  which the listing cards never did. Matching accepts either the card-style
+  title or the fuller index title, so a promotion identified by keyword rather
+  than by team can now match a plain "Team A vs Team B date" release.
+- Sport labels are derived from the index title's own wording, and a label a
+  category page confirmed is never downgraded to a derived one.
+
+### Event-first matching
+
+- Releases are compared only against fixtures within a day of them, instead of
+  against the whole catalog. Matching a full site index stays cheap.
+- Retention raised to 6,000 releases so a scan cannot evict what it just found.
+
+### Opt-in automatic warming
+
+- Promotions can be individually selected for automatic TorBox warming. A
+  selected promotion has its matched, already-prepared releases submitted
+  during a scan, bounded by a per-scan cap (default 5).
+- Warming respects each account's catalog selection and only runs for accounts
+  holding a TorBox key. Nothing is submitted for unselected promotions, which
+  remains the default for every promotion.
+
 ## 0.81.1
 
 ### Sport-Video discovery coverage

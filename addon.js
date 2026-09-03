@@ -878,6 +878,7 @@ function createApp() {
     return {
       config: settings.getSportVideo(), status: sportVideo.status(), releases,
       cached, torboxConfigured: Boolean(torboxKey),
+      promotions: promotions.enabled.map((promotion) => ({ id: promotion.id, name: promotion.name })),
     };
   }
 
@@ -889,6 +890,7 @@ function createApp() {
     catch (error) {
       snapshot = {
         config: settings.getSportVideo(), status: sportVideo.status(),
+        promotions: promotions.enabled.map((promotion) => ({ id: promotion.id, name: promotion.name })),
         releases: sportVideo.load().releases.slice(0, 200), cached: new Set(),
         torboxConfigured: Boolean(req.user.config && req.user.config.torboxApiKey),
         flash: 'TorBox availability check failed: ' + security.safeErrorMessage(error),
@@ -906,6 +908,7 @@ function createApp() {
         enabled: req.body.enabled === 'on', autoScan: req.body.autoScan === 'on',
         intervalHours: req.body.intervalHours, startDelaySeconds: req.body.startDelaySeconds,
         maxDetailsPerScan: req.body.maxDetailsPerScan, archivePages: req.body.archivePages,
+        autoWarmPromotions: req.body.autoWarmPromotions, autoWarmPerScan: req.body.autoWarmPerScan,
         categories: req.body.categories,
       });
       sportVideo.startScheduler();
