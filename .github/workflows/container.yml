@@ -29,10 +29,12 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
-      - name: Verify authenticated account configuration
+      - name: Verify before publishing
         run: |
           npm ci --no-audit --no-fund
           npm audit --omit=dev --audit-level=moderate
+          npm run test:unit
+          npm run test:nuvio
           npm run test:account
 
       - uses: docker/setup-buildx-action@v3
