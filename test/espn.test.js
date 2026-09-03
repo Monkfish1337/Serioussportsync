@@ -158,3 +158,29 @@ test('a custom promotion can be created against an ESPN league', () => {
     /league must be one of/);
   assert.equal(custom.normaliseSpec(spec({ league: 'NHL' })).league, 'nhl');
 });
+
+// A 120-day refresh window (the default eventWindowDaysBack/Ahead) answered as
+// one ESPN response exceeded the adapter's byte cap, so the NFL promotion could
+// only ever report "ESPN scoreboard exceeded its size limit". The range is now
+// split, which bounds each response rather than raising the ceiling and hoping.
+test('splits a long window into bounded date chunks', () => {
+  const windows = espn.dateWindows('2026-08-04', '2026-12-02');
+  assert.ok(windows.length >= 4, 'expected a 121-day range to split, got ' + windows.length);
+  assert.equal(windows[0][0], '2026-08-04');
+  assert.equal(windows[windows.length - 1][1], '2026-12-02');
+  for (const [from, to] of windows) {
+    const days = (Date.parse(to) - Date.parse(from)) / 86400000 + 1;
+    assert.ok(days <= espn.CHUNK_DAYS, 'window ' + from + '..' + to + ' spans ' + days + ' days');
+  }
+  // Contiguous and non-overlapping: no fixture can fall between two windows.
+  for (let i = 1; i < windows.length; i += 1) {
+    assert.equal(Date.parse(windows[i][0]) - Date.parse(windows[i - 1][1]), 86400000,
+      'gap or overlap between ' + windows[i - 1][1] + ' and ' + windows[i][0]);
+  }
+});
+
+test('a range inside one chunk stays a single request, and a bad range is empty', () => {
+  assert.deepEqual(espn.dateWindows('2026-09-01', '2026-09-10'), [['2026-09-01', '2026-09-10']]);
+  assert.deepEqual(espn.dateWindows('2026-09-10', '2026-09-01'), []);
+  assert.deepEqual(espn.dateWindows('nonsense', '2026-09-01'), []);
+});

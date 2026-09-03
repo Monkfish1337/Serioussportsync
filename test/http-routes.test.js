@@ -196,6 +196,21 @@ test('catalog responses are marked private, not shared-cacheable', async () => {
   assert.match(cacheControl, /private/);
 });
 
+// The manifest is configuration, not content: it carries the catalog
+// selection, the published order and the showInHome hint. A one-hour max-age
+// meant a change saved on the Configure page appeared not to take effect until
+// the client's cache expired. The ETag test below keeps revalidation cheap.
+test('the manifest is revalidated rather than held for an hour', async () => {
+  const user = await makeUser('manifestcache');
+  const response = await get('/u/' + user.id + '/' + user.apiToken + '/manifest.json');
+  assert.equal(response.status, 200);
+  const cacheControl = response.headers.get('cache-control') || '';
+  assert.match(cacheControl, /no-cache/,
+    'the manifest must be revalidated on use, got: ' + cacheControl);
+  assert.doesNotMatch(cacheControl, /max-age=[1-9]/,
+    'the manifest must not carry a positive max-age, got: ' + cacheControl);
+});
+
 // Node's global fetch silently attaches `cache-control: no-cache`, which makes
 // Express's freshness check fail and turns every conditional request into a
 // 200. Real clients send no such header, so this uses node:http to assert what

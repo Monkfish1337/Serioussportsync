@@ -62,3 +62,42 @@ test('validates collection artwork and exposes the admin workflow', () => {
   assert.ok(script);
   assert.doesNotThrow(() => new Function(script[1])); // eslint-disable-line no-new-func
 });
+
+// Emptying a folder was refused outright, and any folder emptied as a
+// side-effect was silently deleted. Between them, "remove this promotion from
+// my Nuvio collection" either failed with an error or made the folder vanish —
+// both of which the user reads as the save not working.
+test('a promotion can be removed from a folder, including the last one', () => {
+  const ids = new Set(promotions.enabled.map((p) => p.id));
+  const state = settings.load();
+  const folder = state.folders.find((item) => item.promotions.length > 1);
+  assert.ok(folder, 'expected a multi-promotion default folder');
+
+  const keep = folder.promotions.slice(0, -1);
+  const dropped = folder.promotions[folder.promotions.length - 1];
+  const base = {
+    title: folder.title, artwork: folder.artwork,
+    tileShape: folder.tileShape, hideTitle: folder.hideTitle,
+  };
+  settings.upsertFolder(folder.id, Object.assign({}, base, { promotions: keep }), ids);
+  let saved = settings.load().folders.find((item) => item.id === folder.id);
+  assert.deepEqual(saved.promotions, keep, 'removing one promotion should persist');
+  assert.ok(!saved.promotions.includes(dropped));
+
+  // Emptying it completely is allowed, and the folder survives so the user can
+  // put something back into it.
+  settings.upsertFolder(folder.id, Object.assign({}, base, { promotions: [] }), ids);
+  saved = settings.load().folders.find((item) => item.id === folder.id);
+  assert.ok(saved, 'the folder should still exist after being emptied');
+  assert.deepEqual(saved.promotions, []);
+
+  // An empty folder is simply omitted from the Nuvio export.
+  const exported = collections.buildNuvioCollections({ user: { config: {} }, origin: 'https://example.test' });
+  assert.ok(!exported[0].folders.some((item) => item.id === folder.id),
+    'an empty folder should not be exported to Nuvio');
+
+  // A brand-new folder with nothing selected is still a mis-filled form.
+  assert.throws(() => settings.upsertFolder(null, Object.assign({}, base, {
+    title: 'Empty on creation', promotions: [],
+  }), ids), /at least one promotion/);
+});

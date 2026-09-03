@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.85.0
+
+Four defects reported against 0.84.0.
+
+### NFL preview failed with "ESPN scoreboard exceeded its size limit"
+
+- The adapter's byte cap was sized from a browser probe that ESPN answered with
+  a trimmed payload. A real refresh asks for `eventWindowDaysBack` +
+  `eventWindowDaysAhead` — 120 days by default — in one request, and that
+  response is larger than the cap.
+- Fixed by bounding the request rather than raising the ceiling: the range is
+  split into 31-day windows and the results de-duplicated by fixture id, so no
+  single response can grow unbounded whatever the window setting. NBA was
+  unaffected and its 385-fixture import confirmed the parser itself was sound.
+
+### A promotion preview could hang on "Fetching and comparing events..."
+
+- TheSportsDB's client was the only adapter with no request timeout at all, and
+  its 429 back-off had no overall budget: four rate-limited retries could sleep
+  for roughly seven minutes while the admin request stayed open.
+- It now uses a 20s per-request timeout and refuses a retry it cannot afford
+  within its budget, reporting the rate limit instead of waiting through it.
+- Independently, "Preview refresh" now has a 60s deadline of its own, so any
+  slow source reports failure rather than leaving the panel spinning. A preview
+  writes nothing, so abandoning the in-flight work is safe.
+
+### Catalog and home-row changes appeared not to save
+
+- The manifest was being served with `max-age=3600`. It is configuration, not
+  content — it carries the catalog selection, the published order and the
+  `showInHome` hint — so a change saved on the Configure page could not take
+  effect until the client's cache expired.
+- It is now revalidated on use. Express's ETag keeps that a 304, so repeat
+  requests stay as cheap as they were.
+
+### Removing a promotion from a Nuvio collection folder did not save
+
+- Emptying a folder was refused outright, which made removing a promotion
+  impossible for any folder holding only one, and any folder emptied as a
+  side-effect of a move was silently deleted.
+- An existing folder may now be emptied and is kept. The export already skips
+  folders that resolve to no catalogs, so nothing malformed reaches Nuvio, and
+  Remove stays the explicit way to delete a folder. A brand-new folder with
+  nothing selected is still refused.
+
 ## 0.84.0
 
 ### NFL and NBA

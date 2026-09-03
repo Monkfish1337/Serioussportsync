@@ -463,8 +463,15 @@ function createApp() {
       next();
     });
 
+    // The manifest is configuration, not content: it carries the catalog
+    // selection, the published order and the showInHome hint, so a one-hour
+    // max-age meant a saved change on the Configure page appeared not to work
+    // until the client's cache expired. `no-cache` still permits the stored
+    // copy — it just forces revalidation, and Express's ETag keeps the
+    // revalidation a 304.
     r.get('/manifest.json', (req, res) => {
-      send(res, buildManifest({ user: req.userAccount, origin: publicOriginFromReq(req) }));
+      send(res, buildManifest({ user: req.userAccount, origin: publicOriginFromReq(req) }),
+        { cacheControl: 'private, no-cache' });
     });
 
     r.get('/catalog/:type/:id.json', (req, res) => {
