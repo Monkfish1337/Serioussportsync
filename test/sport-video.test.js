@@ -69,6 +69,8 @@ test('matches a source release to the existing MLB event rules', () => {
   }, [event], promotions);
   assert.deepEqual(matches, [{
     eventId: 'mlb:123', eventTitle: event.name, eventDate: event.date, promotion: 'mlb',
+    // Carried so the team filter can be applied without a catalog lookup.
+    eventTeams: ['Atlanta Braves', 'Washington Nationals'],
   }]);
 });
 

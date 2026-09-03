@@ -888,6 +888,7 @@ function createApp() {
       config: settings.getSportVideo(), status: sportVideo.status(), releases,
       cached, torboxConfigured: Boolean(torboxKey),
       promotions: promotions.enabled.map((promotion) => ({ id: promotion.id, name: promotion.name })),
+      catalogTeams: matchDiagnostics.catalogTeams({}),
     };
   }
 
@@ -900,6 +901,7 @@ function createApp() {
       snapshot = {
         config: settings.getSportVideo(), status: sportVideo.status(),
         promotions: promotions.enabled.map((promotion) => ({ id: promotion.id, name: promotion.name })),
+        catalogTeams: [],
         releases: sportVideo.load().releases.slice(0, 200), cached: new Set(),
         torboxConfigured: Boolean(req.user.config && req.user.config.torboxApiKey),
         flash: 'TorBox availability check failed: ' + security.safeErrorMessage(error),
@@ -919,6 +921,13 @@ function createApp() {
         maxDetailsPerScan: req.body.maxDetailsPerScan, archivePages: req.body.archivePages,
         autoWarmPromotions: req.body.autoWarmPromotions, autoWarmPerScan: req.body.autoWarmPerScan,
         autoWarmWindowDays: req.body.autoWarmWindowDays,
+        // Multi-selects post as teamFilter:<promotionId>, one field per
+        // promotion, so an untouched promotion simply never appears.
+        teamFilters: Object.entries(req.body || {}).reduce((out, [field, value]) => {
+          if (!field.startsWith('teamFilter:')) return out;
+          out[field.slice('teamFilter:'.length)] = [].concat(value || []);
+          return out;
+        }, {}),
         categories: req.body.categories,
       });
       sportVideo.startScheduler();

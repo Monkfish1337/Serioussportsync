@@ -24,6 +24,7 @@ test('Sport-Video is opt-in with conservative automatic scan defaults', () => {
   assert.deepEqual(value.autoWarmPromotions, []);
   assert.equal(value.autoWarmPerScan, 5);
   assert.equal(value.autoWarmWindowDays, 14);
+  assert.deepEqual(value.teamFilters, {});
   assert.ok(value.categories.includes('baseball'));
   assert.ok(value.categories.includes('football'));
 });
@@ -37,8 +38,19 @@ test('validates and persists bounded Sport-Video scan controls', () => {
   assert.deepEqual(value, {
     enabled: true, autoScan: false, intervalHours: 12, startDelaySeconds: 120,
     maxDetailsPerScan: 25, archivePages: 20, autoWarmPromotions: [], autoWarmPerScan: 5,
-    autoWarmWindowDays: 14, categories: ['baseball', 'football'],
+    autoWarmWindowDays: 14, teamFilters: {}, categories: ['baseball', 'football'],
   });
+  // Team filters are stored per promotion, de-duplicated, and an empty
+  // selection is dropped so "not filtered" has one representation.
+  assert.deepEqual(settings.setSportVideo({
+    enabled: true, autoScan: false, intervalHours: 12, startDelaySeconds: 120,
+    maxDetailsPerScan: 25, archivePages: 20, categories: ['baseball'],
+    teamFilters: {
+      mlb: ['New York Yankees', 'New York Yankees', '  '],
+      ucl: [],
+      boxing: '',
+    },
+  }).teamFilters, { mlb: ['New York Yankees'] });
   // Auto-warm is opt-in per promotion and de-duplicates its selection.
   assert.deepEqual(settings.setSportVideo({
     enabled: true, autoScan: false, intervalHours: 12, startDelaySeconds: 120,

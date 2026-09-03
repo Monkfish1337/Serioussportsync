@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.83.0
+
+### Narrow Sport-Video to the teams you follow
+
+- Added a per-promotion team filter to the Sport-Video page. Selecting Man
+  United under its promotion, or the Yankees under MLB, restricts torrent
+  detail fetching and automatic TorBox warming to that side's fixtures.
+- The selectable teams are derived from your own catalog — every side appearing
+  in a fixture over the last 120 days, ordered by how many fixtures it appears
+  in — rather than a hardcoded club list, so the picker stays correct as
+  competitions come and go.
+- Filtering applies only to the expensive half. Everything still matches, stays
+  listed in the console, and appears in the diagnostics export; the Prepare and
+  Warm to TorBox buttons ignore the filter entirely.
+- A promotion with nothing selected is not filtered. Boxing, UFC and anything
+  else without a recurring line-up therefore behaves exactly as before, and
+  selecting an MLB team does not silently narrow Champions League.
+- The filter fails open wherever it cannot judge: a release matched before this
+  release carries no team names, and a fixture whose title does not name two
+  sides is never dropped by a rule that could not have applied to it.
+- Matches now carry both sides of their fixture, so the filter needs no catalog
+  lookup — the same approach used for the fixture date in 0.81.4.
+- The scan panel reports how many matched releases the team filter skipped.
+
+Man United is unaffected in practice: that promotion is already team-scoped
+through football-data, so it has always pulled the club across every
+competition. The filter matters for the competition-wide promotions — MLB is
+roughly 2,400 fixtures a season, and every one of them was previously a
+candidate for preparation.
+
 ## 0.82.0
 
 ### Request-path performance

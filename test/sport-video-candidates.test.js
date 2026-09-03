@@ -198,3 +198,65 @@ test('migrates stored state forward instead of relying on read-site fallbacks', 
   const current = { version: sportVideo.STATE_VERSION, releases: [] };
   assert.equal(sportVideo.migrateState(current), current);
 });
+
+// Narrowing the expensive half of the pipeline to named sides. MLB alone is
+// ~2,400 fixtures a season; preparing every one of them spends detail fetches
+// and TorBox quota on games nobody asked for.
+test('prepares only selected teams, and leaves unfiltered promotions alone', () => {
+  const yankees = {
+    matches: [{ promotion: 'mlb', eventTeams: ['New York Yankees', 'Los Angeles Angels'] }],
+  };
+  const otherGame = {
+    matches: [{ promotion: 'mlb', eventTeams: ['Chicago Cubs', 'Milwaukee Brewers'] }],
+  };
+  const filters = { mlb: ['New York Yankees'] };
+
+  assert.equal(sportVideo.matchesSelectedTeams(yankees, filters), true);
+  assert.equal(sportVideo.matchesSelectedTeams(otherGame, filters), false);
+  // Either side counts, not just the home team.
+  assert.equal(sportVideo.matchesSelectedTeams({
+    matches: [{ promotion: 'mlb', eventTeams: ['Boston Red Sox', 'New York Yankees'] }],
+  }, filters), true);
+
+  // A promotion with nothing selected is not filtered — this is what keeps
+  // boxing, UFC and anything else without a recurring line-up working.
+  const boxing = { matches: [{ promotion: 'boxing', eventTeams: ['Fury', 'Usyk'] }] };
+  assert.equal(sportVideo.matchesSelectedTeams(boxing, filters), true);
+  assert.equal(sportVideo.matchesSelectedTeams(boxing, { boxing: [] }), true);
+
+  // No filters configured at all: everything passes.
+  assert.equal(sportVideo.matchesSelectedTeams(otherGame, {}), true);
+});
+
+test('never drops a release the team filter cannot judge', () => {
+  const filters = { mlb: ['New York Yankees'] };
+  // Matched before this feature existed, so it carries no eventTeams.
+  assert.equal(sportVideo.matchesSelectedTeams({
+    matches: [{ promotion: 'mlb', eventTitle: 'Cubs at Brewers' }],
+  }, filters), true);
+  // A fixture whose name does not split into two sides.
+  assert.equal(sportVideo.matchesSelectedTeams({
+    matches: [{ promotion: 'mlb', eventTeams: [] }],
+  }, filters), true);
+  // Matched to a second promotion that is unfiltered.
+  assert.equal(sportVideo.matchesSelectedTeams({
+    matches: [
+      { promotion: 'mlb', eventTeams: ['Chicago Cubs', 'Milwaukee Brewers'] },
+      { promotion: 'boxing', eventTeams: ['Fury', 'Usyk'] },
+    ],
+  }, filters), true);
+});
+
+test('reads both sides of a fixture however the provider names it', () => {
+  assert.deepEqual(sportVideo.participantsOf({ name: 'New York Yankees at Los Angeles Angels' }),
+    ['New York Yankees', 'Los Angeles Angels']);
+  assert.deepEqual(sportVideo.participantsOf({ name: 'AEK Athens FC vs PFC Levski Sofia' }),
+    ['AEK Athens FC', 'PFC Levski Sofia']);
+  // Structured provider names win over the title when both are present.
+  assert.deepEqual(sportVideo.participantsOf({
+    name: 'Lyon vs Fenerbahce',
+    teamNames: { home: ['Olympique Lyonnais', 'Lyon'], away: ['Fenerbahce SK'] },
+  }), ['Olympique Lyonnais', 'Fenerbahce SK']);
+  // A single-sided event has no participants to filter on.
+  assert.deepEqual(sportVideo.participantsOf({ name: 'UFC 300' }), []);
+});
