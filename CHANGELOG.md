@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.84.0
+
+### NFL and NBA
+
+- Added ready-to-use NFL and NBA promotions, backed by a new ESPN scoreboard
+  adapter that needs no key and no account.
+- TheSportsDB was measured first and rejected: on the shared key its season
+  endpoint returns about fifteen events for a 272-game NFL season. ESPN returns
+  the full slate — 285 NFL fixtures for a season range, 71 NBA fixtures across
+  nine days.
+- Fixtures are named "Away at Home", the same convention MLB already produces,
+  so promotion matching, alias generation and the Sport-Video team filter all
+  work unchanged.
+- Exclusion rules cover the studio programming that carries both team names on
+  the same day — RedZone, condensed games, NFL Network and NBA TV shows,
+  Summer League and G League.
+- The adapter also knows NHL and MLB paths, so either can be added later
+  without new code.
+
+### Structured team names
+
+- `transform.fromWiki` now carries structured home and away names when the
+  adapter supplies them. ESPN provides four naming forms per side — full name,
+  location, nickname and abbreviation — which the team filter and team-aware
+  matching both prefer over splitting a fixture title.
+
+### Custom promotions
+
+- `espn` is accepted as a custom promotion source with a validated league
+  reference, so the forthcoming team wizard can create these promotions through
+  the same path as any other.
+
+The ESPN endpoint is undocumented and carries no compatibility promise — the
+same trade already made for MLB's statsapi feed. The adapter fails soft: a
+shape change drops individual records rather than failing a refresh, and that
+behaviour is covered by tests built from real captured payloads.
+
 ## 0.83.0
 
 ### Narrow Sport-Video to the teams you follow
