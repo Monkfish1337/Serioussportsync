@@ -905,7 +905,8 @@ function createApp() {
       settings.setSportVideo({
         enabled: req.body.enabled === 'on', autoScan: req.body.autoScan === 'on',
         intervalHours: req.body.intervalHours, startDelaySeconds: req.body.startDelaySeconds,
-        maxDetailsPerScan: req.body.maxDetailsPerScan, categories: req.body.categories,
+        maxDetailsPerScan: req.body.maxDetailsPerScan, archivePages: req.body.archivePages,
+        categories: req.body.categories,
       });
       sportVideo.startScheduler();
       res.redirect('/admin/sport-video?flash=' + encodeURIComponent('Sport-Video settings saved and applied.'));
@@ -919,6 +920,20 @@ function createApp() {
     sportVideo.scan().catch(() => {});
     res.redirect('/admin/sport-video?flash=' + encodeURIComponent(alreadyRunning
       ? 'A Sport-Video scan is already running.' : 'Sport-Video scan started. Refresh this page for results.'));
+  });
+
+  // Re-check stored releases against the catalog as it stands now. Sport-Video
+  // publishes ahead of metadata refreshes, so a release discovered before its
+  // fixture existed would otherwise stay unmatched until it was rediscovered.
+  app.post('/admin/sport-video/rematch', requireAdmin, (_req, res) => {
+    try {
+      const result = sportVideo.rematch();
+      res.redirect('/admin/sport-video?flash=' + encodeURIComponent(
+        'Re-matched ' + result.releases + ' stored release(s); ' + result.matched + ' now match a current event.'));
+    } catch (error) {
+      res.redirect('/admin/sport-video?flash=' + encodeURIComponent(
+        'Re-match failed: ' + security.safeErrorMessage(error)));
+    }
   });
 
   app.post('/admin/sport-video/prepare/:id', requireAdmin, async (req, res) => {

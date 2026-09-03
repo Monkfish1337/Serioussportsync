@@ -130,3 +130,69 @@ test('feeds a matched direct release into TorBox discovery without Companion or 
     sportVideo.candidatesForEvent = originals.candidatesForEvent;
   }
 });
+
+test('collects dated archive pages from the site index, newest first', () => {
+  const html = '<a href="./index.html">Home</a><a href="./schedule.html">Schedule</a>'
+    + '<a href="./august2026-1.html">1</a><a href="./august2026-10.html">10</a>'
+    + '<a href="./august2026-2.html">2</a><a href="./september2026.html">Sep</a>'
+    + '<a href="./july2026.html">Jul</a><a href="./december2025-3.html">Dec</a>'
+    + '<a href="./august2026-1.html">dupe</a><a href="./oldergames.html">Older</a>'
+    + '<a href="https://evil.example/august2026-1.html">off-site</a>';
+  const links = sportVideo.parseArchiveLinks(html);
+  assert.deepEqual(links.map((entry) => entry.file), [
+    'september2026.html',
+    'august2026-1.html', 'august2026-2.html', 'august2026-10.html',
+    'july2026.html',
+    'december2025-3.html',
+  ]);
+  // Navigation and non-archive pages never become archive targets.
+  assert.ok(!links.some((entry) => /index|schedule|oldergames/.test(entry.file)));
+});
+
+test('re-matches stored releases once their event metadata arrives', () => {
+  const stored = [{
+    id: 'a', title: 'Atlanta Braves at Washington Nationals 02.09.2026',
+    date: '2026-09-02', matches: [],
+  }];
+  // First pass: the fixture does not exist yet, which is the normal case for a
+  // source that publishes ahead of a metadata refresh.
+  assert.equal(sportVideo.rematchReleases(stored, [], promotions), 0);
+  assert.deepEqual(stored[0].matches, []);
+  // Second pass: the same stored record now matches without being rediscovered.
+  const matched = sportVideo.rematchReleases(stored, [{
+    id: 'mlb:123', name: 'Atlanta Braves vs Washington Nationals', date: '2026-09-02',
+  }], promotions);
+  assert.equal(matched, 1);
+  assert.equal(stored[0].matches[0].eventId, 'mlb:123');
+  assert.ok(stored[0].matchedAt);
+});
+
+test('never matches a release the stream pipeline would reject', () => {
+  const event = {
+    id: 'mlb:123', name: 'Atlanta Braves vs Washington Nationals', date: '2026-09-02',
+  };
+  const report = {};
+  // Highlights are dropped by the shared release filter in lib/streams.js.
+  // Matching one here would offer a Warm button for a row that could never be
+  // served, which is exactly the admin/stream asymmetry 0.81.1 removes.
+  assert.deepEqual(sportVideo.matchRelease({
+    title: 'Atlanta Braves at Washington Nationals Highlights 02.09.2026',
+    date: '2026-09-02',
+  }, [event], promotions, report), []);
+  assert.deepEqual(report.exclusions, ['release filter']);
+  assert.equal(sportVideo.matchRelease({
+    title: 'Atlanta Braves at Washington Nationals 02.09.2026', date: '2026-09-02',
+  }, [event], promotions).length, 1);
+});
+
+test('ranks a source that reports pixel geometry instead of a scene token', () => {
+  const geometry = { title: 'Atlanta Braves at Washington Nationals 02.09.2026', resolution: '1920x1080', size: 1 };
+  const scene = { title: 'MLB.2026.09.02.Braves.vs.Nationals.720p.WEB-DL', size: 9 };
+  assert.equal(streams._test.candidateResolution(geometry), '1080p');
+  const list = [scene, geometry];
+  streams._test.sortCandidates(list, 'size', 'publishDate');
+  // Without the geometry translation the larger 720p release sorted first and
+  // the Sport-Video row was pushed toward (or past) the row cap.
+  assert.equal(list[0], geometry);
+  assert.match(streams._test.buildTorboxRow(geometry, 'https://example/resolve').name, /1080p/);
+});

@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.81.1
+
+### Sport-Video discovery coverage
+
+- Added the dated archive index to discovery. The seven per-sport catalogue
+  pages together list roughly 300 releases, while one month of the archive
+  lists about 600 across ten paginated pages, most of which never appear on a
+  category page at all.
+- Archive pages are discovered from the site's own index and read newest first,
+  bounded by a new **Archive pages per scan** control (default 12, 0 to read
+  the sport pages only).
+- A release found only on an archive page keeps any sport label a category page
+  gave it previously, and is listed under "From archive" until one does.
+- Raised the per-page size ceiling from 1 MB to 3 MB. The ceiling throws rather
+  than truncates, so one page outgrowing it would have failed the whole scan.
+- An unavailable archive index no longer discards the category results that
+  already succeeded.
+
+### Matching against current metadata
+
+- Stored releases are now re-matched against the event catalog on every scan,
+  not only when rediscovered. Sport-Video publishes ahead of metadata
+  refreshes, so a release scanned before its fixture existed was previously
+  stamped "No current SSS event" permanently.
+- Added a **Re-match events** action that re-evaluates stored releases against
+  the current catalog without any network access.
+- Matching now applies the same sports-noise, foreign-language and per-event
+  exclusion filters the stream pipeline applies. The console could previously
+  offer a Warm button for a title the event's own stream request would reject.
+- Releases rejected by those filters are shown as "Filtered out" with the
+  reason, instead of being indistinguishable from genuinely unmatched rows.
+
+### Warmed releases in Nuvio
+
+- Fixed prepared releases being dropped before they could be served. Candidate
+  selection sliced matched releases to the row limit *before* filtering for a
+  usable info hash, so an event with more matches than the limit could discard
+  its one prepared — and possibly already warmed — release, then return nothing
+  once the hash filter removed the rest.
+- Sport-Video reports resolution as a pixel geometry on the detail page rather
+  than a scene token in the title. That geometry now travels with the candidate
+  and is used for stream ranking and row labelling, so these rows no longer
+  sort below every other result and fall outside the row cap.
+- Candidate selection prefers already-prepared releases and reports its own
+  status, resolution and video details to the stream pipeline.
+
 ## 0.79.0
 
 - Add Companion Release Intelligence as a first-class Alias Research source, using recent title-only metadata before live event searches.

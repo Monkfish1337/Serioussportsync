@@ -20,6 +20,7 @@ test('Sport-Video is opt-in with conservative automatic scan defaults', () => {
   assert.equal(value.autoScan, true);
   assert.equal(value.intervalHours, 6);
   assert.equal(value.maxDetailsPerScan, 50);
+  assert.equal(value.archivePages, 12);
   assert.ok(value.categories.includes('baseball'));
   assert.ok(value.categories.includes('football'));
 });
@@ -27,12 +28,21 @@ test('Sport-Video is opt-in with conservative automatic scan defaults', () => {
 test('validates and persists bounded Sport-Video scan controls', () => {
   const value = settings.setSportVideo({
     enabled: true, autoScan: false, intervalHours: 12, startDelaySeconds: 120,
-    maxDetailsPerScan: 25, categories: ['baseball', 'football', 'unknown', 'baseball'],
+    maxDetailsPerScan: 25, archivePages: 20,
+    categories: ['baseball', 'football', 'unknown', 'baseball'],
   });
   assert.deepEqual(value, {
     enabled: true, autoScan: false, intervalHours: 12, startDelaySeconds: 120,
-    maxDetailsPerScan: 25, categories: ['baseball', 'football'],
+    maxDetailsPerScan: 25, archivePages: 20, categories: ['baseball', 'football'],
   });
+  assert.equal(settings.setSportVideo({
+    enabled: true, autoScan: false, intervalHours: 12, startDelaySeconds: 120,
+    maxDetailsPerScan: 25, archivePages: 0, categories: ['baseball'],
+  }).archivePages, 0);
+  assert.throws(() => settings.setSportVideo({
+    enabled: true, autoScan: true, intervalHours: 6, startDelaySeconds: 90,
+    maxDetailsPerScan: 50, archivePages: 900, categories: ['baseball'],
+  }), /Archive pages/);
   assert.throws(() => settings.setSportVideo({
     enabled: true, autoScan: true, intervalHours: 0, startDelaySeconds: 90,
     maxDetailsPerScan: 50, categories: ['baseball'],
