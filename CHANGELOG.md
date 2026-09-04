@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.89.0
+
+### Select your team
+
+The stated goal, from the start: pick your Premier League club, NFL, NBA and
+MLB team, and the catalogs are produced with no further configuration. The
+Configure page now does exactly that — four choosers, each turning a pick into a
+promotion with Upcoming and Recent catalogs, refreshed immediately so it is
+never an empty row you have to trust.
+
+A pick produces one of two shapes, and the difference matters:
+
+- **A football club gets a team feed.** football-data's `/teams/{id}/matches`
+  returns that club's fixtures from every competition the key covers, which is
+  why the shipped Man United promotion spans the league, both domestic cups and
+  Europe. Substituting a filtered league feed would have quietly dropped every
+  cup and European fixture — the opposite of "results in all competitions".
+- **A US team gets its league, narrowed.** ESPN and statsapi have no per-team
+  schedule endpoint here and the league call costs the same either way, so the
+  promotion fetches the league and keeps its own club's fixtures through a new
+  `teamFilter`, matched on provider team id first and naming forms second.
+
+Supporting work: `fetchCompetitionTeams` for football-data and `fetchTeams` for
+ESPN (32 NFL, 30 NBA, 30 MLB clubs with logos), team lists cached for twelve
+hours because they change once a season, and MLB fixtures now carry structured
+team names and ids like ESPN and football-data already did.
+
+Picking the same team twice updates its promotion rather than leaving a second
+copy of the catalogs behind. A chooser whose provider is unconfigured or down
+says so and leaves the other three working.
+
+**Creating a promotion stays admin-only.** The wizard is on the Configure page
+because choosing a team is a user's decision, but a promotion is shared by
+everyone on the server — so a non-admin sees the picker, sees what it would do,
+and is told an admin has to create it. Hiding it would be worse: they would have
+no way to know what to ask for.
+
+### The Configure / Admin line
+
+As specified: Configure is what a user chooses, Admin is what an operator runs.
+
+- The team wizard opens the Configure page.
+- **Nuvio collection folders are now edited on Configure**, embedded rather than
+  linked, next to the export they feed. Arranging folders changes what everyone
+  sees, so the editor is admin-only in place, with an explanation for everyone
+  else.
+
 ## 0.88.1
 
 ### A club's own name spelled out is no longer mistaken for a different club

@@ -17,6 +17,9 @@ function setFreshStreamHeaders(res) {
 const store = require('./lib/store');
 const settings = require('./lib/settings');
 const eventAvailability = require('./lib/event-availability');
+const customPromotions = require('./lib/custom-promotions');
+const teamPicker = require('./lib/team-picker');
+const accountTeamWizard = require('./lib/account-team-wizard');
 const { runRefresh: runEventsRefresh } = require('./scripts/refresh');
 const promotions = require('./lib/promotions');
 const users = require('./lib/users');
@@ -297,6 +300,59 @@ function createApp() {
     res.setHeader('Content-Disposition', 'attachment; filename="serioussportsync-nuvio-collections.json"');
     res.setHeader('Cache-Control', 'no-store');
     res.send(JSON.stringify(payload, null, 2));
+  });
+
+  // --- Configure page: the team wizard -------------------------------
+  //
+  // Reading the team list is a signed-in action; CREATING a promotion is not.
+  // A promotion is shared by everyone on the server, so the create route is
+  // admin-only even though the wizard itself lives on the user-facing page.
+  app.get('/account/teams/:key.json', requireLogin, async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const out = await teamPicker.teamsFor(req.params.key, { log: () => {} });
+    res.status(out.ok ? 200 : 422).send(JSON.stringify(out));
+  });
+
+  app.post('/account/teams', requireLogin, async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const fail = (status, error) => res.status(status).send(JSON.stringify({ ok: false, error }));
+    if (!req.user || req.user.role !== 'admin') {
+      return fail(403, 'A team catalog is shared by everyone on this server, so an admin has to create it.');
+    }
+    const body = req.body || {};
+    const key = String(body.chooser || '').trim();
+    const teamId = String(body.teamId || '').trim();
+    try {
+      const listed = await teamPicker.teamsFor(key, { log: () => {} });
+      if (!listed.ok) return fail(422, listed.error || 'Team list unavailable');
+      const team = listed.teams.find((entry) => String(entry.id) === teamId);
+      if (!team) return fail(422, 'That team is not in the current list');
+
+      const spec = teamPicker.specFor(key, team);
+      // Choosing again replaces rather than duplicates.
+      const existing = customPromotions.findById(spec.id);
+      if (existing) customPromotions.update(spec.id, spec);
+      else customPromotions.add(spec);
+      promotions.reload();
+
+      // Fetch straight away: a catalog that appears empty because nothing has
+      // refreshed yet is indistinguishable from one that does not work.
+      let events = 0;
+      try {
+        const result = await runEventsRefresh({ promotionId: spec.id, log: () => {} });
+        events = Number(result && result.added) || 0;
+      } catch (error) {
+        return res.status(200).send(JSON.stringify({
+          ok: true, name: spec.name, events: 0,
+          warning: 'Created, but the first refresh failed: ' + security.safeErrorMessage(error),
+        }));
+      }
+      res.send(JSON.stringify({ ok: true, name: spec.name, id: spec.id, events }));
+    } catch (error) {
+      fail(422, security.safeErrorMessage(error));
+    }
   });
 
   app.post('/account/save', requireLogin, (req, res) => {
@@ -1930,6 +1986,29 @@ function renderAccountPage(user, opts) {
 
   const defaultMaxStreams = parseInt(process.env.STREAM_MAX_ROWS || '20', 10);
 
+  // Configure is what a user chooses; Admin is what an operator runs. The team
+  // wizard and the Nuvio collection layout are both choices, so both belong
+  // here — the collections editor is embedded rather than linked so it is not
+  // one more page to go and find.
+  const isAdmin = !!(user && user.role === 'admin');
+  let teamWizardHtml = '';
+  try { teamWizardHtml = accountTeamWizard.renderBody({ isAdmin }); }
+  catch (error) {
+    teamWizardHtml = '<div class="alert alert-warning">The team picker is unavailable: '
+      + escapeHtml(security.safeErrorMessage(error)) + '</div>';
+  }
+  let nuvioFoldersHtml = '';
+  if (isAdmin) {
+    try { nuvioFoldersHtml = require('./lib/admin-nuvio-collections').renderBody({ embedded: true }); }
+    catch (error) {
+      nuvioFoldersHtml = '<div class="alert alert-warning">The collection editor is unavailable: '
+        + escapeHtml(security.safeErrorMessage(error)) + '</div>';
+    }
+  } else {
+    nuvioFoldersHtml = '<div class="alert alert-info">Collection folders are shared by everyone on this '
+      + 'server, so an admin arranges them. Your export below always uses the catalogs you have enabled.</div>';
+  }
+
   const catalogsPanel = ''
     + '<style>'
     +   '.promotion-drag-handle,.catalog-drag-handle{cursor:grab;touch-action:none;user-select:none;font-weight:700;letter-spacing:-3px;}'
@@ -1965,6 +2044,9 @@ function renderAccountPage(user, opts) {
     + '</div>'
     + flashHtml
     + '<form method="POST" action="/account/save">'
+    +   '<section class="config-block"><div class="config-block-head">Your teams</div><div class="config-block-body">'
+    +     teamWizardHtml
+    +   '</div></section>'
     +   '<section class="config-block"><div class="config-block-head">Playback services</div><div class="config-block-body">'
     +     '<div class="provider-grid">'
     +       '<div class="wide"><label class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" name="torboxEnabled" value="on"' + (cfg.torboxEnabled !== false ? ' checked' : '') + '><span class="form-check-label"><strong>Enable TorBox pipeline</strong></span></label><p class="text-secondary small mb-2">Resolves companion results and returns playable URLs. Turning it off preserves the encrypted API key.</p>' + secretField('TorBox API key', 'torboxApiKey', cfg.torboxApiKey, 'paste your TorBox API key') + '</div>'
@@ -2018,6 +2100,9 @@ function renderAccountPage(user, opts) {
     +     '</section>'
     +   '</div></details>'
     +   '<details class="config-fold"><summary>Catalogs and display order</summary>' + catalogsPanel + '</details>'
+    +   '<details class="config-fold"><summary>Nuvio collection folders</summary><div class="config-fold-body">'
+    +     nuvioFoldersHtml
+    +   '</div></details>'
     +   '<details class="config-fold"><summary>Advanced playback settings</summary><div class="config-fold-body">'
     +     '<div class="provider-grid">'
     +       '<div><label class="form-label">Maximum results per event</label><input class="form-control" type="number" name="maxStreams" min="0" max="20" value="' + escapeHtml(String(cfg.maxStreams || 0)) + '"><div class="form-hint">0 uses the server default (' + escapeHtml(String(defaultMaxStreams)) + ').</div></div>'

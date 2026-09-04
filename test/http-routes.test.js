@@ -250,6 +250,41 @@ test('a conditional request is answered 304 without a body', async () => {
   assert.ok(third.body.length > 0);
 });
 
+// The team wizard lives on the Configure page because picking a team is a
+// choice a user makes. Creating the promotion is not: it changes the registry
+// every account shares, so that action stays admin-only. Getting this wrong
+// would let any invited user add catalogs for everyone.
+test('a signed-in user can browse teams but not create a promotion', async () => {
+  const user = await makeUser('teampicker');
+  const login = await get('/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ username: 'teampicker', password: 'correct-horse-battery-staple' }).toString(),
+  });
+  const cookie = (login.headers.getSetCookie ? login.headers.getSetCookie() : [])
+    .map((value) => value.split(';')[0]).join('; ');
+  assert.ok(cookie, 'expected a session cookie');
+  assert.ok(user.id);
+
+  const create = await get('/account/teams', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', cookie },
+    body: new URLSearchParams({ chooser: 'nfl', teamId: '6' }).toString(),
+  });
+  assert.equal(create.status, 403);
+  const body = await create.json();
+  assert.equal(body.ok, false);
+  assert.match(body.error, /admin/i);
+});
+
+test('the wizard endpoints refuse anonymous callers', async () => {
+  for (const [method, pathname] of [['GET', '/account/teams/nfl.json'], ['POST', '/account/teams']]) {
+    const response = await get(pathname, { method });
+    assert.ok(response.status === 302 || response.status === 401 || response.status === 403,
+      method + ' ' + pathname + ' answered ' + response.status + ' anonymously');
+  }
+});
+
 test('failed sign-ins are rate limited per client', async () => {
   const body = new URLSearchParams({ username: 'nobody', password: 'wrong' });
   let limited = false;
