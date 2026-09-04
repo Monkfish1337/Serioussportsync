@@ -1,5 +1,66 @@
 # Changelog
 
+## 0.86.1
+
+### A nationality in an event name was read as a language tag
+
+- The foreign-language filter rejected any release title containing an English
+  nationality adjective. Sport is full of those as place names — the F1 and
+  MotoGP calendars are literally a list of them — so "Formula 1 Hungarian
+  Grand Prix Practice 1" was dropped as Hungarian audio.
+- In a real diagnostics export this was the ONLY genuine false negative among
+  14,758 rejections, and it was enough to leave F1 and MotoGP matching nothing
+  at all.
+- Ambiguous words are now guarded against the nouns that make them a place
+  (Grand Prix, GP, Open, Masters, Cup, League, Championship and friends).
+  Native-language names — DEUTSCH, ESPANOL, MAGYAR, POLSKI — need no guard and
+  are still rejected outright, as are real tags like "GERMAN DUB".
+
+### Match diagnostics: near misses are now separable from noise
+
+Every event is replayed against every release within a day of it, so the great
+majority of rows are one sport's fixture being correctly rejected against
+another sport's release. Read raw, that looks like catastrophic failure.
+
+- Two new CSV columns: `name_overlap` (share of the event's distinctive words
+  present in the release title, 0-1) and `near_miss` (a rejection whose release
+  really does look like this fixture). Sort on those and the list worth reading
+  drops from ~14,000 rows to a few dozen.
+- The summary now counts near misses and groups them by reason, so the report
+  says how many rejections are actually suspicious rather than only how many
+  there were.
+
+## 0.86.0
+
+### Catalog availability gate
+
+The fixture feeds are a schedule; the catalogs are meant to be a library. On a
+real deployment most stored events have nothing behind them, and a catalog full
+of unwatchable fixtures reads as the addon being broken rather than the content
+not existing.
+
+- New Admin -> Database switch: **only show events with known content**. With it
+  on, a catalog lists just the events something has actually been found for.
+- "Known content" merges two sources that previously knew nothing about each
+  other: every event the SQLite availability index has stored a release
+  against (TorBox, Prowlarr, Usenet Ultimate, Easynews, the DIY lane) and every
+  event a Sport-Video release matched. The merged set is cached for a minute,
+  so the gate costs nothing per request.
+- The gate is deliberately scope-blind. Availability in the index is per
+  provider and per credential scope, but "this fixture has content somewhere"
+  is a property of the event, not of one viewer's account.
+- Curated events are always shown. An operator who added an event by hand meant
+  it.
+- Optional second switch keeps future fixtures visible even with nothing found
+  yet, for anyone who wants Recent cleaned up without losing the schedule.
+- The gate fails open. If the availability data cannot be read at all, it hides
+  nothing rather than emptying every catalog on the deployment at once.
+- The admin card shows coverage per promotion — events, how many have content,
+  and what the gate would leave — *before* the switch, because turning a gate on
+  blind is how you end up with empty catalogs and no idea why.
+
+Off by default: turning it on visibly changes what every client sees.
+
 ## 0.85.1
 
 ### A newly added promotion could show a permanently blank row

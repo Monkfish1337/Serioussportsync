@@ -16,6 +16,7 @@ function setFreshStreamHeaders(res) {
 }
 const store = require('./lib/store');
 const settings = require('./lib/settings');
+const eventAvailability = require('./lib/event-availability');
 const { runRefresh: runEventsRefresh } = require('./scripts/refresh');
 const promotions = require('./lib/promotions');
 const users = require('./lib/users');
@@ -864,6 +865,8 @@ function createApp() {
         const event = store.getEvent(row.eventId);
         return Object.assign({}, row, { eventTitle: event && event.name || '' });
       }),
+      catalogGate: settings.getCatalogGate(),
+      coverage: eventAvailability.coverage(),
     };
   }
 
@@ -1079,6 +1082,21 @@ function createApp() {
     settings.resetAvailabilityWarm();
     availabilityScheduler.reconfigure();
     res.redirect('/admin/database?flash=' + encodeURIComponent('Warmer settings reset to environment defaults.'));
+  });
+
+  app.post('/admin/database/catalog-gate', requireAdmin, (req, res) => {
+    const body = req.body || {};
+    const gate = settings.setCatalogGate({
+      enabled: body.enabled === 'on' || body.enabled === '1' || body.enabled === 'true',
+      keepUpcoming: body.keepUpcoming === 'on' || body.keepUpcoming === '1' || body.keepUpcoming === 'true',
+    });
+    // The snapshot is cached for a minute; a save should take effect at once.
+    eventAvailability.invalidate();
+    res.redirect('/admin/database?flash=' + encodeURIComponent(gate.enabled
+      ? ('Catalog availability gate on'
+        + (gate.keepUpcoming ? ', future fixtures kept.' : '.')
+        + ' Clients may need to refresh before the change shows.')
+      : 'Catalog availability gate off. All stored events are listed again.'));
   });
 
   app.post('/admin/database/warm', requireAdmin, (_req, res) => {

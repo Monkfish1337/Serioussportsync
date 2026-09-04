@@ -1,6 +1,6 @@
 {
     "name":  "serioussportsync",
-    "version": "0.85.1",
+    "version": "0.86.1",
     "description":  "Self-hosted Stremio/Nuvio sports metadata calendar with optional TorBox, Usenet Ultimate, DIY Usenet, and Easynews playback pipelines.",
     "main":  "server.js",
     "scripts":  {

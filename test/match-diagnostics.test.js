@@ -130,3 +130,40 @@ test('scopes the export to one promotion and a date window', () => {
   const all = diagnostics.diagnose({ events, days: 30 });
   assert.deepEqual(all.rows.map((row) => row.eventId).sort(), ['mlb:other', 'ucl:in']);
 });
+
+// A real export carried 14,758 rejections against 394 matches, which reads as
+// total failure until you notice nearly all of it is one sport's fixture being
+// correctly rejected against another sport's release. The overlap score is what
+// separates a genuine near miss from that noise.
+test('scores how much of the event name the release title actually carries', () => {
+  const csv = diagnostics.toCsv({ rows: [{
+    promotion: 'f1', eventId: 'f1:1', eventName: 'Hungarian Grand Prix Practice 1',
+    nameOverlap: 1, nearMiss: true,
+    decision: 'rejected', stage: 'release-filter', reason: 'foreign-language',
+    release: { title: 'Formula 1 Hungarian Grand Prix Practice 1 24.07.2026' },
+  }] });
+  const [header, row] = csv.trim().split('\r\n');
+  const columns = header.split(',');
+  assert.ok(columns.includes('name_overlap'), 'expected a name_overlap column');
+  assert.ok(columns.includes('near_miss'), 'expected a near_miss column');
+  const cells = row.slice(1, -1).split('","');
+  assert.equal(cells.length, diagnostics.CSV_COLUMNS.length,
+    'every column must be written for every row');
+  assert.equal(cells[columns.indexOf('name_overlap')], '1');
+  assert.equal(cells[columns.indexOf('near_miss')], 'yes');
+});
+
+test('an unrelated sport scores near zero and a true pairing scores high', () => {
+  const rows = diagnostics.toCsv({ rows: [
+    { eventName: 'Detroit Tigers vs Cleveland Guardians', decision: 'rejected',
+      nameOverlap: 0, nearMiss: false,
+      release: { title: 'Colorado Buffaloes at Georgia Tech Yellow Jackets 03.09.2026' } },
+    { eventName: 'San Francisco Giants vs Pittsburgh Pirates', decision: 'matched',
+      nameOverlap: 1, nearMiss: false,
+      release: { title: 'San Francisco Giants at Pittsburgh Pirates 03.09.2026' } },
+  ] }).trim().split('\r\n');
+  const columns = rows[0].split(',');
+  const overlapAt = columns.indexOf('name_overlap');
+  assert.equal(rows[1].slice(1, -1).split('","')[overlapAt], '0');
+  assert.equal(rows[2].slice(1, -1).split('","')[overlapAt], '1');
+});
