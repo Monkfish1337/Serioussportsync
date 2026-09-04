@@ -428,6 +428,39 @@ test('promotions can be refreshed in a chosen set', async () => {
   // HTTP would start real source fetches and leave the run unable to exit.
 });
 
+// The manifest Copy button reported success and copied nothing.
+//
+// navigator.clipboard only exists in a secure context. A self-hosted addon is
+// usually reached over plain http on a LAN address, where it is undefined — so
+// the guard `if (navigator.clipboard)` skipped the copy, and the very next line
+// set the label to "Copied!" regardless.
+test('the manifest Copy button works outside a secure context', async () => {
+  const user = await makeUser('copybutton', 'admin');
+  const login = await get('/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ username: 'copybutton', password: 'correct-horse-battery-staple' }).toString(),
+  });
+  const cookie = (login.headers.getSetCookie ? login.headers.getSetCookie() : [])
+    .map((value) => value.split(';')[0]).join('; ');
+  const html = await (await get('/account', { headers: { cookie } })).text();
+  assert.ok(user.id);
+
+  const script = html.slice(html.indexOf('copyUrlBtn'));
+  assert.ok(script.includes('isSecureContext'),
+    'the async clipboard API must only be attempted where it exists');
+  assert.ok(script.includes('execCommand'),
+    'a plain-http install needs the textarea fallback');
+
+  // The bug was that success was announced unconditionally. "Copied!" must sit
+  // behind a path that actually copied something.
+  const announcement = script.indexOf('"Copied!"');
+  assert.ok(announcement > -1);
+  const before = script.slice(0, announcement);
+  assert.ok(/legacyCopy|then\(/.test(before),
+    'the success label must follow a copy that succeeded, not run regardless');
+});
+
 test('failed sign-ins are rate limited per client', async () => {
   const body = new URLSearchParams({ username: 'nobody', password: 'wrong' });
   let limited = false;

@@ -2186,15 +2186,34 @@ function renderAccountPage(user, opts) {
     + '</div></details>'
     + '</main>'
 
-    // Inline JS: copy install URL + toggle password reveal. Same logic as
-    // before, just rebound to Tabler's input-group markup.
+    // Inline JS: copy install URL + toggle password reveal.
+    //
+    // 0.90.6 — navigator.clipboard only exists in a SECURE CONTEXT. A
+    // self-hosted addon is usually reached over plain http on a LAN address,
+    // where it is undefined — so the old code silently skipped the copy and
+    // still flashed "Copied!". The button reported success and the clipboard
+    // was untouched, which is worse than an error.
+    //
+    // Same shape as the Nuvio JSON copy below, which already had the
+    // fallback: try the async API only where it exists, otherwise select a
+    // detached textarea and use execCommand, and say so when both fail.
     + '<script>'
     + '(function(){'
     +   'var buttons=[document.getElementById("copyUrlBtn"),document.getElementById("copyUrlOutputBtn")], code = document.getElementById("murl");'
+    +   'function legacyCopy(text){var area=document.createElement("textarea");area.value=text;area.setAttribute("readonly","");area.style.position="fixed";area.style.left="0";area.style.top="0";area.style.width="2px";area.style.height="2px";area.style.opacity=".01";document.body.appendChild(area);area.focus();area.select();area.setSelectionRange(0,area.value.length);var ok=false;try{ok=document.execCommand("copy");}finally{document.body.removeChild(area);}return ok;}'
+    +   'function flash(btn,text){var old=btn.getAttribute("data-label")||btn.textContent;btn.setAttribute("data-label",old);btn.textContent=text;setTimeout(function(){btn.textContent=old;},1800);}'
+    +   'function fallback(btn,text){'
+    +     'if(legacyCopy(text)){flash(btn,"Copied!");return;}'
+    +     // The URL is already selected in the field at this point, so
+    +     // "press Ctrl+C" is advice the user can actually act on.
+    +     'if(code&&code.select){code.focus();code.select();}'
+    +     'flash(btn,"Press Ctrl+C");'
+    +   '}'
     +   'buttons.forEach(function(btn){if(!btn||!code)return;btn.addEventListener("click", function() {'
     +     'var t = code.value;'
-    +     'if (navigator.clipboard) { navigator.clipboard.writeText(t); }'
-    +     'var old=btn.textContent;btn.textContent = "Copied!"; setTimeout(function(){ btn.textContent = old; }, 1800);'
+    +     'if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {'
+    +       'navigator.clipboard.writeText(t).then(function(){flash(btn,"Copied!");}).catch(function(){fallback(btn,t);});'
+    +     '} else { fallback(btn,t); }'
     +   '});});'
     + '})();'
     + '(function(){'

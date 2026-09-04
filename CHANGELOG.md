@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.90.6
+
+### The discovered catalogs had artwork the client could never fetch
+
+0.90.1 gave each of the seven `discovered-*` catalogs its own tile and set it
+as `/assets/discovered-rugby.png`. That is a root-relative path, and a Stremio
+meta is fetched by the CLIENT, not by a browser sitting on an SSS page — so it
+resolved against the client's own origin and 404'd. Every tile stayed blank,
+exactly as before, and reinstalling the manifest could not help.
+
+It reads as correct in the code and looks right in an admin page, which is why
+it survived a review. Every other piece of bundled art goes through
+`brandedPoster`, which prefixes `PUBLIC_URL` and checks the file actually
+ships — that is why nothing else has ever had this problem. The discovered
+tiles go through it now too, and the test asserts an absolute URL rather than
+just "some path".
+
+If `PUBLIC_URL` is unset the poster is empty, as with all bundled art. Set it
+to the address your clients reach SSS on or the tiles stay blank.
+
+### The manifest Copy button said "Copied!" and copied nothing
+
+`navigator.clipboard` only exists in a secure context. A self-hosted addon is
+usually reached over plain http on a LAN address, where it is undefined — so
+`if (navigator.clipboard)` skipped the copy and the very next line set the
+label to "Copied!" anyway. The button reported success and the clipboard was
+untouched, which is worse than an error.
+
+It now uses the same fallback the Nuvio JSON copy already had: the async API
+only where it exists, a detached textarea and `execCommand` otherwise, and if
+both fail it selects the URL and says "Press Ctrl+C" instead of claiming to
+have done something. The success label sits behind a copy that actually
+succeeded.
+
 ## 0.90.5
 
 ### The log names accepted usenet releases, not only rejected ones
