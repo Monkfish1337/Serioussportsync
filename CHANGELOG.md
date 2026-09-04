@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.90.3
+
+### A slow usenet source failed permanently, not intermittently
+
+From a real log, on a Man United fixture with usenet coverage sitting on the
+user's own indexer:
+
+    uu: network error: network timeout at: http://192.168.1.16:1337/...
+    stream request complete rows=2 pipelineRows={"usenetUltimate":0, ...}
+
+A stream request has to answer inside Nuvio's ~10s patience, so each pipeline
+gets about 7.5s. A Usenet Ultimate or Newznab instance that fans out to several
+indexers routinely needs longer than that. The part that turned a slow source
+into a dead one: a search that times out returns nothing AND caches nothing,
+because only a result that succeeded is recorded. So every subsequent request
+repeated the same doomed search under the same budget, forever, while torrents
+— which are also warmed in the background at a 15s budget — kept working.
+
+Raising the live budget is not the fix; the client gives up at ten seconds.
+Turning on automatic usenet warming is not either: it is off by default on
+purpose, because Newznab indexers meter API hits per day and warming every
+event in the window would spend that allowance on fixtures nobody opened.
+
+So the retry is demand-driven. A live usenet search that runs out of budget
+schedules ONE background search for that event at the warm budget; the result
+lands in the availability index and the next request is served from it
+instantly. One in flight per event and account, only for events someone
+actually opened, and `STREAM_USENET_BACKFILL=off` disables it.
+
+A source that answers — including "nothing here", HTTP 401, or "unsupported" —
+never triggers a retry. Backfilling those would spend metered indexer calls
+re-learning an answer already given.
+
 ## 0.90.2
 
 ### Refresh several promotions at once
