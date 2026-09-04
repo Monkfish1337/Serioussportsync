@@ -122,3 +122,42 @@ test('a college fixture matches its release and not the NFL game beside it', () 
   assert.equal(promotion.isRelevantStreamTitle(
     'Idaho Vandals at 21 Utah Utes 03.09.2026', event).ok, false);
 });
+
+// Found in the first live export after the leagues shipped: the one genuine
+// miss out of 233 matches. football-data registers "Club Atlético de Madrid";
+// the release says "Atletico Madrid". "Club" is filler and now strips.
+test('a filler club prefix does not hide the club', () => {
+  const event = fixture('laliga',
+    ['Club Atlético de Madrid', 'Atleti', 'ATM'], ['Málaga CF', 'Málaga', 'MAL'], '2026-08-19');
+  assert.equal(promotions.byPrefix.laliga
+    .isRelevantStreamTitle('Atletico Madrid vs Malaga 19.08.2026', event).ok, true);
+});
+
+// A club name can be a whole word inside a different club's name. AC Milan's
+// short name is "Milan", which is present in "Inter Milan" — so both the
+// boundary regex and the contiguous matcher said yes, and Serie A would have
+// attached an Inter fixture to a Milan one. The preceding word decides: it has
+// to belong to the same club.
+test('one club is not found inside another club\'s name', () => {
+  const milan = fixture('seriea', ['AC Milan', 'Milan', 'MIL'], ['Juventus FC', 'Juventus', 'JUV'], '2026-09-03');
+  assert.equal(promotions.byPrefix.seriea
+    .isRelevantStreamTitle('Juventus vs Inter Milan 03.09.2026', milan).ok, false);
+  assert.equal(promotions.byPrefix.seriea
+    .isRelevantStreamTitle('Juventus vs AC Milan 03.09.2026', milan).ok, true);
+
+  // The reverse must still work: Inter really is Inter Milan.
+  const inter = fixture('seriea', ['FC Internazionale Milano', 'Inter', 'INT'], ['Juventus FC', 'Juventus', 'JUV'], '2026-09-03');
+  assert.equal(promotions.byPrefix.seriea
+    .isRelevantStreamTitle('Juventus vs Inter Milan 03.09.2026', inter).ok, true);
+
+  // And a leading word that IS part of the club's own name is not an objection.
+  const dortmund = fixture('bundesliga',
+    ['Borussia Dortmund', 'Dortmund', 'BVB'], ['FC Bayern München', 'Bayern Munich', 'FCB'], '2026-09-03');
+  assert.equal(promotions.byPrefix.bundesliga
+    .isRelevantStreamTitle('Bayern Munchen vs Borussia Dortmund 03.09.2026', dortmund).ok, true);
+
+  const sparta = fixture('eredivisie',
+    ['Sparta Rotterdam', 'Sparta', 'SPA'], ['PEC Zwolle', 'Zwolle', 'ZWO'], '2026-09-04');
+  assert.equal(promotions.byPrefix.eredivisie
+    .isRelevantStreamTitle('Sparta Rotterdam vs Zwolle 04.09.2026', sparta).ok, true);
+});

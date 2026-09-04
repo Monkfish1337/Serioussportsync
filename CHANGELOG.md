@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.87.1
+
+Two findings from the first live export after the leagues shipped — 233 matches,
+0 false positives, and exactly one genuine miss.
+
+### "Club" hid a club
+
+football-data registers "Club Atlético de Madrid"; the release says "Atletico
+Madrid". "Club" and "Clube" are pure filler and now strip alongside the FC/CF
+initialisms. Disambiguating prefixes are deliberately still kept — "AC Milan"
+reduced to "Milan" would be worse than the problem it solved.
+
+### One club found inside another club's name
+
+Adding Serie A exposed a collision that would have shipped as a false positive:
+AC Milan's short name is "Milan", which is a whole word inside "Inter Milan".
+Both the boundary regex and the contiguous matcher said yes, so a Juventus vs
+Inter release would have attached to a Juventus vs Milan fixture.
+
+Team matching now checks the word in front of the match: it has to belong to the
+same club. "Borussia Dortmund" is fine for a club named "Dortmund" because
+"Borussia" appears in its own naming forms; "Inter Milan" is not, because
+"Inter" appears in none of Milan's. Verified in both directions — Inter still
+matches "Inter Milan".
+
 ## 0.87.0
 
 ### Ten leagues, chosen from what the site actually carries
