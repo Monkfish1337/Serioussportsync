@@ -16,6 +16,8 @@ let mlb = null;
 try { mlb = require('../lib/sources/mlb'); } catch (e) { mlb = null; }
 let espn = null;
 try { espn = require('../lib/sources/espn'); } catch (e) { espn = null; }
+let releaseIngest = null;
+try { releaseIngest = require('../lib/sources/release-ingest'); } catch (e) { releaseIngest = null; }
 let wikiList = null;
 try { wikiList = require('../lib/sources/wikipedia-list'); } catch (e) { wikiList = null; }
 // 0.38.0: football-data.org parallel source for custom promotions whose
@@ -119,6 +121,17 @@ async function refreshPromotion(promotion, log) {
       league: promotion.source.league,
       dateFrom: from.toISOString().slice(0, 10),
       dateTo: to.toISOString().slice(0, 10),
+      log,
+    });
+  } else if (promotion.source.type === 'sport-video') {
+    // Release-first ingestion. No network call: this reads SSS's own record of
+    // what Sport-Video published and no fixture feed claimed.
+    if (!releaseIngest) { log('  release-ingest unavailable — skipping'); return { ok: true }; }
+    raw = releaseIngest.fetchAll({
+      sport: promotion.source.sport,
+      ownPromotionIds: new Set(promotions.all
+        .filter((item) => item.source && item.source.type === 'sport-video')
+        .map((item) => item.id)),
       log,
     });
   } else if (promotion.source.type === 'wikipedia-list') {
@@ -265,6 +278,7 @@ function normalizeRecord(raw, promotion) {
   if (promotion.source.type === 'wikipedia' || promotion.source.type === 'onefc'
       || promotion.source.type === 'mlb' || promotion.source.type === 'espn'
       || promotion.source.type === 'wikipedia-list'
+      || promotion.source.type === 'sport-video'
       || promotion.source.type === 'json-feed') {
     return transform.fromWiki(raw, promotion);
   }

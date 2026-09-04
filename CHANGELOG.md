@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.88.0
+
+### Release-first ingestion
+
+The catalogs are built from fixture feeds, and no feed covers everything the
+site carries. A scan found 620 releases within a day of some fixture that
+matched nothing at all — rugby, tennis, the South American cups — because no
+promotion claims those competitions and, for several of them, no free feed
+exists to claim them with. All of it was being discovered and thrown away.
+
+For exactly that remainder the direction is now inverted: the release becomes
+the event.
+
+- Seven "Discovered" promotions, one per sport the discovery index labels,
+  each owning the releases no fixture feed claimed. The metadata is weak by
+  construction — a name parsed from the release title, the date the site
+  published it against, a generic mark — which is the trade this is for. Where
+  a real feed exists it wins, and the release never reaches ingestion.
+- Implemented as an ordinary source (`source: 'sport-video'`) rather than as
+  something writing events directly, so pruning, the event window, catalogs,
+  streams, the availability gate and the Nuvio export all work with no special
+  cases. The next Sport-Video rematch links the release back to the event it
+  produced, so playback and TorBox warming need no new plumbing either.
+- Event ids are derived from the release's own identity, so a rescan produces
+  the same event rather than a duplicate.
+- A release matched only to the event it previously created still counts as
+  unclaimed. Treating that as claimed would make the event vanish on the next
+  refresh and return on the one after, flickering forever.
+- Relevance for these promotions is replaced, not extended. The generic matcher
+  decides a non-matchup event on promotion keywords, which a discovered
+  promotion has none of — that would either accept every release sharing a date
+  (the NFL false-positive shape) or reject the event's own release for lacking
+  a keyword nobody writes. The question here is exact: the event was built from
+  a release title, so a relevant release still has to carry that title.
+
+Catalog count goes from 52 to 66. Disable the sports you do not want in
+Admin → Promotions; the availability gate will not hide these, since by
+construction every one of them has content.
+
+### Prepared no longer reads as a funnel it never was
+
+Preparation and matching are independent, so the Sport-Video card could show
+more prepared than matched — which is what happens to releases prepared while
+the NFL matcher was over-accepting, and then correctly disconnected by 0.86.2.
+The card now counts prepared-and-matched, and names the orphans separately
+instead of leaving the arithmetic looking broken.
+
 ## 0.87.1
 
 Two findings from the first live export after the leagues shipped — 233 matches,
