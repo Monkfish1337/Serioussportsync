@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.90.5
+
+### The log names accepted usenet releases, not only rejected ones
+
+The filter summary said `discovered=4 afterNoise=4 matched=4`, and the
+rejection log printed every refused title. So a log could prove exactly which
+releases SSS threw away and could not prove which four it kept — which made
+"is it finding the release I can see on my own indexer?" unanswerable without
+guessing.
+
+Accepted usenet candidates are now logged by title, with the indexer that
+supplied them.
+
+## 0.90.4
+
+### The background search budget was too tight for the sources it exists for
+
+0.90.3 works — from the log:
+
+    16:07:05  uu: network timeout (7526ms) -> rows=2, backfill scheduled
+    16:07:20  backfill: uu: 4 unique candidate(s)
+    16:07:25  stream request complete durationMs=51 rows=3 usenetUltimate=4
+
+Five seconds later the same fixture answered in 51 milliseconds with four
+usenet rows. But the backfill before that one had itself timed out, at exactly
+15000ms; the successful run took 14.8s. The retry built to rescue slow usenet
+sources was losing to its own ceiling by 600 milliseconds.
+
+The background budget is now 25s (`AVAILABILITY_WARM_PROVIDER_TIMEOUT_MS`).
+Nothing waits on that path — it runs after the stream response has gone out, or
+on the warmer's own schedule — so its job is to be the slow, thorough
+counterpart to the live budget, and 15s was borrowed timidity from the live one.
+
 ## 0.90.3
 
 ### A slow usenet source failed permanently, not intermittently
