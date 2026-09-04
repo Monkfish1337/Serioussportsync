@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.86.2
+
+### Every NFL fixture was matching every American-football release on its date
+
+Two compounding bugs. In a real export, 234 of 252 NFL "matches" were wrong —
+college and CFL games attached to NFL fixtures, each one offered as "Warm to
+TorBox" in the console.
+
+- **" at " was not a matchup separator.** Every team check reaches its team
+  list by splitting the fixture name, and the splitter knew `vs`, `v`, `@` and
+  `-` but not `at` — the separator the ESPN adapter produces. For NFL and NBA
+  no team check ran at all. This was introduced in 0.84.0 on the stated
+  assumption that "the promotion matchers already split on" that convention.
+  They did not.
+- **The site's category blurb satisfied the keyword check.** With the team
+  check skipped, relevance fell through to keywords, and Sport-Video appends a
+  per-category blurb to every index entry — "NFL CFL UFL NCAAFB …" on every
+  American-football entry, "MLB … Major League Baseball" on every baseball one.
+  Any release in the section therefore satisfied the promotion's keyword.
+
+Fixed on both sides:
+
+- Structured home and away names supplied by an adapter are now used directly,
+  without parsing the fixture title at all. That removes the dependency on
+  title formatting, and on getting home and away the right way round — which
+  splitting "Away at Home" as home-first also got wrong. `at` was added to the
+  separator list for everything that still parses names.
+- The index title is now a supplement, never a substitute. It is retried only
+  when the release's own name already identified the fixture and the single
+  objection was a missing competition keyword. Any other rejection — wrong
+  teams, wrong date, an exclusion — stands. The legitimate case it was added
+  for still works: a bare "AEK Athens vs Levski Sofia 26.08.2026" is still
+  rescued by the "UEFA Champions League" suffix.
+
+Anything already warmed to TorBox on a bad match stays in TorBox; the wrong
+rows disappear from the console on the next scan.
+
 ## 0.86.1
 
 ### A nationality in an event name was read as a language tag
