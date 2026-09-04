@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.90.7
+
+### The Sport-Video control wall
+
+Fifteen inputs sat in one flat column, so the four that decide whether
+Sport-Video does anything at all — the master switch, automatic scanning, which
+sports, how often — were drawn exactly like the startup delay.
+
+Those four stay in the open. Everything else folds into three named sections:
+**Automatic warming** (it submits torrents to your TorBox account, so it is its
+own section rather than buried in "advanced"), **Team limits**, and **Advanced
+tuning**.
+
+`<details>`, not a disabled fieldset: a closed `<details>` still submits its
+inputs, where a disabled input submits nothing and would silently clear the
+setting on the next save. That trap has cost this project two bugs already.
+
+A folded section still says what it holds — "2 promotions · up to 5 per scan ·
+last 14 days", or "Off — every release stays a manual click" — because a
+section you cannot see that does not report its own state is just hidden state.
+Anything switched on opens by default, so a setting that is actually doing
+something is never behind a fold you have not seen. Sections you open or close
+yourself are remembered.
+
+### Latest scan
+
+Eleven equal-weight rows, so "Last error" carried the same visual weight as
+"Archive pages read" and the panel had to be read top to bottom to answer "did
+the scan work?".
+
+Now: the current state and last completion on one line, errors as an alert (or
+a plain "No errors on the last run"), and the four counts that explain a
+release you expected and did not get — unmatched, filtered out, outside window,
+team filter — as a compact grid with a line each on what they mean. Discovery
+source, index entries, archive pages and last re-match fold into Scan details.
+
 ## 0.90.6
 
 ### The discovered catalogs had artwork the client could never fetch

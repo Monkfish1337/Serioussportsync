@@ -101,3 +101,52 @@ test('the settings under the master switch are subordinated, not disabled', () =
     assert.doesNotMatch(html, /name="intervalHours"[^>]*disabled/);
   }
 });
+
+// Fifteen inputs in one flat column meant the four that decide whether
+// Sport-Video does anything were indistinguishable from the startup delay.
+// The rest fold — with <details>, which still submits, unlike the `disabled`
+// trap this file already guards against twice over.
+test('folded sections still submit, and say what they hold while closed', () => {
+  const adminSportVideo = require('../lib/admin-sport-video');
+  const render = (config) => adminSportVideo.renderBody({
+    config: Object.assign({ enabled: true, autoScan: true, categories: ['football'] }, config),
+    status: {}, cached: new Set(), torboxConfigured: true,
+    promotions: [{ id: 'ucl', name: 'Champions League' }, { id: 'ufc', name: 'UFC' }],
+    catalogTeams: [{
+      promotion: 'mlb', promotionName: 'MLB',
+      teams: [{ name: 'New York Yankees', fixtures: 12 }, { name: 'Boston Red Sox', fixtures: 9 }],
+    }],
+  });
+
+  const idle = render({ teamFilters: {}, autoWarmPromotions: [] });
+
+  // Everything the form used to post must still be in the markup. A closed
+  // <details> submits its inputs; a disabled one silently clears them.
+  for (const field of ['autoScan', 'intervalHours', 'startDelaySeconds', 'maxDetailsPerScan',
+    'archivePages', 'autoWarmPromotions', 'autoWarmPerScan', 'autoWarmWindowDays', 'categories']) {
+    assert.match(idle, new RegExp('name="' + field + '"'), field + ' went missing from the form');
+    assert.doesNotMatch(idle, new RegExp('name="' + field + '"[^>]*disabled'),
+      field + ' must never be disabled — a disabled input submits nothing');
+  }
+
+  // A section you cannot see must still say what it is set to.
+  assert.match(idle, /Off — every release stays a manual click/);
+  assert.match(idle, /Not limited — every matched fixture is prepared/);
+
+  const armed = render({
+    teamFilters: { mlb: ['New York Yankees'] },
+    autoWarmPromotions: ['ucl', 'ufc'], autoWarmPerScan: 3, autoWarmWindowDays: 7,
+  });
+  assert.match(armed, /2 promotions · up to 3 per scan · last 7 days/);
+  assert.match(armed, /1 promotion limited to chosen teams/);
+
+  // Anything switched on opens by default, so a setting that is actually doing
+  // something is never hidden behind a fold the operator has not seen.
+  assert.match(armed, /<details class="sv-section" open data-sv-section="automatic-warming"/);
+  assert.match(idle, /<details class="sv-section" data-sv-section="automatic-warming"/,
+    'an idle section stays folded');
+
+  // Advanced tuning holds nothing an operator needs to see at a glance, so it
+  // stays folded even when its values are non-default.
+  assert.match(idle, /<details class="sv-section" data-sv-section="advanced-tuning"/);
+});
