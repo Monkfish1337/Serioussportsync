@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.87.0
+
+### Ten leagues, chosen from what the site actually carries
+
+A scan showed 620 discovered releases matching no event in any catalog. These
+are the competitions behind the largest blocks of them, so every one of these
+fixtures was being found and thrown away:
+
+- **WNBA** and **College Football** on the existing ESPN adapter — one line of
+  configuration each, and the two biggest single blocks (56 and 33 releases).
+  Each path was checked against the live endpoint first: a wrong one answers
+  200 with an empty list rather than an error. CFL was checked and rejected on
+  those grounds — ESPN still serves the path, but its newest fixture is 2022.
+- **La Liga, Premier League, EFL Championship, Serie A, Brasileirão, Ligue 1,
+  Bundesliga and Eredivisie** on football-data.org. A key without access to one
+  competition fails that promotion's refresh with a clear message and leaves
+  the others working.
+
+### Clubs are recognised whichever name the release used
+
+Adding the feeds was the easy half. The two sides name clubs differently, and
+on first measurement only one pairing in six matched:
+
+- **Accents were destroyed, not folded.** The plain team matcher stripped every
+  non-ASCII character, so "München" became "m nchen" and could never match a
+  "Munchen" release. It now folds through the same helper the rest of the
+  codebase already used.
+- **Legal affixes.** "Manchester City FC" from the provider against a
+  "Manchester City" release. Both team paths now also try the affix-stripped
+  scene form.
+- **Connector words.** "Celta Vigo" against "Celta de Vigo". Dropped from both
+  sides — while the match stays contiguous, so "Real Madrid" still cannot be
+  assembled out of "Real Sociedad vs Atletico Madrid".
+- **football-data fixtures now carry every naming form the provider supplies**
+  (name, shortName and tla) rather than only the one the event is titled with.
+  That is what makes "Man City" find a "Manchester City" release, and "Inter"
+  find "Inter Milan".
+
+All five real pairings that failed on first measurement now match, and the
+three near-miss collisions above are still refused.
+
+Not covered, and left deliberately: rugby (170 releases — no free fixture feed
+found), tennis (61), and the Argentine and Copa competitions (41), which are
+outside football-data's free tier.
+
 ## 0.86.2
 
 ### Every NFL fixture was matching every American-football release on its date

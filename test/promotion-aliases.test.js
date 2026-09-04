@@ -274,7 +274,12 @@ test('alias research combines configured sources, explains decisions, and strips
     },
   });
   assert.equal(result.ok, true);
-  assert.deepEqual(result.counts, { discovered: 4, matched: 2, possible: 2, rejected: 0 });
+  // 0.87.0 moved "UCL.2026.08.25.LASK.vs.Celtic.1080p" from possible to
+  // matched. The club is "Celtic FC" and the release says "Celtic"; team
+  // matching now strips the legal affixes one feed carries and releases omit,
+  // so that is a match rather than a maybe. "…vs.Celts.720p" is still only
+  // possible — a nickname is a curated alias, not a mechanical transformation.
+  assert.deepEqual(result.counts, { discovered: 4, matched: 3, possible: 1, rejected: 0 });
   assert.equal(result.groups.matched[0].reason, 'matched');
   assert.match(result.groups.possible[0].reason, /away-team/);
   assert.equal(result.providers.find((provider) => provider.id === 'easynews').error, 'Timed out or unavailable');

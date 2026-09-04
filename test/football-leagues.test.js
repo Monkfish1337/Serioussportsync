@@ -1,0 +1,124 @@
+'use strict';
+
+// Domestic leagues added from a real Sport-Video scan, where 233 football
+// releases matched nothing because no promotion claimed the competition.
+//
+// The hard part is not the feed, it is that the two sides name clubs
+// differently. football-data returns a registered name ("Manchester City FC")
+// alongside a broadcast short name ("Man City"), and a release uses whichever
+// the group felt like — usually neither exactly. Every case below is a real
+// pairing observed in the export or in football-data's own responses.
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const promotions = require('../lib/promotions');
+const transform = require('../lib/transform');
+const espn = require('../lib/sources/espn');
+
+// A football-data match payload, shaped as the API returns it.
+function fixture(promotionId, home, away, date) {
+  return transform.fromFootballData({
+    id: 'fx-' + promotionId,
+    utcDate: date + 'T19:00:00Z',
+    homeTeam: { id: 1, name: home[0], shortName: home[1], tla: home[2] },
+    awayTeam: { id: 2, name: away[0], shortName: away[1], tla: away[2] },
+    competition: { name: promotionId, code: 'XX' },
+    season: { startDate: date },
+  }, promotions.byPrefix[promotionId]);
+}
+
+const CELTA = ['RC Celta de Vigo', 'Celta Vigo', 'CEL'];
+const SOCIEDAD = ['Real Sociedad de Futbol', 'Real Sociedad', 'RSO'];
+const CITY = ['Manchester City FC', 'Man City', 'MCI'];
+const ARSENAL = ['Arsenal FC', 'Arsenal', 'ARS'];
+const INTER = ['FC Internazionale Milano', 'Inter', 'INT'];
+const JUVE = ['Juventus FC', 'Juventus', 'JUV'];
+const BAYERN = ['FC Bayern München', 'Bayern Munich', 'FCB'];
+const OSNABRUCK = ['VfL Osnabrück', 'Osnabrück', 'OSN'];
+const LILLE = ['LOSC Lille', 'Lille', 'LIL'];
+const TOULOUSE = ['Toulouse FC', 'Toulouse', 'TOU'];
+
+test('the leagues Sport-Video actually carries are registered', () => {
+  for (const id of ['laliga', 'epl', 'efl-championship', 'seriea',
+    'brasileirao', 'ligue1', 'bundesliga', 'eredivisie']) {
+    const promotion = promotions.byPrefix[id];
+    assert.ok(promotion, 'missing promotion: ' + id);
+    assert.equal(promotion.source.type, 'football-data');
+    assert.ok(promotion.source.competitionId, id + ' has no competition code');
+    assert.equal(promotion.catalogs.length, 2);
+  }
+});
+
+test('a club is recognised whichever naming form the release used', () => {
+  const cases = [
+    ['laliga', CELTA, SOCIEDAD, '2026-09-03', 'Real Sociedad vs Celta de Vigo 03.09.2026'],
+    ['epl', CITY, ARSENAL, '2026-09-03', 'Arsenal vs Manchester City 03.09.2026'],
+    ['seriea', INTER, JUVE, '2026-09-03', 'Juventus vs Inter Milan 03.09.2026'],
+    ['bundesliga', BAYERN, OSNABRUCK, '2026-09-02', 'Osnabruck vs Bayern Munchen 02.09.2026'],
+    ['ligue1', LILLE, TOULOUSE, '2026-09-03', 'Toulouse vs Lille 03.09.2026'],
+  ];
+  for (const [id, home, away, date, release] of cases) {
+    const event = fixture(id, home, away, date);
+    const verdict = promotions.byPrefix[id].isRelevantStreamTitle(release, event);
+    assert.equal(verdict.ok, true,
+      id + ': "' + event.name + '" should match "' + release + '", got ' + JSON.stringify(verdict));
+  }
+});
+
+// Looser team matching is only safe if it still refuses the near misses. Each
+// of these shares words with the fixture and is a different game.
+test('a different fixture is still refused', () => {
+  const laliga = fixture('laliga', CELTA, SOCIEDAD, '2026-09-03');
+  assert.equal(promotions.byPrefix.laliga
+    .isRelevantStreamTitle('Toulouse vs Lille 03.09.2026', laliga).ok, false);
+
+  // "Real Madrid" must not be assembled out of "Real Sociedad" plus "Atletico
+  // Madrid" — which is why connector words are dropped from both sides while
+  // the match stays contiguous.
+  const madrid = fixture('epl', ['Real Madrid CF', 'Real Madrid', 'RMA'], ['FC Barcelona', 'Barcelona', 'FCB'], '2026-09-03');
+  assert.equal(promotions.byPrefix.epl
+    .isRelevantStreamTitle('Real Sociedad vs Atletico Madrid 03.09.2026', madrid).ok, false);
+
+  const city = fixture('epl', CITY, ARSENAL, '2026-09-03');
+  assert.equal(promotions.byPrefix.epl
+    .isRelevantStreamTitle('Arsenal vs Manchester United 03.09.2026', city).ok, false);
+});
+
+test('football-data fixtures carry every naming form the provider supplies', () => {
+  const event = fixture('epl', CITY, ARSENAL, '2026-09-03');
+  assert.deepEqual(event.teamNames.home, ['Man City', 'Manchester City FC', 'MCI']);
+  assert.deepEqual(event.teamNames.away, ['Arsenal', 'Arsenal FC', 'ARS']);
+});
+
+// WNBA was the single largest unclaimed block in the scan (56 releases) and
+// college football the next American one (33). Both are one line of ESPN
+// configuration each, because the adapter already existed.
+test('the added ESPN leagues resolve to verified endpoints', () => {
+  assert.equal(espn.LEAGUES.wnba.path, 'basketball/wnba');
+  assert.equal(espn.LEAGUES.ncaaf.path, 'football/college-football');
+  // ESPN still serves a CFL path, but its newest fixture is from 2022, so it is
+  // deliberately not offered.
+  assert.equal(espn.LEAGUES.cfl, undefined);
+  for (const id of ['wnba', 'ncaaf']) {
+    const promotion = promotions.byPrefix[id];
+    assert.ok(promotion, 'missing promotion: ' + id);
+    assert.equal(promotion.source.type, 'espn');
+    assert.ok(espn.LEAGUES[promotion.source.league], id + ' points at an unknown league');
+  }
+});
+
+test('a college fixture matches its release and not the NFL game beside it', () => {
+  const [raw] = espn.parseScoreboard({ events: [{
+    id: '401', date: '2026-09-03T23:00Z',
+    competitions: [{ competitors: [
+      { homeAway: 'home', team: { id: '1', displayName: 'Georgia Tech Yellow Jackets', location: 'Georgia Tech', name: 'Yellow Jackets', abbreviation: 'GT' } },
+      { homeAway: 'away', team: { id: '2', displayName: 'Colorado Buffaloes', location: 'Colorado', name: 'Buffaloes', abbreviation: 'COLO' } },
+    ] }],
+  }] }, 'ncaaf');
+  const event = transform.fromWiki(raw, promotions.byPrefix.ncaaf);
+  const promotion = promotions.byPrefix.ncaaf;
+  assert.equal(promotion.isRelevantStreamTitle(
+    'Colorado Buffaloes at Georgia Tech Yellow Jackets 03.09.2026', event).ok, true);
+  assert.equal(promotion.isRelevantStreamTitle(
+    'Idaho Vandals at 21 Utah Utes 03.09.2026', event).ok, false);
+});
