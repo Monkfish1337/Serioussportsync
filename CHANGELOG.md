@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.90.2
+
+### Refresh several promotions at once
+
+Between "refresh this one" and "refresh all thirty" there was nothing, so
+touching four promotions meant four page loads with a preview each — or the
+global button and a full pull of everything else, which is the expensive way to
+refresh four things.
+
+Each row on Promotions now has a tick box, with select-all in the header and a
+"Refresh selected" button above the table. Disabled promotions are shown ticked
+out, since a refresh skips them anyway.
+
+The refreshes run one after another in the background rather than together:
+several of these sources are rate-limited, and the event store is
+read-modify-written per run, so overlapping runs would race and lose events.
+One warm pass runs at the end instead of one per promotion.
+
+There is no preview gate here, unlike the single-promotion button. That gate
+exists because the single-promotion route can also apply a pending source
+CHANGE, and a source change should be previewed first. This one only re-fetches
+with the settings already saved — the same thing the global "Refresh catalogs"
+button does, to fewer promotions.
+
+The tick boxes are not inside a form. The rows already contain two forms each,
+and wrapping the table in a third would nest them — the exact mistake that
+detached the Configure Save button in 0.89.0. A test asserts the bulk form
+closes before the table opens.
+
 ## 0.90.1
 
 ### Link pulling stopped for competition-prefixed releases

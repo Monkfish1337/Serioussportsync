@@ -845,6 +845,60 @@ function createApp() {
     res.redirect('/admin?flash=' + encodeURIComponent('Catalog refresh started in the background — pulls events from TSDB for every promotion. Check server logs for progress.'));
   });
 
+  // 0.90.2 — refresh a chosen set of promotions.
+  //
+  // Between "refresh this one" and "refresh all thirty" there was nothing, so
+  // touching four promotions meant four page loads with a preview each, or the
+  // global button and a full pull of everything else.
+  //
+  // No preview gate here, unlike the single-promotion route. That gate exists
+  // because that route can also apply a pending source CHANGE, and a source
+  // change should be previewed. This one only re-fetches with the settings
+  // already saved — the same thing the global "Refresh catalogs" button does,
+  // to fewer promotions.
+  //
+  // Sequential, not parallel: several of these sources are rate-limited, and
+  // the store is read-modify-written per run, so overlapping runs would race
+  // each other and lose events.
+  app.post('/admin/promotions/refresh-selected', requireAdmin, (req, res) => {
+    const { selected, skipped } = adminPromotions.selectForRefresh(
+      (req.body && req.body.promotionIds) || '', promotions.all);
+    if (!selected.length) {
+      const why = skipped.length ? 'Nothing to refresh — ' + skipped.join(', ') : 'Select at least one promotion to refresh.';
+      return res.redirect('/admin/promotions?flash=' + encodeURIComponent(why));
+    }
+
+    (async () => {
+      const failed = [];
+      for (const promotion of selected) {
+        try {
+          const result = await runEventsRefresh({ promotionId: promotion.id, log: (m) => console.log(m) });
+          if (result && result.ok) console.log('[admin] bulk refresh "' + promotion.id + '" complete: ' + JSON.stringify(result));
+          else { failed.push(promotion.id); console.error('[admin] bulk refresh "' + promotion.id + '" failed: ' + JSON.stringify(result)); }
+        } catch (err) {
+          failed.push(promotion.id);
+          console.error('[admin] bulk refresh "' + promotion.id + '" failed: ' + err.message);
+        }
+      }
+      console.log('[admin] bulk refresh finished — ' + (selected.length - failed.length) + '/' + selected.length + ' succeeded'
+        + (failed.length ? ' (failed: ' + failed.join(', ') + ')' : ''));
+      // One warm pass at the end rather than one per promotion: it reads the
+      // whole store either way, so per-promotion warming would repeat the same
+      // work N times.
+      if (failed.length < selected.length) {
+        await availabilityWarmer.run({ reason: 'bulk-promotion-refresh' }).catch((err) =>
+          console.error('[admin] bulk refresh warm failed: ' + err.message));
+      }
+    })().catch((err) => console.error('[admin] bulk refresh crashed: ' + err.message));
+
+    const names = selected.map((promotion) => promotion.name);
+    const summary = 'Refreshing ' + selected.length + ' promotion' + (selected.length === 1 ? '' : 's')
+      + ' in the background: ' + names.slice(0, 4).join(', ')
+      + (names.length > 4 ? ' and ' + (names.length - 4) + ' more' : '') + '.'
+      + (skipped.length ? ' Skipped ' + skipped.join(', ') + '.' : '');
+    res.redirect('/admin/promotions?flash=' + encodeURIComponent(summary));
+  });
+
   // 0.41.0 — per-promotion refresh. Speeds up iteration when you're just
   // tweaking one promotion (e.g. EPL aliases) — skips fetching sources for
   // every other promotion. Events belonging to other promotions are

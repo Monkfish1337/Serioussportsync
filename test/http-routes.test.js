@@ -380,6 +380,54 @@ test('no page depends on a CDN to render itself', async () => {
   }
 });
 
+// Refreshing four promotions used to mean four page loads with a preview each,
+// or the global button and a full pull of everything else.
+test('promotions can be refreshed in a chosen set', async () => {
+  const user = await makeUser('bulkrefresh', 'admin');
+  const login = await get('/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ username: 'bulkrefresh', password: 'correct-horse-battery-staple' }).toString(),
+  });
+  const cookie = (login.headers.getSetCookie ? login.headers.getSetCookie() : [])
+    .map((value) => value.split(';')[0]).join('; ');
+  assert.ok(user.id);
+
+  const html = await (await get('/admin/promotions', { headers: { cookie } })).text();
+  assert.match(html, /class="form-check-input m-0 promotion-select"/,
+    'expected a per-promotion checkbox');
+  assert.match(html, /action="\/admin\/promotions\/refresh-selected"/,
+    'expected the bulk refresh form');
+
+  // The row already carries two forms of its own. Wrapping the table in a
+  // third would nest them, which is what detached the Configure Save button in
+  // 0.89.0 — so the bulk form must open and close before the table starts.
+  const bulkForm = html.indexOf('action="/admin/promotions/refresh-selected"');
+  const tableStart = html.indexOf('<table', bulkForm);
+  assert.ok(bulkForm > -1 && tableStart > bulkForm);
+  assert.ok(html.slice(bulkForm, tableStart).includes('</form>'),
+    'the bulk form must close before the table, or the row forms are nested inside it');
+
+  const post = (body) => get('/admin/promotions/refresh-selected', {
+    method: 'POST', redirect: 'manual',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', cookie },
+    body: new URLSearchParams(body).toString(),
+  });
+
+  // An empty selection says so rather than refreshing everything, which is the
+  // expensive way to be wrong.
+  const empty = await post({ promotionIds: '' });
+  assert.equal(empty.status, 302);
+  assert.match(decodeURIComponent(empty.headers.get('location')), /Select at least one/);
+
+  // An unknown id is reported, not silently dropped.
+  const unknown = await post({ promotionIds: 'not-a-promotion' });
+  assert.match(decodeURIComponent(unknown.headers.get('location')), /not found/);
+
+  // The set that actually runs is covered by a unit test — driving it through
+  // HTTP would start real source fetches and leave the run unable to exit.
+});
+
 test('failed sign-ins are rate limited per client', async () => {
   const body = new URLSearchParams({ username: 'nobody', password: 'wrong' });
   let limited = false;
