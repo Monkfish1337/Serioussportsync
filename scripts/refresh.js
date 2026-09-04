@@ -52,6 +52,20 @@ function withinWindow(ev) {
   return -diffDays <= back;
 }
 
+// Every promotion the installation KNOWS about, enabled or not.
+// promotions.byPrefix holds only the enabled ones, so it is the wrong list for
+// deciding whether an event has been orphaned — see the prune in runRefresh.
+function knownPromotionPrefixes() {
+  return new Set(promotions.all.map((p) => p.idPrefix).filter(Boolean));
+}
+
+function isOrphanEventId(eventId, knownPrefixes) {
+  const id = String(eventId || '');
+  const idx = id.indexOf(':');
+  if (idx <= 0) return false;
+  return !knownPrefixes.has(id.slice(0, idx));
+}
+
 function inScope(ev, promotion) {
   if (promotion && typeof promotion.eventScope === 'function') {
     return promotion.eventScope(ev);
@@ -307,6 +321,22 @@ async function runRefresh(options) {
   let prunedExisting = 0;
   let prunedStaleSource = 0;
   let preservedOther = 0;
+  let prunedOrphans = 0;
+
+  // 0.90.1 — events whose promotion no longer exists.
+  //
+  // Deleting a promotion left its events in the store forever: getByEventId
+  // returns null for them, so no prune rule below ever reached them, no
+  // catalog could render them, and lib/streams.js had no promotion to build a
+  // search from — which is exactly the shape a user reads as "this fixture
+  // used to pull links and now pulls none".
+  //
+  // KNOWN, not ENABLED, is the test. byPrefix holds only enabled promotions,
+  // so keying off it would destroy every event of a promotion the user merely
+  // switched off, and re-fetching those spends API budget they may not have.
+  const knownPrefixes = knownPromotionPrefixes();
+  const isOrphan = (eventId) => isOrphanEventId(eventId, knownPrefixes);
+
   // Prune existing events: drop anything outside scope OR tagged with a
   // source.type that no longer matches the promotion's current source.
   //
@@ -322,6 +352,10 @@ async function runRefresh(options) {
   //     explicit tag is reliable.
   for (const ev of existing.events || []) {
     const p = promotions.getByEventId(ev.id);
+
+    // Orphans go first, before the targeted-refresh preserve below: a targeted
+    // run must not be the thing that keeps them alive forever.
+    if (!p && isOrphan(ev.id)) { prunedOrphans++; continue; }
 
     // 0.41.0 — per-promotion refresh: keep every event that ISN'T ours,
     // untouched. No prune, no source-mismatch check. Only the target
@@ -353,6 +387,7 @@ async function runRefresh(options) {
     if (inScope(ev, p)) byId.set(ev.id, ev);
     else prunedExisting++;
   }
+  if (prunedOrphans > 0) log('[refresh] pruned ' + prunedOrphans + ' events whose promotion no longer exists');
   if (prunedStaleSource > 0) log('[refresh] pruned ' + prunedStaleSource + ' events from previous source(s)');
   if (prunedExisting > 0) log('[refresh] pruned ' + prunedExisting + ' existing events outside scope');
   if (preservedOther > 0) log('[refresh] preserved ' + preservedOther + ' events from other promotions');
@@ -467,7 +502,8 @@ async function runRefresh(options) {
   const ok = failures.length === 0;
   log('[refresh] done in ' + dur + 's — ' + merged.length + ' total (' + totalAdded + ' new, ' + totalUpdated + ' updated, ' + totalSkipped + ' skipped'
     + (failures.length ? ', ' + failures.length + ' failed' : '') + ')');
-  const result = { ok, total: merged.length, added: totalAdded, updated: totalUpdated };
+  const result = { ok, total: merged.length, added: totalAdded, updated: totalUpdated,
+    prunedOrphans };
   if (failures.length) {
     result.error = failures.length === 1
       ? failures[0].error
@@ -481,4 +517,5 @@ if (require.main === module) {
   runRefresh().then((r) => process.exit(r.ok ? 0 : 1));
 }
 
-module.exports = { runRefresh, refreshPromotion, normalizeRecord, inScope, activeSeasons };
+module.exports = { runRefresh, refreshPromotion, normalizeRecord, inScope, activeSeasons,
+  knownPromotionPrefixes, isOrphanEventId };

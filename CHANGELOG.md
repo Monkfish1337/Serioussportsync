@@ -1,5 +1,66 @@
 # Changelog
 
+## 0.90.1
+
+### Link pulling stopped for competition-prefixed releases
+
+The worst regression I have shipped in this series, and the diagnostics could
+not have caught it. The 0.87.1 collision guard — added to stop "Inter Milan"
+satisfying a check for "Milan" — required the word before a team name to be
+something it recognised. Indexers put the competition first:
+
+    EPL Manchester United vs Arsenal 02.09.2026
+    Football.EPL.Manchester.United.vs.Arsenal.02.09.2026.1080p
+    UEFA Champions League Manchester United vs Arsenal 02.09.2026
+
+"EPL" was not recognised, so every one of those was rejected as not naming the
+team. Fixtures that had several Usenet and torrent sources dropped to none.
+
+Every matching diagnostic I ran was against Sport-Video, which names its
+releases bare — no prefix, so nothing to reject. The pipelines that carry the
+convention are the ones with no export to read. That gap is now closed by
+tests, not by another export.
+
+The guard now knows a vocabulary of competition words, plus each promotion's
+own names and aliases. The collision it was added for still holds: all
+thirteen recorded invariants pass, "Serie A Juventus vs Inter Milan" included.
+
+### An alias that names two clubs now names neither
+
+Fixing the above exposed a second bug in the new team wizard. A wizard club is
+built on the `epl` alias preset, and that table lists "Manchester" under both
+Manchester clubs and "United" under a club whose rivals all carry "United" in
+their own names. So a Man United catalog matched "EPL Manchester City vs
+Arsenal" and "EPL Newcastle United vs Arsenal". The hand-built Man United
+promotion this replaced carried a bespoke guard against exactly that, which
+went away with it.
+
+The alias table used to let the last-registered club win a shared form, and the
+comment there accepted that cost deliberately. It was the right call while only
+league promotions read the table — both clubs are inside the same promotion and
+the matchup split sorts them out — and the wrong one the moment a single club
+did. Any form that cannot name one club, whether shared outright or sitting
+inside another club's name, is now dropped from the table. "Man Utd", "MUFC",
+"Wolves", "Spurs" and "Magpies" are untouched.
+
+### The discovered catalogs have their own artwork
+
+All seven fell back to the SSS banner, so the home screen showed seven
+identical rows with nothing to tell them apart. Each sport now has its own
+bundled tile — football, American football, basketball, baseball, hockey,
+rugby and a trophy for the rest — drawn by `scripts/make-discovered-art.py`,
+which is checked in so the set can be regenerated or restyled.
+
+### Deleting a promotion left its events behind forever
+
+Nothing pruned an event whose promotion no longer existed: no catalog could
+render it and no promotion existed to build a search from, so it sat in the
+store as a fixture that pulls no links. Removing the shipped Man United
+promotion in 0.89.1 created a store full of them.
+
+The refresh now drops them. Known, not enabled, is the test — a promotion you
+switch off keeps its events, because re-fetching them costs API budget.
+
 ## 0.90.0
 
 ### Tabler is served from the addon, not from a CDN

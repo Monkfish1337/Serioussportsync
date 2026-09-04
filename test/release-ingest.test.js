@@ -126,3 +126,47 @@ test('prepared releases are counted separately from orphaned ones', () => {
   assert.equal(typeof status.preparedOrphans, 'number');
   assert.equal(status.preparedMatched + status.preparedOrphans, status.prepared);
 });
+
+// All seven discovered catalogs used to fall back to the SSS banner, which put
+// seven visually identical rows on the home screen. The artwork is bundled
+// rather than fetched, so the file has to actually be there — a poster path
+// pointing at nothing is worse than the banner was.
+test('every discovered catalog has its own bundled artwork', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const seen = new Set();
+  for (const sport of Object.keys(releaseIngest.SPORTS)) {
+    const promotion = promotions.byPrefix[releaseIngest.promotionIdFor(sport)];
+    assert.ok(promotion, 'no promotion for ' + sport);
+    const poster = promotion.defaults && promotion.defaults.poster;
+    assert.match(String(poster), /^\/assets\/discovered-[a-z]+\.png$/,
+      sport + ' has no per-sport poster');
+    assert.equal(promotion.defaults.fanart, poster);
+    assert.equal(seen.has(poster), false, 'two sports share artwork: ' + poster);
+    seen.add(poster);
+    const file = path.join(__dirname, '..', 'public', poster.replace('/assets/', ''));
+    assert.equal(fs.existsSync(file), true, 'missing bundled image: ' + file);
+  }
+});
+
+// Deleting a promotion used to leave its events behind forever: nothing could
+// render them and nothing could search for them, which reads to the user as
+// "this fixture used to pull links and now pulls none".
+test('events are orphaned by deleting a promotion, not by disabling one', () => {
+  const known = refresh.knownPromotionPrefixes();
+  assert.equal(refresh.isOrphanEventId('manutd:12345', known), true,
+    'a deleted promotion leaves orphans');
+  assert.equal(refresh.isOrphanEventId('epl:12345', known), false);
+
+  // Disabled promotions are still known. Pruning their events would destroy
+  // data the user only meant to hide, and re-fetching it costs API budget.
+  const disabled = promotions.all.filter((p) => !p.enabled);
+  for (const promotion of disabled.slice(0, 3)) {
+    assert.equal(refresh.isOrphanEventId(promotion.idPrefix + ':1', known), false,
+      promotion.id + ' is disabled, not deleted');
+  }
+
+  // Ids with no promotion prefix are not ours to judge.
+  assert.equal(refresh.isOrphanEventId('nocolon', known), false);
+  assert.equal(refresh.isOrphanEventId('', known), false);
+});
