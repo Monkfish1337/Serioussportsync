@@ -161,3 +161,32 @@ test('one club is not found inside another club\'s name', () => {
   assert.equal(promotions.byPrefix.eredivisie
     .isRelevantStreamTitle('Sparta Rotterdam vs Zwolle 04.09.2026', sparta).ok, true);
 });
+
+// A regression caught by diffing two live exports: 0.87.1's collision rule cost
+// one real match. football-data registers Atlético Mineiro as "CA Mineiro", so
+// none of its three naming forms contain "Atletico" — and the release writes
+// "Atletico Mineiro". The leading word is the club's own name spelled out, but
+// the rule could not know that.
+//
+// The signal is the provider's own abbreviation: a multi-word form beginning
+// with a short prefix ("CA") says the club HAS a spelled-out prefix, so a long
+// leading word starting with one of those letters is plausibly it. Narrow on
+// purpose — a standalone tla must never license this, because MIL would put
+// "Inter" back through the gap the rule exists to close.
+test('a spelled-out prefix the provider abbreviates is still the same club', () => {
+  const MINEIRO = ['CA Mineiro', 'Mineiro', 'CAM'];
+  const BAHIA = ['EC Bahia', 'Bahia', 'BAH'];
+  const event = fixture('brasileirao', MINEIRO, BAHIA, '2026-07-21');
+  assert.equal(promotions.byPrefix.brasileirao
+    .isRelevantStreamTitle('Atletico Mineiro vs Bahia 21.07.2026', event).ok, true);
+
+  // A different club whose name also starts with "Atletico" is still refused —
+  // the rule licenses the leading word, not the club name behind it.
+  assert.equal(promotions.byPrefix.brasileirao
+    .isRelevantStreamTitle('Atletico Paranaense vs Bahia 21.07.2026', event).ok, false);
+
+  // And the collision this all guards stays closed.
+  const milan = fixture('seriea', ['AC Milan', 'Milan', 'MIL'], ['Juventus FC', 'Juventus', 'JUV'], '2026-09-03');
+  assert.equal(promotions.byPrefix.seriea
+    .isRelevantStreamTitle('Juventus vs Inter Milan 03.09.2026', milan).ok, false);
+});

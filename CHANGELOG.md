@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.88.1
+
+### A club's own name spelled out is no longer mistaken for a different club
+
+0.87.1 stopped one club matching inside another's name ("Milan" inside "Inter
+Milan") by requiring the word in front of a match to belong to the same club.
+Diffing two live exports showed that cost exactly one real match:
+football-data registers Atlético Mineiro as **"CA Mineiro"**, so none of its
+three naming forms contain "Atletico" — and the release writes "Atletico
+Mineiro". The leading word was the club's own name, and the rule could not know
+it.
+
+The provider's own abbreviation is the signal. A multi-word form beginning with
+a short prefix ("CA") says the club HAS a spelled-out prefix, so a long leading
+word starting with one of those letters is plausibly that expansion.
+
+Deliberately narrow: only the prefix of a **multi-word** form counts. A
+standalone three-letter code must not, because MIL is AC Milan's tla and its
+"I" would put "Inter" straight back through the gap the rule closes. Both
+directions are pinned by tests, along with a different club that also begins
+with "Atletico" still being refused.
+
 ## 0.88.0
 
 ### Release-first ingestion
