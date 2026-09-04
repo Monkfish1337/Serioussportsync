@@ -461,6 +461,49 @@ test('the manifest Copy button works outside a secure context', async () => {
     'the success label must follow a copy that succeeded, not run regardless');
 });
 
+// The skin picker. Anything a form posts is attacker-controlled, and this value
+// ends up inside a <style> block on every page.
+test('the skin picker applies a known skin and refuses anything else', async () => {
+  const user = await makeUser('skinpicker', 'admin');
+  const login = await get('/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ username: 'skinpicker', password: 'correct-horse-battery-staple' }).toString(),
+  });
+  const cookie = (login.headers.getSetCookie ? login.headers.getSetCookie() : [])
+    .map((value) => value.split(';')[0]).join('; ');
+  assert.ok(user.id);
+
+  const admin = await (await get('/admin', { headers: { cookie } })).text();
+  assert.match(admin, /name="skin" value="sportsroom"/);
+  assert.match(admin, /Apply skin/);
+
+  const apply = (skin) => get('/admin/appearance', {
+    method: 'POST', redirect: 'manual',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', cookie },
+    body: new URLSearchParams({ skin }).toString(),
+  });
+
+  const ok = await apply('newsprint');
+  assert.equal(ok.status, 302);
+  assert.match(decodeURIComponent(ok.headers.get('location')), /Skin set to Newsprint/);
+
+  // The chosen skin is in force on the very next page, in light mode.
+  const light = await (await get('/admin', { headers: { cookie } })).text();
+  assert.match(light, /data-bs-theme="light"/);
+  assert.match(light, /--tblr-primary: #4263eb;/);
+
+  // A value that is not a skin must not reach the stylesheet.
+  const bad = await apply('"><script>alert(1)</script>');
+  assert.equal(bad.status, 302);
+  assert.match(decodeURIComponent(bad.headers.get('location')), /Unknown skin/);
+  const after = await (await get('/admin', { headers: { cookie } })).text();
+  assert.doesNotMatch(after, /alert\(1\)/);
+  assert.match(after, /--tblr-primary: #4263eb;/, 'a refused skin leaves the previous one in place');
+
+  await apply('sportsroom');
+});
+
 test('failed sign-ins are rate limited per client', async () => {
   const body = new URLSearchParams({ username: 'nobody', password: 'wrong' });
   let limited = false;

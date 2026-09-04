@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.90.8
+
+### Skins
+
+Tabler is themed through CSS custom properties, not swappable stylesheets, so a
+skin here is a small variable block layered over the one vendored
+tabler.min.css. No second download, no build step, and a new skin costs a dozen
+lines.
+
+Admin → Appearance picks from eight: **Sportsroom** (the current red),
+**Floodlight** (blue), **Pitch** (green), **Amber**, **Terrace** (violet, soft
+corners), **Broadcast** (red, sharp corners), **Daylight** (light, red) and
+**Newsprint** (light, indigo, soft corners). The choice belongs to the
+installation rather than the account — there is one admin console, not one per
+user — so it is admin-only and applies everywhere on the next page load,
+including the sign-in page.
+
+Three things vary and no more: light or dark (Tabler's own `data-bs-theme`),
+the accent, and the corner radius. Everything Tabler derives for itself is left
+alone; only what it cannot derive is set — which is why the accent is written
+as both hex and RGB, since the tints behind `.bg-primary-lt` come from the RGB
+triple and would otherwise have stayed red.
+
+**No font picker, deliberately.** Every font Tabler's own theme builder offers
+is a Google Fonts request. Vendoring Tabler in 0.90.0 was specifically so a
+self-hosted addon renders on a network that cannot reach a CDN; a skin that
+quietly reintroduced a webfont would undo that, and would look fine to whoever
+added it. A test asserts no skin emits a remote asset.
+
+The sidebar stays dark in every skin, light modes included. Tabler's own
+layouts do the same, a dark rail reads as chrome rather than content, and it
+keeps the brand mark and white sidebar text correct without a second rule set.
+
+An unknown skin — a hand-posted form value, a settings file edited by hand —
+falls back to the default rather than reaching a `<style>` block, and an
+unreadable settings file still renders the page, since that page is the one an
+operator would use to fix it.
+
+### The admin copy buttons had the same bug as the manifest one
+
+Invite-link Copy used the same unguarded `navigator.clipboard` fixed in 0.90.6,
+so on a plain-http LAN address it announced "Copied!" and copied nothing. Same
+fallback now, and it says "Press Ctrl+C" rather than claiming success.
+
 ## 0.90.7
 
 ### The Sport-Video control wall

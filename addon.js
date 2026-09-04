@@ -845,6 +845,20 @@ function createApp() {
     res.redirect('/admin?flash=' + encodeURIComponent('Catalog refresh started in the background — pulls events from TSDB for every promotion. Check server logs for progress.'));
   });
 
+  // 0.90.8 — apply a skin. One console, one skin: this is an operator choice
+  // about the machine, not a per-account preference, so it is admin-only and
+  // takes effect for everyone on the next page load.
+  app.post('/admin/appearance', requireAdmin, (req, res) => {
+    try {
+      const applied = settings.setAppearance({ skin: (req.body || {}).skin });
+      const skins = require('./lib/skins');
+      res.redirect('/admin?flash=' + encodeURIComponent(
+        'Skin set to ' + skins.get(applied.skin).name + '.'));
+    } catch (err) {
+      res.redirect('/admin?flash=' + encodeURIComponent('Appearance: ' + err.message));
+    }
+  });
+
   // 0.90.2 — refresh a chosen set of promotions.
   //
   // Between "refresh this one" and "refresh all thirty" there was nothing, so
@@ -1689,6 +1703,52 @@ function renderAdminPage(currentUser, opts) {
       +   '<td><form method="POST" action="/admin/invites/' + escapeHtml(i.token) + '/revoke" class="d-inline" onsubmit="return confirm(\'Revoke invite for ' + escapeHtml(i.username) + '?\');"><button type="submit" class="btn btn-sm btn-outline-danger">Revoke</button></form></td>'
       + '</tr>';
   }).join('');
+
+  // 0.90.8 — Appearance. A skin is a handful of CSS variables layered over the
+  // one vendored Tabler stylesheet, so the picker is a plain radio group: no
+  // second stylesheet, no build step, and no font request. The choice applies
+  // to every page for everyone, because there is one admin console rather than
+  // one per account.
+  const _skins = require('./lib/skins');
+  const _activeSkin = settings.getAppearance().skin;
+  const _radiusLabel = (radius) => radius === '0px' ? 'sharp corners'
+    : radius === '4px' ? 'default corners' : 'soft corners';
+  const appearanceHtml = ''
+    + '<div class="card mb-3">'
+    +   '<div class="card-header"><div><h3 class="card-title">Appearance</h3>'
+    +     '<div class="text-secondary small">Applies to the whole admin, for everyone. Colour, light or dark, and corner style — no fonts are fetched, so an install that cannot reach a CDN is unaffected.</div></div></div>'
+    +   '<form method="POST" action="/admin/appearance"><div class="card-body">'
+    +     '<style>'
+    +       '.sss-skin{display:block;cursor:pointer;border:1px solid var(--tblr-border-color);border-radius:10px;padding:12px;height:100%}'
+    +       '.sss-skin:has(input:checked){border-color:var(--sss-accent);box-shadow:0 0 0 1px var(--sss-accent)}'
+    +       '.sss-skin input{margin-right:7px}'
+    +       '.sss-skin-swatch{display:flex;gap:5px;align-items:center;margin:9px 0 7px}'
+    +       '.sss-skin-chip{width:26px;height:26px;border:1px solid rgba(128,128,128,.35)}'
+    +       '.sss-skin-bar{flex:1;height:26px;border:1px solid rgba(128,128,128,.35)}'
+    +     '</style>'
+    +     '<div class="row g-2">'
+    +     _skins.list().map(function skinCard(skin) {
+        const isDark = skin.mode === 'dark';
+        return '<div class="col-md-6 col-xl-3"><label class="sss-skin">'
+          + '<input type="radio" name="skin" value="' + escapeHtml(skin.id) + '"'
+            + (skin.id === _activeSkin ? ' checked' : '') + '>'
+          + '<strong>' + escapeHtml(skin.name) + '</strong>'
+          + '<div class="sss-skin-swatch">'
+            + '<span class="sss-skin-chip" style="background:' + escapeHtml(skin.accent)
+              + ';border-radius:' + escapeHtml(skin.radius) + '"></span>'
+            + '<span class="sss-skin-bar" style="background:' + (isDark ? '#1a1d24' : '#f6f8fb')
+              + ';border-radius:' + escapeHtml(skin.radius) + '"></span>'
+          + '</div>'
+          + '<div class="text-secondary small">' + escapeHtml(skin.description) + '</div>'
+          + '<div class="text-secondary" style="font-size:.72rem">' + (isDark ? 'Dark' : 'Light')
+            + ' · ' + escapeHtml(_radiusLabel(skin.radius)) + '</div>'
+          + '</label></div>';
+      }).join('')
+    +     '</div>'
+    +   '</div>'
+    +   '<div class="card-footer"><button class="btn btn-primary" type="submit">Apply skin</button></div>'
+    + '</form></div>';
+
   const invitesHtml = ''
     + '<div class="card mb-3">'
     +   '<div class="card-header"><h3 class="card-title">Invites (' + invites.length + ')</h3></div>'
@@ -1858,12 +1918,15 @@ function renderAdminPage(currentUser, opts) {
     + '</div>'
 
     + invitesHtml
+    + appearanceHtml
 
     // Shared inline JS: password show/toggle + copy button.
     // (Sidebar nav links replaced the bottom footer strip — chrome handles nav.)
     + '<script>'
     + 'document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e.target.closest(".btn-reveal"):null;if(!b)return;e.preventDefault();var g=b.closest(".input-group");if(!g)return;var i=g.querySelector("input");if(!i)return;var sh=i.type==="password";i.type=sh?"text":"password";b.textContent=sh?"Hide":"Show";});'
-    + 'document.addEventListener("click",function(e){var c=e.target&&e.target.closest?e.target.closest(".btn-copy"):null;if(!c)return;var u=c.getAttribute("data-copy");if(!u)return;if(navigator.clipboard)navigator.clipboard.writeText(u);var t=c.textContent;c.textContent="Copied!";setTimeout(function(){c.textContent=t;},1500);});'
+    + 'function sssCopy(text){if(navigator.clipboard&&navigator.clipboard.writeText&&window.isSecureContext){return navigator.clipboard.writeText(text).then(function(){return true;}).catch(function(){return sssLegacyCopy(text);});}return Promise.resolve(sssLegacyCopy(text));}'
+    + 'function sssLegacyCopy(text){var a=document.createElement("textarea");a.value=text;a.setAttribute("readonly","");a.style.position="fixed";a.style.opacity=".01";document.body.appendChild(a);a.focus();a.select();var ok=false;try{ok=document.execCommand("copy");}finally{document.body.removeChild(a);}return ok;}'
+    + 'document.addEventListener("click",function(e){var c=e.target&&e.target.closest?e.target.closest(".btn-copy"):null;if(!c)return;var u=c.getAttribute("data-copy");if(!u)return;var t=c.textContent;sssCopy(u).then(function(ok){c.textContent=ok?"Copied!":"Press Ctrl+C";setTimeout(function(){c.textContent=t;},1500);});});'
     + '</script>';
 
   return tablerChrome.tablerPage('Admin', body, { user: currentUser, currentSection: 'admin' });
