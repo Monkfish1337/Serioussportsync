@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.89.1
+
+### The Save button on Configure did nothing
+
+A regression from 0.89.0, and entirely self-inflicted. Embedding the Nuvio
+collection editor *inside* the account form nested one form in another, which
+HTML does not allow: the browser closes the outer form at the first inner
+`</form>`, so everything after it — including the Save button — stopped
+belonging to any form at all. It rendered perfectly and submitted nothing.
+
+The editor now sits outside the account form, still on the Configure page. A
+route test asserts no `</form>` appears between the account form and its Save
+button, so this cannot come back quietly.
+
+### DIY Usenet has its own page
+
+It was by far the largest thing on Configure — two discovery backends, two
+playback backends, roughly thirty inputs and four test buttons — burying a page
+whose actual job is a handful of switches.
+
+Configure now carries one switch and a link. Everything else lives at
+`/account/usenet`, in the sidebar beside Account, saved by its own route.
+
+That last part matters more than it looks: `/account/save` had to stop listing
+those fields, because a form that no longer renders an input submits nothing for
+it, and the save would have blanked every DIY, NZB DAV and NNTP setting on the
+account. Both halves are pinned by tests.
+
+### Man United removed
+
+The Configure-page wizard creates a club promotion from a pick now, so keeping a
+hand-built promotion for one club meant two promotions competing for the same
+fixtures. Removed along with its metadata source assignment; the default Nuvio
+"Football" folder now points at the Premier League and Champions League
+promotions instead.
+
+The wizard was improved in the same change so it loses nothing: a Premier League
+pick now carries the curated `epl` alias preset, which knows the forms a
+mechanical deriver misses — Wolves for Wolverhampton Wanderers, Spurs for
+Tottenham. Verified: a wizard-created Man United matches both
+"Man Utd vs Wolves" and "Manchester United vs Wolverhampton".
+
+`scripts/test-man-united.js` and its `test:manutd` npm script are gone; the
+script file can be deleted.
+
 ## 0.89.0
 
 ### Select your team

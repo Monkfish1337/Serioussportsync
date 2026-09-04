@@ -20,6 +20,7 @@ const eventAvailability = require('./lib/event-availability');
 const customPromotions = require('./lib/custom-promotions');
 const teamPicker = require('./lib/team-picker');
 const accountTeamWizard = require('./lib/account-team-wizard');
+const accountUsenetPage = require('./lib/account-usenet-page');
 const { runRefresh: runEventsRefresh } = require('./scripts/refresh');
 const promotions = require('./lib/promotions');
 const users = require('./lib/users');
@@ -355,6 +356,54 @@ function createApp() {
     }
   });
 
+  // --- DIY Usenet, on its own page -----------------------------------
+  app.get('/account/usenet', requireLogin, (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    const body = accountUsenetPage.renderBody({
+      cfg: req.user.config || {},
+      flash: req.query.flash || null,
+      escapeHtml,
+      secretField,
+    });
+    res.send(tablerChrome.tablerPage('DIY Usenet', body, {
+      user: req.user, currentSection: 'usenet',
+    }));
+  });
+
+  app.post('/account/usenet/save', requireLogin, (req, res) => {
+    const b = req.body || {};
+    try {
+      users.updateUserConfig(req.user.id, {
+        diyNativeSearchEnabled: b.diyNativeSearchEnabled === 'on'
+          || b.diyNativeSearchEnabled === '1' || b.diyNativeSearchEnabled === 'true',
+        diyUuSearchEnabled: b.diyUuSearchEnabled === 'on'
+          || b.diyUuSearchEnabled === '1' || b.diyUuSearchEnabled === 'true',
+        diySearchKind: String(b.diySearchKind || '') === 'prowlarr' ? 'prowlarr' : 'newznab',
+        diySearchName: String(b.diySearchName || '').trim().slice(0, 80),
+        diySearchUrl: security.cleanHttpUrl(b.diySearchUrl, { label: 'Search URL' }),
+        diySearchApiKey: String(b.diySearchApiKey || ''),
+        nzbdavUrl: security.cleanHttpUrl(b.nzbdavUrl, { label: 'NZB DAV API URL' }),
+        nzbdavApiKey: String(b.nzbdavApiKey || ''),
+        nzbdavWebdavUrl: security.cleanHttpUrl(b.nzbdavWebdavUrl, { label: 'NZB DAV WebDAV URL' }),
+        nzbdavWebdavUsername: String(b.nzbdavWebdavUsername || '').trim(),
+        nzbdavWebdavPassword: String(b.nzbdavWebdavPassword || ''),
+        nativeNntpEnabled: b.nativeNntpEnabled === 'on'
+          || b.nativeNntpEnabled === '1' || b.nativeNntpEnabled === 'true',
+        nntpHost: String(b.nntpHost || '').trim(),
+        nntpPort: Math.min(65535, Math.max(1, parseInt(String(b.nntpPort || '563'), 10) || 563)),
+        nntpTls: b.nntpTls === 'on' || b.nntpTls === '1' || b.nntpTls === 'true',
+        nntpUsername: String(b.nntpUsername || '').trim(),
+        nntpPassword: String(b.nntpPassword || ''),
+        nntpConnections: Math.min(50, Math.max(1,
+          parseInt(String(b.nntpConnections || '20'), 10) || 20)),
+      });
+      res.redirect('/account/usenet?flash=' + encodeURIComponent('DIY Usenet settings saved.'));
+    } catch (err) {
+      res.redirect('/account/usenet?flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(err)));
+    }
+  });
+
   app.post('/account/save', requireLogin, (req, res) => {
     const b = req.body || {};
     // Collect selected catalogs (empty = all). Stremio sends repeated form
@@ -395,30 +444,12 @@ function createApp() {
         torboxApiKey: String(b.torboxApiKey || '').trim(),
         easynewsUsername: String(b.easynewsUsername || '').trim(),
         easynewsPassword: String(b.easynewsPassword || ''),
+        // Only the switch lives on Configure now. Every other DIY / NZB DAV /
+        // NNTP field is saved by /account/usenet/save — including them here
+        // would blank the lot on any Configure save, because the inputs are
+        // simply not in this form any more.
         diyUsenetEnabled: b.diyUsenetEnabled === 'on'
           || b.diyUsenetEnabled === '1' || b.diyUsenetEnabled === 'true',
-        diyNativeSearchEnabled: b.diyNativeSearchEnabled === 'on'
-          || b.diyNativeSearchEnabled === '1' || b.diyNativeSearchEnabled === 'true',
-        diyUuSearchEnabled: b.diyUuSearchEnabled === 'on'
-          || b.diyUuSearchEnabled === '1' || b.diyUuSearchEnabled === 'true',
-        diySearchKind: String(b.diySearchKind || '') === 'prowlarr' ? 'prowlarr' : 'newznab',
-        diySearchName: String(b.diySearchName || '').trim().slice(0, 80),
-        diySearchUrl: security.cleanHttpUrl(b.diySearchUrl, { label: 'Search URL' }),
-        diySearchApiKey: String(b.diySearchApiKey || ''),
-        nzbdavUrl: security.cleanHttpUrl(b.nzbdavUrl, { label: 'NZB DAV API URL' }),
-        nzbdavApiKey: String(b.nzbdavApiKey || ''),
-        nzbdavWebdavUrl: security.cleanHttpUrl(b.nzbdavWebdavUrl, { label: 'NZB DAV WebDAV URL' }),
-        nzbdavWebdavUsername: String(b.nzbdavWebdavUsername || '').trim(),
-        nzbdavWebdavPassword: String(b.nzbdavWebdavPassword || ''),
-        nativeNntpEnabled: b.nativeNntpEnabled === 'on'
-          || b.nativeNntpEnabled === '1' || b.nativeNntpEnabled === 'true',
-        nntpHost: String(b.nntpHost || '').trim(),
-        nntpPort: Math.min(65535, Math.max(1, parseInt(String(b.nntpPort || '563'), 10) || 563)),
-        nntpTls: b.nntpTls === 'on' || b.nntpTls === '1' || b.nntpTls === 'true',
-        nntpUsername: String(b.nntpUsername || '').trim(),
-        nntpPassword: String(b.nntpPassword || ''),
-        nntpConnections: Math.min(50, Math.max(1,
-          parseInt(String(b.nntpConnections || '20'), 10) || 20)),
         catalogs: finalCats,
         catalogDefaultsVersion: CURRENT_DEFAULTS_VERSION,
         showCatalogsOnHome: b.showCatalogsOnHome === 'on' || b.showCatalogsOnHome === '1' || b.showCatalogsOnHome === 'true',
@@ -2056,53 +2087,13 @@ function renderAccountPage(user, opts) {
     +       '<div class="wide"><label class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" name="uuEnabled" value="on"' + (cfg.uuEnabled !== false ? ' checked' : '') + '><span class="form-check-label"><strong>Enable Usenet Ultimate stream rows</strong></span></label><p class="text-secondary small mb-2">When disabled, the DIY pipeline may still use UU for text search, but UU’s own playback rows are hidden.</p><label class="form-label" for="uu-url">Usenet Ultimate manifest URL</label><input class="form-control text-mono" type="url" id="uu-url" name="uuManifestUrl" value="' + escapeHtml(cfg.uuManifestUrl || '') + '" placeholder="https://your-uu.example/stremio/&lt;config&gt;/manifest.json"></div>'
     +     '</div>'
     +   '</div></section>'
-    +   '<details class="config-fold" open><summary>DIY Usenet pipeline</summary><div class="config-fold-body">'
-    +     '<div class="pipeline-map">'
-    +       '<div class="pipeline-node"><strong>1. Discover</strong><span class="text-secondary small">Prowlarr, Newznab/NZBHydra, and optional UU title search.</span></div><div class="pipeline-arrow">→</div>'
-    +       '<div class="pipeline-node"><strong>2. Match</strong><span class="text-secondary small">SSS filters noise, checks event relevance, ranks, and stores opaque candidates.</span></div><div class="pipeline-arrow">→</div>'
-    +       '<div class="pipeline-node"><strong>3. Play</strong><span class="text-secondary small">Choose native NNTP, NZB DAV, or keep both as independent result rows.</span></div>'
-    +     '</div>'
-    +     '<div class="alert alert-info mb-0"><strong>One search, flexible playback:</strong> both backends consume the same filtered candidates and run alongside every existing service. Disabling either backend preserves its encrypted credentials.</div>'
-    +     '<section class="pipeline-stage"><div class="pipeline-stage-head"><div><div class="pipeline-kicker">Stage 1</div><h3>Search and candidate discovery</h3></div><span class="badge bg-blue-lt">Shared input</span></div>'
-    +     '<div class="provider-grid">'
-    +       '<div class="wide"><label class="form-check form-switch"><input class="form-check-input" type="checkbox" name="diyNativeSearchEnabled" value="on"' + (cfg.diyNativeSearchEnabled === true ? ' checked' : '') + '><span class="form-check-label"><strong>Enable native Usenet text search</strong></span></label></div>'
-    +       '<div><label class="form-label" for="diy-search-kind">Search service</label><select class="form-select" id="diy-search-kind" name="diySearchKind"><option value="newznab"' + (cfg.diySearchKind !== 'prowlarr' ? ' selected' : '') + '>Newznab / NZBHydra</option><option value="prowlarr"' + (cfg.diySearchKind === 'prowlarr' ? ' selected' : '') + '>Prowlarr</option></select></div>'
-    +       '<div><label class="form-label" for="diy-search-name">Display name</label><input class="form-control" type="text" id="diy-search-name" name="diySearchName" value="' + escapeHtml(cfg.diySearchName || '') + '" placeholder="NZBHydra or NZBGeek"></div>'
-    +       '<div><label class="form-label" for="diy-search-url">Search URL</label><input class="form-control text-mono" type="url" id="diy-search-url" name="diySearchUrl" value="' + escapeHtml(cfg.diySearchUrl || '') + '" placeholder="http://nzbhydra2:5076 or http://prowlarr:9696"></div>'
-    +       '<div>' + secretField('Search API key', 'diySearchApiKey', cfg.diySearchApiKey, 'paste the indexer or manager API key') + '</div>'
-    +       '<div><label class="form-label" for="diy-search-test-query">Test query</label><input class="form-control" type="text" id="diy-search-test-query" name="diySearchTestQuery" value="UFC" maxlength="200"></div>'
-    +       '<div class="d-flex align-items-end"><button class="btn btn-outline-primary w-100" type="submit" formaction="/account/test-diy-search" formnovalidate>Test native search</button></div>'
-    +       '<div class="wide"><label class="form-check form-switch"><input class="form-check-input" type="checkbox" name="diyUuSearchEnabled" value="on"' + (cfg.diyUuSearchEnabled !== false ? ' checked' : '') + '><span class="form-check-label">Also use UU text search for DIY results</span></label><div class="form-hint">Turn this off to validate SSS native search without UU. This does not control UU’s own stream rows.</div></div>'
-    +     '</div></section>'
-    +     '<section class="pipeline-stage"><div class="pipeline-stage-head"><div><div class="pipeline-kicker">Stage 2</div><h3>Playback backends</h3></div><span class="badge bg-green-lt">Choose one or both</span></div>'
-    +     '<div class="pipeline-backends">'
-    +       '<div class="pipeline-backend"><div class="d-flex justify-content-between gap-2 mb-2"><div><h4 class="h4 mb-1">NZB DAV</h4><div class="text-secondary small">Complete download and WebDAV playback, including archive releases.</div></div><span class="badge bg-green-lt align-self-start">Stable</span></div>'
-    +         '<label class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" name="diyUsenetEnabled" value="on"' + (cfg.diyUsenetEnabled === true ? ' checked' : '') + '><span class="form-check-label"><strong>Enable NZB DAV rows</strong></span></label>'
-    +         '<div class="provider-grid">'
-    +           '<div><label class="form-label" for="nzbdav-url">API URL</label><input class="form-control text-mono" type="url" id="nzbdav-url" name="nzbdavUrl" value="' + escapeHtml(cfg.nzbdavUrl || '') + '" placeholder="http://nzbdav:3000"></div>'
-    +           '<div>' + secretField('API key', 'nzbdavApiKey', cfg.nzbdavApiKey, 'paste the NZB DAV API key') + '</div>'
-    +           '<div><label class="form-label" for="nzbdav-webdav-url">WebDAV URL</label><input class="form-control text-mono" type="url" id="nzbdav-webdav-url" name="nzbdavWebdavUrl" value="' + escapeHtml(cfg.nzbdavWebdavUrl || '') + '" placeholder="http://nzbdav:3000"></div>'
-    +           '<div><label class="form-label" for="nzbdav-webdav-user">WebDAV username</label><input class="form-control" type="text" id="nzbdav-webdav-user" name="nzbdavWebdavUsername" value="' + escapeHtml(cfg.nzbdavWebdavUsername || '') + '" autocomplete="off"></div>'
-    +           '<div>' + secretField('WebDAV password', 'nzbdavWebdavPassword', cfg.nzbdavWebdavPassword, 'your WebDAV password') + '</div>'
-    +         '</div><button class="btn btn-outline-primary mt-3 w-100" type="submit" formaction="/account/test-nzbdav" formnovalidate>Test NZB DAV pipeline</button></div>'
-    +       '<div class="pipeline-backend"><div class="d-flex justify-content-between gap-2 mb-2"><div><h4 class="h4 mb-1">Native NNTP</h4><div class="text-secondary small">Instant range streaming for direct files and stored RAR4/RAR5 videos.</div></div><span class="badge bg-azure-lt align-self-start">Preview</span></div>'
-    +         '<label class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" name="nativeNntpEnabled" value="on"' + (cfg.nativeNntpEnabled === true ? ' checked' : '') + '><span class="form-check-label"><strong>Enable native NNTP rows</strong></span></label>'
-    +         '<div class="provider-grid">'
-    +           '<div><label class="form-label" for="nntp-host">NNTP host</label><input class="form-control text-mono" id="nntp-host" name="nntpHost" value="' + escapeHtml(cfg.nntpHost || '') + '" placeholder="news.provider.example"></div>'
-    +           '<div><label class="form-label" for="nntp-port">Port</label><input class="form-control" type="number" min="1" max="65535" id="nntp-port" name="nntpPort" value="' + escapeHtml(String(cfg.nntpPort || 563)) + '"></div>'
-    +           '<div><label class="form-label" for="nntp-user">Username</label><input class="form-control" id="nntp-user" name="nntpUsername" value="' + escapeHtml(cfg.nntpUsername || '') + '" autocomplete="off"></div>'
-    +           '<div>' + secretField('Password', 'nntpPassword', cfg.nntpPassword, 'your NNTP password') + '</div>'
-    +           '<div><label class="form-label" for="nntp-connections">Maximum connections</label><input class="form-control" type="number" min="1" max="50" id="nntp-connections" name="nntpConnections" value="' + escapeHtml(String(cfg.nntpConnections || 20)) + '"><div class="form-hint">20 recommended; sockets are pre-authenticated, pooled, and reused. Do not exceed your provider limit.</div></div>'
-    +           '<div class="d-flex align-items-center"><label class="form-check form-switch mt-3"><input class="form-check-input" type="checkbox" name="nntpTls" value="on"' + (cfg.nntpTls !== false ? ' checked' : '') + '><span class="form-check-label">Use TLS (recommended)</span></label></div>'
-    +         '</div><button class="btn btn-outline-primary mt-3 w-100" type="submit" formaction="/account/test-nntp" formnovalidate>Test NNTP pipeline</button></div>'
-    +     '</div>'
-    +     '<div class="pipeline-output"><span class="badge bg-secondary-lt">Shared filtered results</span><span class="badge bg-green-lt">📦 NZB DAV rows</span><span class="badge bg-azure-lt">⚡ Native NNTP rows</span><span class="badge bg-secondary-lt">Independent toggles</span></div>'
-    +     '</section>'
+    +   '<details class="config-fold"><summary>DIY Usenet pipeline</summary><div class="config-fold-body">'
+    +     '<p class="text-secondary small mb-3">Your own indexer and playback backend, for events the shared pipelines miss. '
+    +       'The switch below turns it on; its thirty-odd settings live on their own page so they do not bury the rest of this one.</p>'
+    +     '<label class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" name="diyUsenetEnabled" value="on"' + (cfg.diyUsenetEnabled === true ? ' checked' : '') + '><span class="form-check-label"><strong>Enable the DIY Usenet pipeline</strong></span></label>'
+    +     '<a class="btn btn-outline-primary" href="/account/usenet">Open DIY Usenet settings</a>'
     +   '</div></details>'
     +   '<details class="config-fold"><summary>Catalogs and display order</summary>' + catalogsPanel + '</details>'
-    +   '<details class="config-fold"><summary>Nuvio collection folders</summary><div class="config-fold-body">'
-    +     nuvioFoldersHtml
-    +   '</div></details>'
     +   '<details class="config-fold"><summary>Advanced playback settings</summary><div class="config-fold-body">'
     +     '<div class="provider-grid">'
     +       '<div><label class="form-label">Maximum results per event</label><input class="form-control" type="number" name="maxStreams" min="0" max="20" value="' + escapeHtml(String(cfg.maxStreams || 0)) + '"><div class="form-hint">0 uses the server default (' + escapeHtml(String(defaultMaxStreams)) + ').</div></div>'
@@ -2121,6 +2112,12 @@ function renderAccountPage(user, opts) {
     +     '<div class="config-management"><button class="btn btn-outline-danger" type="submit" formaction="/account/regenerate-token" formnovalidate onclick="return confirm(\'Rotate the manifest? Your current install URL stops working immediately.\');">Rotate manifest URL</button></div>'
     +   '</div></section>'
     + '</form>'
+    // Outside the account form on purpose. This editor has forms of its own,
+    // and HTML does not allow nested ones: the first inner </form> closes the
+    // outer form, which orphaned the Save button and made it do nothing.
+    + '<details class="config-fold"><summary>Nuvio collection folders</summary><div class="config-fold-body">'
+    +   nuvioFoldersHtml
+    + '</div></details>'
     + '</main>'
 
     // Inline JS: copy install URL + toggle password reveal. Same logic as

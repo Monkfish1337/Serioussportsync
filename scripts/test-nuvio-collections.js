@@ -87,8 +87,12 @@ const legacySelection = build({
 const migratedFootball = legacySelection[0].folders.find((folder) => folder.title === 'Football');
 assert.deepStrictEqual(
   catalogIds(migratedFootball),
-  ['motd-upcoming', 'motd', 'manutd-upcoming', 'manutd-recent'],
-  'adds new Manchester United catalogs once for legacy explicit selections',
+  ['motd-upcoming', 'motd'],
+  // The v1 addition named the Man United catalogs, and that promotion was
+  // removed in 0.89.1 in favour of the Configure-page wizard. The migration
+  // entry stays as the record of a past defaults version; its ids simply no
+  // longer resolve to a catalog.
+  'a defaults migration naming a removed promotion adds nothing',
 );
 
 const savedModernSelection = build({
@@ -98,7 +102,7 @@ const savedModernSelection = build({
 assert.deepStrictEqual(
   catalogIds(savedModernSelection[0].folders.find((folder) => folder.title === 'Football')),
   ['motd-upcoming', 'motd'],
-  'respects a modern account that explicitly disables Manchester United catalogs',
+  'respects a modern account that explicitly disables the other catalogs',
 );
 
 const defaultManifest = buildManifest({ user: { config: {} } });
@@ -112,7 +116,7 @@ const migratedManifest = buildManifest({
 });
 assert.deepStrictEqual(
   migratedManifest.catalogs.map((catalog) => catalog.id),
-  ['motd-upcoming', 'motd', 'manutd-upcoming', 'manutd-recent', 'mlb-upcoming', 'mlb-recent'],
+  ['motd-upcoming', 'motd', 'mlb-upcoming', 'mlb-recent'],
   'legacy private manifests receive the new catalogs automatically',
 );
 assert.ok(

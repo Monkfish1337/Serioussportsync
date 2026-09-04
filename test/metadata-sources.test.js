@@ -31,7 +31,7 @@ test.after(() => {
 });
 
 test('seeds all current built-in metadata source assignments', () => {
-  assert.equal(sources.list().length, 11);
+  assert.equal(sources.list().length, 10);
   assert.deepEqual(sources.resolve('one', {}).source, { type: 'onefc' });
   assert.deepEqual(sources.resolve('f1', {}).source, { type: 'thesportsdb', leagueId: '4370' });
   assert.deepEqual(sources.resolve('ucl', {}).source, { type: 'uefa', competitionId: '1' });

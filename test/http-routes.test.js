@@ -285,6 +285,68 @@ test('the wizard endpoints refuse anonymous callers', async () => {
   }
 });
 
+// Two regressions worth pinning, both from splitting the Configure page up.
+//
+// 1. The Nuvio collection editor has forms of its own. Embedding it INSIDE the
+//    account form made the browser close the outer form at the first inner
+//    </form>, which orphaned the Save button — it rendered, and did nothing.
+// 2. The DIY Usenet fields moved to their own page. If /account/save still
+//    listed them, every Configure save would blank the lot, because those
+//    inputs are no longer in that form.
+test('saving Configure does not blank the settings that moved off it', async () => {
+  const user = await makeUser('splitpage', 'admin');
+  const login = await get('/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ username: 'splitpage', password: 'correct-horse-battery-staple' }).toString(),
+  });
+  const cookie = (login.headers.getSetCookie ? login.headers.getSetCookie() : [])
+    .map((value) => value.split(';')[0]).join('; ');
+  assert.ok(cookie, 'expected a session cookie');
+  const post = (pathname, fields) => get(pathname, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', cookie },
+    body: new URLSearchParams(fields).toString(),
+  });
+
+  await post('/account/usenet/save', {
+    diySearchKind: 'prowlarr', diySearchName: 'My Prowlarr',
+    diySearchUrl: 'http://prowlarr:9696', diySearchApiKey: 'secret-key',
+    nntpHost: 'news.example.com', nntpPort: '563', nntpConnections: '20',
+  });
+  assert.equal(users.findById(user.id).config.diySearchName, 'My Prowlarr');
+
+  // A Configure save carrying none of those fields.
+  await post('/account/save', { torboxEnabled: 'on', diyUsenetEnabled: 'on', maxStreams: '10' });
+  const config = users.findById(user.id).config;
+  assert.equal(config.diySearchName, 'My Prowlarr', 'Configure save must not blank DIY settings');
+  assert.equal(config.diySearchApiKey, 'secret-key');
+  assert.equal(config.nntpHost, 'news.example.com');
+  assert.equal(config.diyUsenetEnabled, true, 'the switch that stayed on Configure still saves');
+});
+
+test('the Save button on Configure belongs to the account form', async () => {
+  const user = await makeUser('savebutton', 'admin');
+  const login = await get('/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ username: 'savebutton', password: 'correct-horse-battery-staple' }).toString(),
+  });
+  const cookie = (login.headers.getSetCookie ? login.headers.getSetCookie() : [])
+    .map((value) => value.split(';')[0]).join('; ');
+  const html = await (await get('/account', { headers: { cookie } })).text();
+  assert.ok(user.id);
+
+  // The account form must still be open where the Save button sits: no </form>
+  // may appear between the form that posts to /account/save and that button.
+  const formStart = html.indexOf('action="/account/save"');
+  const saveButton = html.indexOf('Save configuration');
+  assert.ok(formStart > -1 && saveButton > formStart, 'expected the Save button after the form opens');
+  const between = html.slice(formStart, saveButton);
+  assert.equal(between.includes('</form>'), false,
+    'a nested </form> before the Save button detaches it from the account form');
+});
+
 test('failed sign-ins are rate limited per client', async () => {
   const body = new URLSearchParams({ username: 'nobody', password: 'wrong' });
   let limited = false;
