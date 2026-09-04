@@ -347,6 +347,39 @@ test('the Save button on Configure belongs to the account form', async () => {
     'a nested </form> before the Save button detaches it from the account form');
 });
 
+// The admin used to load its entire stylesheet from cdn.jsdelivr.net at
+// runtime, so a self-hosted addon on a network that could not reach the CDN
+// rendered as unstyled HTML with no clue as to why. Tabler is a dependency now
+// and is served from the installed package.
+test('no page depends on a CDN to render itself', async () => {
+  const user = await makeUser('vendorcheck', 'admin');
+  const login = await get('/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ username: 'vendorcheck', password: 'correct-horse-battery-staple' }).toString(),
+  });
+  const cookie = (login.headers.getSetCookie ? login.headers.getSetCookie() : [])
+    .map((value) => value.split(';')[0]).join('; ');
+  assert.ok(cookie && user.id);
+
+  const pages = ['/login', '/account', '/account/usenet', '/admin', '/admin/database'];
+  const referenced = new Set();
+  for (const pathname of pages) {
+    const html = await (await get(pathname, { headers: { cookie } })).text();
+    assert.doesNotMatch(html, /jsdelivr|unpkg|cdnjs|fonts\.googleapis/,
+      pathname + ' still pulls an asset from a CDN');
+    for (const url of html.match(/\/assets\/vendor\/[^"']+/g) || []) referenced.add(url);
+  }
+  assert.ok(referenced.size >= 2, 'expected the vendored CSS and JS to be referenced');
+
+  // Referenced is not enough — they have to actually be served.
+  for (const url of referenced) {
+    const response = await get(url);
+    assert.equal(response.status, 200, url + ' is referenced but not served');
+    assert.ok((await response.text()).length > 1000, url + ' served an implausibly small file');
+  }
+});
+
 test('failed sign-ins are rate limited per client', async () => {
   const body = new URLSearchParams({ username: 'nobody', password: 'wrong' });
   let limited = false;

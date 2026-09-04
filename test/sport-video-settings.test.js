@@ -74,3 +74,30 @@ test('validates and persists bounded Sport-Video scan controls', () => {
     maxDetailsPerScan: 50, categories: [],
   }), /Select at least one/);
 });
+
+// The two switches were drawn identically, so "Scan automatically" read as
+// active while Sport-Video itself was off. The dependent block is now dimmed
+// and labelled — but deliberately NOT disabled: a disabled input submits
+// nothing, so disabling these would silently clear them on the next save. That
+// is the same trap that the DIY Usenet split had to avoid.
+test('the settings under the master switch are subordinated, not disabled', () => {
+  const adminSportVideo = require('../lib/admin-sport-video');
+  const render = (enabled) => adminSportVideo.renderBody({
+    config: { enabled, autoScan: true, categories: [], teamFilters: {}, autoWarmPromotions: [] },
+    status: {}, cachedHashes: new Set(), torboxConfigured: false,
+  });
+
+  const on = render(true);
+  const off = render(false);
+  assert.match(on, /class="sv-dependent"/, 'enabled should not dim the dependent block');
+  assert.match(off, /class="sv-dependent is-inactive"/, 'disabled should dim it');
+  assert.match(off, /nothing below runs while Sport-Video results are off/);
+
+  // Both states must still submit every dependent field.
+  for (const html of [on, off]) {
+    assert.match(html, /name="autoScan"/);
+    assert.doesNotMatch(html, /name="autoScan"[^>]*disabled/,
+      'a disabled input submits nothing and would clear the setting on save');
+    assert.doesNotMatch(html, /name="intervalHours"[^>]*disabled/);
+  }
+});

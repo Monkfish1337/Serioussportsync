@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.90.0
+
+### Tabler is served from the addon, not from a CDN
+
+The admin loaded its entire stylesheet and JavaScript from cdn.jsdelivr.net at
+runtime. On any network that could not reach it — which a self-hosted addon
+behind a restrictive firewall often cannot — every page rendered as unstyled
+HTML: a wall of raw form controls, with nothing to indicate why. Depending on
+the public internet to draw its own admin page was the wrong trade for a
+self-hosted product.
+
+`@tabler/core` is a dependency now, served from the installed package at
+`/assets/vendor/tabler`, with the version in the URL so a browser cache cannot
+outlive an upgrade. A test asserts that no page references a CDN and that every
+vendored asset it does reference is actually served.
+
+`package.json` was reformatted by npm when the dependency was added — the diff
+is large but the content is unchanged apart from the new entry.
+
+### The Sport-Video switches now show which one is in charge
+
+"Scan automatically" was drawn identically to "Enable Sport-Video results", so
+it read as active while the feature itself was off. Everything below the master
+switch is now dimmed and labelled when the master is off.
+
+Deliberately dimmed rather than disabled: a disabled input submits nothing, so
+disabling them would have silently cleared every Sport-Video setting on the next
+save — the same trap the DIY Usenet page split had to avoid, and the test
+asserts against it in both states.
+
 ## 0.89.1
 
 ### The Save button on Configure did nothing
