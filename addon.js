@@ -440,6 +440,14 @@ function createApp() {
     try {
       result = await handleStream({
         id: chosen.event.id,
+        // 0.93.2 — the check is not a stream request and nothing is waiting on
+        // it but this page, so it gets the background budget rather than the
+        // one sized for Nuvio's ~10s patience. A pipeline that needs 15s is
+        // exactly what the check exists to tell you about; reporting it as
+        // "nothing found" because we hung up at 9.5s would be the check
+        // producing the very confusion it was built to remove.
+        budgetMs: Math.max(5000,
+          parseInt(process.env.ACCOUNT_VERIFY_TIMEOUT_MS || '30000', 10) || 30000),
         userConfig: cfg,
         userId: req.user.id,
         apiToken: req.user.apiToken,

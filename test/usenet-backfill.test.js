@@ -3,11 +3,15 @@
 // A slow usenet source used to fail permanently, not intermittently.
 //
 // A stream request must answer inside Nuvio's ~10s patience, so each pipeline
-// gets about 7.5s. A Usenet Ultimate or Newznab instance that fans out to
-// several indexers routinely needs longer — and a search that times out returns
-// nothing AND caches nothing, because only a successful result is recorded. So
-// every request repeated the same doomed search, while torrents, which are also
-// warmed in the background at a 15s budget, kept working.
+// gets about 9s — 7.5s before 0.93.2 raised it. A Usenet Ultimate or Newznab
+// instance that fans out to several indexers can still need longer, and a
+// search that times out returns nothing AND caches nothing, because only a
+// successful result is recorded. So every request repeated the same doomed
+// search, while torrents, which are also warmed in the background at the
+// larger budget, kept working.
+//
+// Raising the live budget buys a slow provider a little more room; this
+// backfill is what makes a consistently slow one work at all.
 //
 // Verbatim from a real log:
 //   uu: network error: network timeout at: http://192.168.1.16:1337/...

@@ -78,3 +78,23 @@ test('a promotion can opt into non-English sports releases', () => {
     allowForeignLanguage: true,
   }).results.length, 1);
 });
+
+// 0.93.2 — the budgets, and why they are different numbers.
+test('the live budget stays inside the client\'s patience', () => {
+  const streams = require('../lib/streams');
+  const source = String(streams.handleStream);
+
+  // The ceiling here is not ours to choose: Nuvio gives up at about ten
+  // seconds, and the response still has to merge, dedupe and serialise after
+  // the slowest pipeline returns. A 10000ms budget answers at ~10.1s and turns
+  // partial results into no results.
+  const match = source.match(/STREAM_PIPELINE_TIMEOUT_MS \|\| '(\d+)'/);
+  assert.ok(match, 'the live budget must be readable from the source');
+  const live = Number(match[1]);
+  assert.ok(live >= 9000, 'a slow indexer fan-out needs more than 8s: ' + live);
+  assert.ok(live < 10000, 'past the client deadline the user gets nothing at all: ' + live);
+
+  // A caller with nothing waiting on it can ask for more.
+  assert.match(source, /Number\(params\.budgetMs\)/,
+    'the install check needs to opt out of the client-sized budget');
+});

@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.93.2 — more room for a slow provider
+
+### The live budget: 8s to 9.5s
+
+Usenet Ultimate fans out across several indexers and some sports take it past
+the old ceiling. At an 8000ms pipeline budget it got 7500ms and timed out
+repeatedly; it now gets 9000ms.
+
+**Not 10000ms, and the reason matters.** The ceiling is the client's patience,
+not ours: Nuvio gives up at about ten seconds, and the response still has to
+merge, dedupe and serialise after the slowest pipeline returns. A 10s budget
+answers at roughly 10.1s — which turns "some rows" into no rows at all, for
+every pipeline, not just the slow one. 9500ms leaves that headroom.
+`STREAM_PIPELINE_TIMEOUT_MS` still overrides it, and a test now asserts the
+default sits under the client deadline so nobody quietly walks it past.
+
+For a provider that is *consistently* slower than the live budget, the fix is
+still the demand-driven backfill from 0.90.3: a search that runs out of time
+schedules one at the 25s background budget, and the next request is served from
+the availability index in milliseconds. Raising the live budget buys a little
+room; the backfill is what makes a slow provider work at all.
+
+### The install check no longer uses a stream-sized budget
+
+The check on Configure is not a stream request — nothing waits on it but the
+page — so racing it against Nuvio's patience was wrong. It now gets 30s
+(`ACCOUNT_VERIFY_TIMEOUT_MS`).
+
+A pipeline that needs fifteen seconds is exactly what the check exists to tell
+you about. Reporting it as "nothing found" because the check hung up at 9.5s
+was the check manufacturing the confusion it was built to remove.
+
 ## 0.93.1 — why only Sport-Video was pulling
 
 Reported as "TorBox, Usenet Ultimate and Easynews return nothing, only
