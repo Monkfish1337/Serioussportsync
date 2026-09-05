@@ -548,10 +548,15 @@ test('the install check reports per pipeline, and says so when it cannot run', a
   assert.equal(response.status, 200);
   const body = await response.json();
 
-  // This test store has no played fixtures, so the honest answer is that there
+  // This test store has no settled fixtures, so the honest answer is that there
   // is nothing to check — not a pass, and not an error the user has to decode.
+  //
+  // The week-old rule matters: a match that finished last night has nothing
+  // posted for it, so checking against it would report no streams for every
+  // pipeline and look exactly like the broken configuration this step exists
+  // to rule out.
   assert.equal(body.ok, false);
-  assert.match(body.error, /no past fixture/i);
+  assert.match(body.error, /at least a week ago/i);
   assert.doesNotMatch(JSON.stringify(body), /token|password|apiKey/i,
     'the check must not echo credentials back to the page');
 });
@@ -559,6 +564,19 @@ test('the install check reports per pipeline, and says so when it cannot run', a
 test('the install check refuses an anonymous caller', async () => {
   const response = await get('/account/verify', { method: 'POST', redirect: 'manual' });
   assert.notEqual(response.status, 200, 'verify runs a real search — it needs a session');
+});
+
+// The Nuvio push signs in from the page, so the policy has to permit exactly
+// that one cross-origin destination and nothing else.
+test('the page may reach Nuvio and nowhere else', async () => {
+  const response = await get('/login');
+  const csp = response.headers.get('content-security-policy') || '';
+  assert.match(csp, /connect-src 'self' https:\/\/api\.nuvio\.tv/,
+    'the browser-side Nuvio push needs this, and it is the only host allowed');
+  assert.doesNotMatch(csp, /jsdelivr|unpkg|cdnjs/,
+    'a CDN nothing loads from should not be permitted');
+  assert.match(csp, /form-action 'self'/);
+  assert.match(csp, /frame-ancestors 'none'/);
 });
 
 test('failed sign-ins are rate limited per client', async () => {

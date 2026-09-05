@@ -397,9 +397,21 @@ function createApp() {
     const selection = effectiveCatalogSelection(cfg);
     const servedPrefixes = new Set(promotions.enabled.map((p) => p.idPrefix));
 
-    // The most recent fixture the user actually has a catalog for: a check
-    // against something they cannot see would prove nothing.
+    // Which fixture to check against.
+    //
+    // NOT the newest played one. A match that finished hours ago has nothing
+    // posted for it yet, so a check against it reports "no streams" for every
+    // pipeline and looks exactly like a broken configuration — the failure this
+    // whole step exists to rule out.
+    //
+    // So: the newest fixture that is at least a week old, which is long enough
+    // for the scene and the indexers to have caught up, and recent enough that
+    // TorBox's ~30 day cache and the usual retention still cover it. If nothing
+    // is that old the check says so rather than guessing.
     const now = Date.now();
+    const DAY = 24 * 60 * 60 * 1000;
+    const settledBefore = now - (7 * DAY);
+    const oldestUseful = now - (60 * DAY);
     let chosen = null;
     for (const event of store.getEvents()) {
       const prefix = String(event.id || '').split(':')[0];
@@ -411,13 +423,16 @@ function createApp() {
         if (!ids.some((id) => selection.has(id))) continue;
       }
       const when = Date.parse(event.date + 'T00:00:00Z');
-      if (!Number.isFinite(when) || when > now) continue;
+      if (!Number.isFinite(when)) continue;
+      if (when > settledBefore || when < oldestUseful) continue;
       if (!chosen || when > chosen.when) chosen = { event, when };
     }
     if (!chosen) {
       return res.send(JSON.stringify({
         ok: false,
-        error: 'No past fixture in your catalogs yet — refresh the catalogs, or come back once a fixture has been played.',
+        error: 'Nothing to check against yet. The check needs a fixture that finished at least a week ago '
+          + '— a match from last night has nothing posted for it, so it would report no streams whatever '
+          + 'your settings are. Refresh your catalogs, or come back in a few days.',
       }));
     }
 
@@ -454,6 +469,7 @@ function createApp() {
       event: {
         name: chosen.event.name,
         date: chosen.event.date,
+        ageDays: Math.round((now - chosen.when) / DAY),
         promotion: (promotions.getByEventId(chosen.event.id) || {}).name || '',
       },
       total: rows.length,

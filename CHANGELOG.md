@@ -1,5 +1,79 @@
 # Changelog
 
+## 0.93.0 — push collections straight into Nuvio
+
+Getting a collection into Nuvio meant copying a JSON blob out of SSS and
+importing it by hand, every time anything changed. Nuvio's backend is a Supabase
+instance at `api.nuvio.tv` whose sync RPCs sit behind an ordinary account login,
+so the Collections step can now sign in, list your profiles, and write the
+collection into the one you pick — optionally installing the addon at the same
+time.
+
+### It runs in your browser, and that is the point
+
+The page talks to `api.nuvio.tv` directly. Your Nuvio password and access token
+never reach this server, are never written to `users.json`, and never appear in
+a log; the token lives in a JavaScript variable for the life of the tab and is
+deliberately kept out of `localStorage` too.
+
+The cost is honest: SSS holds no token, so it cannot push on a schedule. That is
+the right trade for a self-hosted box — an addon that stores your streaming
+account password is an addon whose backup file is a credential dump. A test
+asserts that every request the shipped code makes goes to Nuvio or to SSS's own
+export, and that nothing persists the token.
+
+### Both push RPCs are a full replace
+
+This is the fact everything else follows from. `sync_push_collections` replaces
+the entire collection list, and `sync_push_addons` replaces the entire addon
+list — so sending only the SSS collection would delete every other collection on
+the profile, and installing the addon naively would delete every other addon.
+
+Every write pulls first, merges, and pushes the whole list back:
+
+- **Merge** (default) updates the SSS collection and leaves everything else
+  exactly as it is, in the profile's own order.
+- **Add only** adds it if the profile has never seen it and otherwise changes
+  nothing, so edits you made inside Nuvio survive.
+- **Replace all** does what it says, behind a typed confirmation rather than a
+  click — it is unrecoverable from this end.
+
+Installing the addon re-enables a switched-off copy rather than duplicating it,
+appends rather than reordering your addons, and leaves a disabled addon of yours
+disabled.
+
+### Content-Security-Policy
+
+`connect-src` now permits `https://api.nuvio.tv` and nothing else, so the page
+can do the push and could not exfiltrate those credentials anywhere else if it
+were ever compromised. jsdelivr came out of `script-src`, `style-src` and
+`font-src` in the same pass — it was there for the Tabler CDN build, which
+0.90.0 vendored and 0.92.0 deleted.
+
+## 0.92.1
+
+### Catalog rows show a colour, not a broken poster
+
+The rows on the Catalogs step rendered each promotion's poster. Those posters
+are wide landscape banners meant to fill a Stremio row, and several promotions
+have none at all, so a 62x35 slot showed a squashed crop, the wrong crest, or
+nothing. The artwork was not doing the job the list needs — telling one row from
+another at a glance — so it is a coloured initial tile instead, with the hue
+derived from the promotion id so it is stable and neighbours differ.
+
+### The install check now uses a settled fixture
+
+It picked the most recently played fixture, which is the one guaranteed to fail:
+a match that finished hours ago has nothing posted for it, so every pipeline
+reports no streams and the result looks exactly like the broken configuration
+the check exists to rule out.
+
+It now takes the newest fixture that is at least a week old — long enough for
+indexers to catch up, recent enough that TorBox's cache and normal retention
+still cover it — and caps the search at sixty days. If nothing qualifies it says
+so plainly instead of running a check that cannot pass. The result names the
+fixture's age so it is obvious what was tested.
+
 ## 0.92.0 — everything on the new design system
 
 Tabler is gone: the dependency, the stylesheet, the JavaScript and the static
