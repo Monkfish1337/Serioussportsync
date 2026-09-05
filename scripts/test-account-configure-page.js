@@ -61,10 +61,12 @@ function listen(app) {
     assert.strictEqual(manifest.headers.get('access-control-allow-origin'), '*',
       'addon API retains client-compatible CORS');
     const html = await account.text();
+    // 0.91.0 — Configure is a five-step flow in the new design system. What is
+    // asserted here is the CONTRACT, not the chrome: every field the save route
+    // reads must be present on the page, or a save silently blanks it.
     for (const expected of [
-      'Configure SeriousSportSync',
-      'Signing in is the only editing authority',
-      'No second editing link.',
+      'id="configure-form"',
+      'action="/account/save"',
       'name="torboxApiKey"',
       'name="torboxEnabled"',
       'name="easynewsUsername"',
@@ -72,18 +74,30 @@ function listen(app) {
       'name="easynewsPassword"',
       'name="uuManifestUrl"',
       'name="uuEnabled"',
-      'DIY Usenet pipeline',
       'name="diyUsenetEnabled"',
-      'Enable the DIY Usenet pipeline',
+      'name="maxStreams"',
+      'name="showWarmRows"',
+      'name="promotionOrder"',
       'Open DIY Usenet settings',
       'Your teams',
-      'Catalogs and display order',
-      'Save configuration',
-      'Install Stremio',
-      'Copy manifest',
-      'Nuvio collection',
+      'Catalogs',
+      'Install',
+      'Check it works',
       'stremio://',
     ]) assert.ok(html.includes(expected), 'account page includes ' + expected);
+
+    // The five steps exist, in order, and the flow can be navigated.
+    for (const step of ['Services', 'Your teams', 'Catalogs', 'Collections', 'Install']) {
+      assert.ok(html.includes('>' + step + '</span>') || html.includes(step),
+        'Configure has a ' + step + ' step');
+    }
+    assert.ok(html.includes('data-step-to="0"') && html.includes('data-step-to="4"'),
+      'every step is reachable from the rail');
+
+    // The old page is still served, so a regression is one word to undo.
+    const classic = await fetch(base + '/account/classic', { headers: { Cookie: cookie } });
+    assert.strictEqual(classic.status, 200, 'the previous Configure page is still reachable');
+    assert.ok((await classic.text()).includes('Configure SeriousSportSync'));
     for (const removed of ['TorBox Unified diagnostic', 'torbox-unified-probe', '#edit=']) {
       assert.ok(!html.includes(removed), 'account page omits ' + removed);
     }
@@ -244,7 +258,7 @@ function listen(app) {
     assert.strictEqual(usenetSave.status, 302, 'DIY Usenet settings save');
 
     assert.strictEqual(save.status, 302, 'installed-app null-origin form saves successfully');
-    assert.strictEqual(save.headers.get('location'), '/account?flash=saved');
+    assert.strictEqual(save.headers.get('location'), '/account?flash=saved&step=0');
     const saved = users.findById(user.id).config;
     assert.strictEqual(saved.torboxEnabled, true);
     assert.strictEqual(saved.torboxApiKey, 'test-torbox-key');

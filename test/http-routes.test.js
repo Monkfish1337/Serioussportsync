@@ -337,14 +337,26 @@ test('the Save button on Configure belongs to the account form', async () => {
   const html = await (await get('/account', { headers: { cookie } })).text();
   assert.ok(user.id);
 
-  // The account form must still be open where the Save button sits: no </form>
-  // may appear between the form that posts to /account/save and that button.
-  const formStart = html.indexOf('action="/account/save"');
-  const saveButton = html.indexOf('Save configuration');
-  assert.ok(formStart > -1 && saveButton > formStart, 'expected the Save button after the form opens');
-  const between = html.slice(formStart, saveButton);
-  assert.equal(between.includes('</form>'), false,
-    'a nested </form> before the Save button detaches it from the account form');
+  // 0.89.0 detached the Save button by nesting one form inside another, and
+  // the rebuilt Configure page has the same hazard: five step panels, one of
+  // which offers collection editing that used to be its own <form>.
+  //
+  // The rule is stronger than "Save is inside the form": there must be NO
+  // nested form anywhere in the page, because the browser closes the outer one
+  // at the first </form> and silently orphans everything after it.
+  const formStart = html.indexOf('id="configure-form"');
+  assert.ok(formStart > -1, 'expected the Configure form');
+  const formEnd = html.indexOf('</form>', formStart);
+  assert.ok(formEnd > formStart, 'the Configure form must close');
+  assert.equal(html.slice(formStart, formEnd).includes('<form'), false,
+    'a nested <form> inside Configure detaches everything after it');
+
+  // Save sits in the sticky action bar, outside the form, and reaches it by
+  // id — which is valid HTML and cannot be nested by accident.
+  const saveButton = html.indexOf('id="next-btn"');
+  assert.ok(saveButton > formEnd, 'Save should live in the action bar below the form');
+  assert.match(html.slice(saveButton - 200, saveButton + 60), /form="configure-form"/,
+    'the Save button must name the form it submits');
 });
 
 // The admin used to load its entire stylesheet from cdn.jsdelivr.net at
@@ -446,19 +458,25 @@ test('the manifest Copy button works outside a secure context', async () => {
   const html = await (await get('/account', { headers: { cookie } })).text();
   assert.ok(user.id);
 
-  const script = html.slice(html.indexOf('copyUrlBtn'));
+  const script = html.slice(html.indexOf('copy-manifest'));
   assert.ok(script.includes('isSecureContext'),
     'the async clipboard API must only be attempted where it exists');
   assert.ok(script.includes('execCommand'),
     'a plain-http install needs the textarea fallback');
 
-  // The bug was that success was announced unconditionally. "Copied!" must sit
-  // behind a path that actually copied something.
-  const announcement = script.indexOf('"Copied!"');
-  assert.ok(announcement > -1);
-  const before = script.slice(0, announcement);
-  assert.ok(/legacyCopy|then\(/.test(before),
-    'the success label must follow a copy that succeeded, not run regardless');
+  // The bug was that success was announced unconditionally. Every place the
+  // page can say "Copied" must sit behind something that reports whether the
+  // copy actually happened — a resolved promise, or the execCommand result.
+  const announcements = [];
+  script.replace(/Copied/g, (match, index) => { announcements.push(index); return match; });
+  assert.ok(announcements.length > 0, 'the page should be able to confirm a copy');
+  for (const index of announcements) {
+    const before = script.slice(Math.max(0, index - 240), index);
+    assert.ok(/then\(|ok \?|execCommand/.test(before),
+      'a success label must follow a copy that succeeded, not run regardless');
+  }
+  assert.ok(script.includes('Press Ctrl+C'),
+    'when both paths fail the page should say what to do instead of claiming success');
 });
 
 // The skin picker. Anything a form posts is attacker-controlled, and this value
@@ -502,6 +520,39 @@ test('the skin picker applies a known skin and refuses anything else', async () 
   assert.match(after, /--tblr-primary: #4263eb;/, 'a refused skin leaves the previous one in place');
 
   await apply('sportsroom');
+});
+
+// The step SSS has never had. Until now the first evidence that setup worked
+// was opening Stremio and finding an empty row — and a pipeline returning
+// nothing looked exactly like one that was never configured.
+test('the install check reports per pipeline, and says so when it cannot run', async () => {
+  const user = await makeUser('verifier', 'admin');
+  const login = await get('/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ username: 'verifier', password: 'correct-horse-battery-staple' }).toString(),
+  });
+  const cookie = (login.headers.getSetCookie ? login.headers.getSetCookie() : [])
+    .map((value) => value.split(';')[0]).join('; ');
+  assert.ok(user.id);
+
+  const response = await get('/account/verify', {
+    method: 'POST', headers: { cookie, Accept: 'application/json' },
+  });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+
+  // This test store has no played fixtures, so the honest answer is that there
+  // is nothing to check — not a pass, and not an error the user has to decode.
+  assert.equal(body.ok, false);
+  assert.match(body.error, /no past fixture/i);
+  assert.doesNotMatch(JSON.stringify(body), /token|password|apiKey/i,
+    'the check must not echo credentials back to the page');
+});
+
+test('the install check refuses an anonymous caller', async () => {
+  const response = await get('/account/verify', { method: 'POST', redirect: 'manual' });
+  assert.notEqual(response.status, 200, 'verify runs a real search — it needs a session');
 });
 
 test('failed sign-ins are rate limited per client', async () => {

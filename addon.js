@@ -49,6 +49,11 @@ const security = require('./lib/security');
 // use tablerChrome.tablerPage().
 const tablerChrome = require('./lib/tabler-chrome');
 const { cleanOrder, orderByIds } = require('./lib/catalog-order');
+// 0.91.0 — Configure in the new design system. lib/tabler-chrome still serves
+// every page that has not moved yet; the two are deliberately easy to tell
+// apart on sight while the migration runs.
+const configurePage = require('./lib/configure-page');
+const STEP_IDS = configurePage.STEPS.map((step) => step.id);
 const { effectiveCatalogSelection, CURRENT_DEFAULTS_VERSION } = require('./lib/catalog-selection');
 const { buildNuvioCollections } = require('./lib/nuvio-collections');
 const APP_VERSION = require('./package.json').version || '?';
@@ -298,11 +303,172 @@ function createApp() {
 
   app.post('/logout', (req, res) => { sessions.clearCookie(res, req); res.redirect('/login'); });
 
+  // 0.91.0 — Configure, rebuilt as a stepped flow in the new design system.
+  //
+  // The old renderer is still in this file and still reachable at
+  // /account/classic while the rest of the app moves over, so a regression
+  // here is a one-word change rather than a revert.
   app.get('/account', requireLogin, (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    const cfg = req.user.config || {};
+    const origin = publicOriginFromReq(req);
+    const effective = effectiveCatalogSelection(cfg);
+    const ordered = orderByIds(promotions.enabled, cfg.promotionOrder, (p) => p.id);
+
+    // Which folder each promotion sits in, so a catalog row can say so —
+    // the point being that folder membership does NOT hide the row.
+    const collections = nuvioCollectionSettings.load();
+    const folderOf = {};
+    for (const folder of collections.folders || []) {
+      for (const id of folder.promotions || []) folderOf[id] = folder.title;
+    }
+
+    // Team promotions, enabled or not. A deselected team keeps its promotion
+    // (and its events) and simply stops being served — see the retention note
+    // in lib/custom-promotions.
+    const teamKeys = new Set(teamPicker.CHOOSERS.map((c) => c.key));
+    const teamPromotions = promotions.all
+      .filter((p) => p.isCustom && teamKeys.has(String(p.id).split('-')[0]))
+      .map((p) => ({ id: p.id, name: p.name, enabled: !!p.enabled, chooser: String(p.id).split('-')[0] }));
+
+    res.send(configurePage.render({
+      user: req.user,
+      isAdmin: req.user.role === 'admin',
+      isFirstRun: !cfg.catalogDefaultsVersion && !String(cfg.torboxApiKey || '').trim(),
+      step: STEP_IDS[Math.max(0, Math.min(STEP_IDS.length - 1, parseInt(req.query.step, 10) || 0))],
+      flash: req.query.flash || null,
+      installUrl: origin + '/u/' + req.user.id + '/' + (req.user.apiToken || '') + '/manifest.json',
+      promotions: ordered.map((p) => ({
+        id: p.id, name: p.name,
+        catalogs: (p.catalogs || []).map((c) => ({ id: c.id })),
+        poster: (p.defaults && p.defaults.poster) || '',
+        isTeam: !!(p.isCustom && teamKeys.has(String(p.id).split('-')[0])),
+      })),
+      selected: effective || new Set(),
+      selectAll: effective === null,
+      folderOf,
+      collections,
+      choosers: teamPicker.CHOOSERS.map((c) => ({ key: c.key, label: c.label, hint: c.hint })),
+      teamPromotions,
+    }));
+  });
+
+  app.get('/account/classic', requireLogin, (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
     res.send(renderAccountPage(req.user, { flash: req.query.flash || null, origin: publicOriginFromReq(req) }));
   });
+
+  // Deselecting a team. NOT a delete: the promotion is switched off, which
+  // takes its catalogs out of every manifest while leaving the promotion and
+  // its stored fixtures in place, so re-picking the team costs no provider
+  // calls — and scripts/refresh will not treat those events as orphans,
+  // because it prunes against promotions.all rather than the enabled list.
+  app.post('/account/teams/remove', requireLogin, (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const fail = (status, error) => res.status(status).send(JSON.stringify({ ok: false, error }));
+    if (!req.user || req.user.role !== 'admin') {
+      return fail(403, 'A team catalog is shared by everyone on this server, so an admin has to change it.');
+    }
+    const body = req.body || {};
+    const key = String(body.chooser || '').trim();
+    const teamId = String(body.teamId || '').trim();
+    const spec = customPromotions.list().find((item) => {
+      const filter = item.teamFilter || {};
+      const sameTeam = String(filter.id || '') === teamId || String(item.teamId || '') === teamId;
+      return sameTeam && String(item.id || '').indexOf(key + '-') === 0;
+    });
+    if (!spec) return fail(404, 'No catalog for that team');
+    try {
+      customPromotions.update(spec.id, Object.assign({}, spec, { enabled: false }));
+      promotions.reload();
+      return res.send(JSON.stringify({ ok: true, id: spec.id, retained: true }));
+    } catch (err) {
+      return fail(422, security.safeErrorMessage(err));
+    }
+  });
+
+  // 0.91.0 — "Check it works".
+  //
+  // Until now the first evidence that setup worked was opening Stremio and
+  // finding an empty row, and a pipeline that returned nothing looked exactly
+  // like one that was never configured. This runs one real fixture from the
+  // user's own catalogs through their own pipelines and reports what each one
+  // did — which is also the fastest way to tell a credentials problem from a
+  // matching problem.
+  app.post('/account/verify', requireLogin, async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const cfg = req.user.config || {};
+    const selection = effectiveCatalogSelection(cfg);
+    const servedPrefixes = new Set(promotions.enabled.map((p) => p.idPrefix));
+
+    // The most recent fixture the user actually has a catalog for: a check
+    // against something they cannot see would prove nothing.
+    const now = Date.now();
+    let chosen = null;
+    for (const event of store.getEvents()) {
+      const prefix = String(event.id || '').split(':')[0];
+      if (!servedPrefixes.has(prefix)) continue;
+      const promotion = promotions.getByEventId(event.id);
+      if (!promotion) continue;
+      if (selection) {
+        const ids = (promotion.catalogs || []).map((c) => c.id);
+        if (!ids.some((id) => selection.has(id))) continue;
+      }
+      const when = Date.parse(event.date + 'T00:00:00Z');
+      if (!Number.isFinite(when) || when > now) continue;
+      if (!chosen || when > chosen.when) chosen = { event, when };
+    }
+    if (!chosen) {
+      return res.send(JSON.stringify({
+        ok: false,
+        error: 'No past fixture in your catalogs yet — refresh the catalogs, or come back once a fixture has been played.',
+      }));
+    }
+
+    let result;
+    try {
+      result = await handleStream({
+        id: chosen.event.id,
+        userConfig: cfg,
+        userId: req.user.id,
+        apiToken: req.user.apiToken,
+        username: req.user.username,
+        origin: publicOriginFromReq(req),
+      });
+    } catch (err) {
+      return res.send(JSON.stringify({ ok: false, error: security.safeErrorMessage(err) }));
+    }
+
+    const rows = (result && result.streams) || [];
+    const countFor = (match) => rows.filter((row) => match.test(String(row.name || ''))).length;
+    const uuConfigured = !!String(cfg.uuManifestUrl || '').trim();
+    const pipelines = [
+      { name: 'TorBox', configured: !!String(cfg.torboxApiKey || '').trim(),
+        rows: countFor(/torbox|sport-video/i), detail: 'Debrid — torrents and usenet' },
+      { name: 'Usenet Ultimate', configured: uuConfigured,
+        rows: countFor(/usenet/i), detail: uuConfigured ? 'Indexer fan-out' : 'No manifest URL saved' },
+      { name: 'Easynews', configured: !!(String(cfg.easynewsUsername || '').trim() && cfg.easynewsPassword),
+        rows: countFor(/easynews/i), detail: 'Usenet search and direct play' },
+      { name: 'DIY Usenet', configured: cfg.diyUsenetEnabled === true,
+        rows: countFor(/nzb|dav|nntp/i), detail: cfg.diyUsenetEnabled ? 'Your own indexer' : 'Switched off' },
+    ];
+
+    res.send(JSON.stringify({
+      ok: true,
+      event: {
+        name: chosen.event.name,
+        date: chosen.event.date,
+        promotion: (promotions.getByEventId(chosen.event.id) || {}).name || '',
+      },
+      total: rows.length,
+      pipelines,
+    }));
+  });
+
 
   app.get('/account/nuvio-collections.json', requireLogin, (req, res) => {
     const payload = buildNuvioCollections({
@@ -471,7 +637,11 @@ function createApp() {
         // 0.38.0: warm-to-cache pseudo-streams toggle (default true).
         showWarmRows: b.showWarmRows === 'on' || b.showWarmRows === '1' || b.showWarmRows === 'true',
       });
-      res.redirect('/account?flash=saved');
+      // Land back on the step they were on. A save that throws you to the top
+      // of a five-step flow is the fastest way to make the flow feel hostile.
+      const back = parseInt((req.body || {}).returnStep, 10);
+      const step = Number.isFinite(back) && back >= 0 && back <= 4 ? back : 0;
+      res.redirect('/account?flash=saved&step=' + step);
     } catch (err) {
       res.redirect('/account?flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(err)));
     }

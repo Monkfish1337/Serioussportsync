@@ -1,5 +1,72 @@
 # Changelog
 
+## 0.91.0 — Configure, rebuilt
+
+The first release of the new design system, and the first page moved onto it.
+Everything else still renders through Tabler; the two are deliberately easy to
+tell apart while the migration runs, and the previous Configure page is still
+served at `/account/classic` so a regression here is one word to undo.
+
+### The flow, which was the actual problem
+
+`/account` was one long scroll on which playback services, catalogs,
+collections and the install URL all carried the same weight. Nothing told a new
+user what to do first, nothing ever told them they were finished, and the
+install URL — the entire point of the page — sat in the middle of it.
+
+Five steps now, in an order that argues for itself: **Services → Your teams →
+Catalogs → Collections → Install**. Services first because a team you follow
+with nothing to search it with is a catalog that plays nothing.
+
+Two flows over one set of steps. A first run is a sequence with a permanent
+"Skip to install" — a wizard you cannot leave is worse than no wizard. A
+returning visit is not a sequence at all: every step is equally reachable and
+the button says Save changes, because you came back to fix one API key, not to
+be marched through five screens. Saving returns you to the step you were on.
+
+### Check it works
+
+Until now the first evidence that any of the setup worked was opening Stremio
+and finding an empty row — and a pipeline returning nothing looked exactly like
+one that was never configured. The Install step now runs one real fixture from
+your own catalogs through your own pipelines and reports what each one did, so
+a credentials problem is distinguishable from a matching problem without
+reading a log.
+
+### Deselecting a team now means something
+
+A team catalog, once created, stayed in the catalog list for good: you
+deselected the team, and then had to go and switch the catalog off by hand. The
+team pick is the single source of truth now — deselect and the catalog leaves
+your manifest by itself.
+
+Leaving is not deleting. The promotion is switched off rather than removed, so
+its stored fixtures stay on disk and re-picking the team is instant and costs
+no provider calls. That also keeps the events out of the orphan prune added in
+0.90.1, which keys on known promotions rather than served ones — deleting
+outright is what left a store full of unreachable `manutd:` events in 0.89.1.
+
+### Folders no longer hide rows
+
+Being in a Nuvio collection and being on the home screen are separate things,
+and the old page conflated them. Each catalog row now carries its own home-row
+switch, and folder membership is shown on the row rather than implied by its
+absence.
+
+### The design system
+
+`lib/ui/tokens.js`, `lib/ui/css.js` and `lib/ui/shell.js`: a token set, two
+themes, and a slim icon rail of destinations. No framework and no build step —
+the admin renders as strings of HTML from Node, and a design system that needed
+a bundler would be the wrong answer to "SSS looks very 90s".
+
+No webfonts. Vendoring Tabler in 0.90.0 was so a self-hosted addon renders on a
+network that cannot reach a CDN; opening the new system with a Google Fonts
+request would undo that on day one. The 0.90.8 skins survive as accent sets.
+
+Nothing in Configure is ever `disabled` and no form is ever nested — the two
+traps that have each cost this project a bug. A test asserts both.
+
 ## 0.90.8
 
 ### Skins
