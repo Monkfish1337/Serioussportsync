@@ -85,9 +85,33 @@ test('a different fixture is still refused', () => {
 });
 
 test('football-data fixtures carry every naming form the provider supplies', () => {
+  // 0.93.1 — the affix-stripped form is here on purpose, and it is the one
+  // that matters. football-data supplies only "Man City" and "Manchester City
+  // FC"; search-title generation drops FC-suffixed forms because no release
+  // group writes them, so without this the only long form was filtered out and
+  // every indexer query went out as "Man City". Releases are named "Manchester
+  // City", so they all missed.
   const event = fixture('epl', CITY, ARSENAL, '2026-09-03');
-  assert.deepEqual(event.teamNames.home, ['Man City', 'Manchester City FC', 'MCI']);
-  assert.deepEqual(event.teamNames.away, ['Arsenal', 'Arsenal FC', 'ARS']);
+  assert.deepEqual(event.teamNames.home,
+    ['Man City', 'Manchester City', 'Manchester City FC', 'MCI']);
+  assert.deepEqual(event.teamNames.away, ['Arsenal', 'Arsenal FC', 'ARS'],
+    'a club whose long name has nothing to strip gains no duplicate');
+});
+
+// The failure this prevents, end to end: the queries that actually reach a
+// provider must include the club's full name, not four spellings of the short
+// one. This is the check that would have caught "only Sport-Video pulls".
+test('the queries sent to providers cover both spellings of a club', () => {
+  const streams = require('../lib/streams');
+  const event = fixture('epl', CITY, ARSENAL, '2026-09-03');
+  const promotion = promotions.byPrefix.epl;
+  const titles = Array.from(new Set(promotion.searchTitles(event)));
+  assert.ok(titles.some((t) => /Manchester City/i.test(t)), 'the long form must be generated');
+
+  const sent = streams._test.selectProviderQueries(titles, event, 6, promotion);
+  assert.ok(sent.some((t) => /Manchester City/i.test(t)),
+    'and it must survive the trim — generating it is no use if it is never sent');
+  assert.ok(sent.some((t) => /Man City/i.test(t)), 'the short form is still worth trying');
 });
 
 // WNBA was the single largest unclaimed block in the scan (56 releases) and

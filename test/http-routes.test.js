@@ -561,6 +561,23 @@ test('the install check reports per pipeline, and says so when it cannot run', a
     'the check must not echo credentials back to the page');
 });
 
+// The check reports each pipeline from what handleStream actually produced.
+// Working it out by pattern-matching row labels made a pipeline that answered
+// look like one that found nothing — which is the exact failure the check is
+// supposed to distinguish.
+test('the install check reads provenance from the stream result, not row labels', async () => {
+  const streams = require('../lib/streams');
+  const source = String(streams.handleStream);
+  assert.match(source, /pipelineRows:/,
+    'handleStream must report which pipeline produced what');
+  const addon = fs.readFileSync(path.join(__dirname, '..', 'addon.js'), 'utf8');
+  const verify = addon.slice(addon.indexOf("app.post('/account/verify'"));
+  const body = verify.slice(0, verify.indexOf('\n  });'));
+  assert.match(body, /result\.pipelineRows/);
+  assert.doesNotMatch(body, /row\.name/,
+    'a row\'s display label is presentation, not provenance');
+});
+
 test('the install check refuses an anonymous caller', async () => {
   const response = await get('/account/verify', { method: 'POST', redirect: 'manual' });
   assert.notEqual(response.status, 200, 'verify runs a real search — it needs a session');

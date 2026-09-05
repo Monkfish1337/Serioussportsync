@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.93.1 — why only Sport-Video was pulling
+
+Reported as "TorBox, Usenet Ultimate and Easynews return nothing, only
+Sport-Video works". The configuration was fine. Every indexer query for a
+football fixture was going out with the wrong club name.
+
+### football-data supplies three names and the useful one was being discarded
+
+For a Premier League fixture the provider gives `shortName` "Man United",
+`name` "Manchester United FC" and `tla` "MUN" — and nothing else. Search-title
+generation deliberately drops FC-suffixed forms, because no release group writes
+"Manchester United FC", so the only long form in the list was filtered out and
+every query went out as **"Man United vs Ipswich Town"**.
+
+Releases are named "Manchester United". A literal text search for the short name
+matched nothing, so Usenet Ultimate and Easynews returned zero for fixtures that
+plainly had releases. Sport-Video kept working because it matches against titles
+it has already stored rather than issuing a search — which is exactly why it was
+the only pipeline still producing rows.
+
+The fix is one function: the affix-stripped form is now supplied alongside the
+others, so every football-data league gets its full club name — EPL, Serie A,
+Ligue 1, the Championship — rather than needing a curated alias table each.
+
+### The query budget was buying punctuation instead of spellings
+
+Even with the long form generated, it never reached a provider. The planner
+scores for brevity and token overlap, and every shape of the short name scores
+alike, so all four slots went to "Man United vs Ipswich Town" with the date
+moved around — one query, sent four times.
+
+A provider search is a text match: coverage comes from spelling the club a
+different way, not from swapping a dot for a dash. The planner now allows two
+shapes per spelling and spends the rest of the budget on spellings not yet
+tried. Both "Man United" and "Manchester United" now go out.
+
+### The install check was guessing where rows came from
+
+It attributed each row to a pipeline by pattern-matching the row's display
+label, so a pipeline that answered could be reported as finding nothing.
+`handleStream` already knows exactly which pipeline produced each row, so it now
+returns that, and the check reports the real total.
+
+A fixture with genuinely no release is also no longer described as a
+configuration problem — the wording now says so.
+
 ## 0.93.0 — push collections straight into Nuvio
 
 Getting a collection into Nuvio meant copying a JSON blob out of SSS and

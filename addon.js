@@ -451,17 +451,20 @@ function createApp() {
     }
 
     const rows = (result && result.streams) || [];
-    const countFor = (match) => rows.filter((row) => match.test(String(row.name || ''))).length;
+    // Counts come from handleStream itself rather than from guessing at each
+    // row's label — see the note where it builds them.
+    const counts = (result && result.pipelineRows) || {};
     const uuConfigured = !!String(cfg.uuManifestUrl || '').trim();
     const pipelines = [
       { name: 'TorBox', configured: !!String(cfg.torboxApiKey || '').trim(),
-        rows: countFor(/torbox|sport-video/i), detail: 'Debrid — torrents and usenet' },
+        rows: counts.torbox || 0, detail: 'Debrid — torrents and usenet' },
       { name: 'Usenet Ultimate', configured: uuConfigured,
-        rows: countFor(/usenet/i), detail: uuConfigured ? 'Indexer fan-out' : 'No manifest URL saved' },
+        rows: counts.uu || 0, detail: uuConfigured ? 'Indexer fan-out' : 'No manifest URL saved' },
       { name: 'Easynews', configured: !!(String(cfg.easynewsUsername || '').trim() && cfg.easynewsPassword),
-        rows: countFor(/easynews/i), detail: 'Usenet search and direct play' },
+        rows: counts.easynews || 0, detail: 'Usenet search and direct play' },
       { name: 'DIY Usenet', configured: cfg.diyUsenetEnabled === true,
-        rows: countFor(/nzb|dav|nntp/i), detail: cfg.diyUsenetEnabled ? 'Your own indexer' : 'Switched off' },
+        rows: (counts.nzbdav || 0) + (counts.nativeNntp || 0),
+        detail: cfg.diyUsenetEnabled ? 'Your own indexer' : 'Switched off' },
     ];
 
     res.send(JSON.stringify({

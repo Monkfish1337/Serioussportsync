@@ -32,11 +32,43 @@ test('provider query planner preserves a promotion curated release query', () =>
   const selected = streams._test.selectProviderQueries(
     titles, { name: 'LASK vs Celtic FC', date: '2026-08-25' }, 3
   );
+  // The curated query still leads — that part has not changed. What changed in
+  // 0.93.1 is the third slot: "LASK vs Celtic FC" is the same spelling as
+  // "LASK vs Celtic" with an affix, so sending both is one query twice. The
+  // nickname is a genuinely different spelling, so it is worth the slot.
   assert.deepEqual(selected, [
     'UEFA Champions League 2026.08.25 LASK vs Celtic',
     'LASK vs Celtic 2026.08.25',
-    'LASK vs Celtic FC 2026.08.25',
+    'LASK vs Celts 2026.08.25',
   ]);
+});
+
+test('the budget buys different spellings, not different punctuation', () => {
+  // Four ways of writing one spelling. Before 0.93.1 all four were sent — the
+  // scorer optimises for brevity, and every short-name variant scores alike —
+  // so a fixture whose releases use the long club name matched nothing on any
+  // provider while Sport-Video, which never issues a text search, kept working.
+  const titles = [
+    'EPL 2026.08.30 Man United vs Ipswich Town',
+    'Man United vs Ipswich Town 2026.08.30',
+    'Man United vs Ipswich Town 2026 08 30',
+    'Man United vs Ipswich Town 2026-08-30',
+    'Ipswich Town vs Man United 2026.08.30',
+    'Manchester United vs Ipswich Town 2026.08.30',
+  ];
+  const selected = streams._test.selectProviderQueries(
+    titles, { name: 'Man United vs Ipswich Town', date: '2026-08-30' }, 4
+  );
+  assert.ok(selected.some((t) => /Manchester United/.test(t)),
+    'the long spelling must get a slot: ' + JSON.stringify(selected));
+
+  // Every distinct spelling is tried before any one of them gets a third
+  // shape. Leftover budget going back to more punctuation of the best spelling
+  // is fine — that only happens once there is nothing new left to try.
+  const beforeLong = selected.slice(0, selected.findIndex((t) => /Manchester United/.test(t)));
+  assert.ok(beforeLong.length <= 2,
+    'the long spelling must not queue behind three shapes of the short one: '
+      + JSON.stringify(selected));
 });
 
 test('a promotion can opt into non-English sports releases', () => {
