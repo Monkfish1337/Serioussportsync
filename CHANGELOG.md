@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.93.3 — Easynews rows no longer vanish when Usenet Ultimate catches up
+
+Reported as: refresh so UU can catch up, and the Easynews links that were there
+a moment ago disappear. It was the dedupe, and the numbers from the log are
+unambiguous — 3 TorBox + 10 UU + 3 Easynews rows arrived, 11 went out. Five were
+silently removed, all of them Easynews rows whose release title UU had also
+produced.
+
+The dedupe scope was shared across pipelines, so the first pipeline to produce a
+release title took the slot and every other copy was dropped. Results appeared to
+get *worse* the more the addon found.
+
+Two rows with the same release title from different pipelines are not
+duplicates. They are different ways to play the same file — Easynews streams it
+directly, UU hands an NZB to your debrid, TorBox resolves a torrent. They fail
+differently, perform differently, and are labelled differently in the client, so
+dropping one removes a working fallback for a release you can already see.
+
+Deduping within a pipeline is still right: one provider returning the same
+release twice is a duplicate. `nzbdav` and `nntp` already set their own scopes
+for exactly this reason — this generalises what they were doing rather than
+inventing a new rule, and their scopes still win where present.
+
+The merge moved out of `handleStream` into a function the tests call directly,
+so the behaviour is covered by exercising the shipped code rather than a copy of
+its logic.
+
 ## 0.93.2 — more room for a slow provider
 
 ### The live budget: 8s to 9.5s

@@ -98,3 +98,50 @@ test('the live budget stays inside the client\'s patience', () => {
   assert.match(source, /Number\(params\.budgetMs\)/,
     'the install check needs to opt out of the client-sized budget');
 });
+
+// A release offered by two pipelines is two ways to play it, not a duplicate.
+//
+// From a real log: 3 TorBox + 10 Usenet Ultimate + 3 Easynews rows arrived and
+// 11 went out. Five disappeared — every Easynews row whose release title UU
+// had already produced. The user saw Easynews links vanish as soon as UU
+// caught up, which reads as results getting worse the more the addon finds.
+test('a release offered by two pipelines keeps both rows', () => {
+  const merge = streams._test.mergePipelineRows;
+  const title = 'EPL.2026.08.30.Man.United.vs.Ipswich.1080p-DARKSPORT';
+  const rows = merge([
+    ['torbox', [{ name: 'TorBox', title: title + '\n7 GB' }]],
+    ['uu', [
+      { name: 'Usenet', title: title + '\n7 GB' },
+      { name: 'Usenet', title: title + '\n7 GB' },
+    ]],
+    ['easynews', [{ name: 'Easynews', title: title + '\n7.8 GB' }]],
+  ]);
+
+  assert.equal(rows.length, 3, 'one row per pipeline, and the UU duplicate dropped');
+  assert.deepEqual(rows.map((r) => r.name), ['TorBox', 'Usenet', 'Easynews']);
+});
+
+test('a pipeline returning the same release twice still dedupes', () => {
+  const rows = streams._test.mergePipelineRows([
+    ['uu', [{ title: 'A\nx' }, { title: 'A\ny' }, { title: 'B\nz' }]],
+  ]);
+  assert.equal(rows.length, 2, 'within one pipeline a repeat is a duplicate');
+});
+
+test('a row that names its own dedupe scope keeps it', () => {
+  // nzbdav and nntp share a candidate list and set their own scopes so the
+  // two playback paths do not cancel each other out.
+  const rows = streams._test.mergePipelineRows([
+    ['diy', [
+      { name: 'NZB DAV', title: 'A\nx', _sssDedupeScope: 'nzbdav' },
+      { name: 'NNTP', title: 'A\nx', _sssDedupeScope: 'nntp' },
+    ]],
+  ]);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0]._sssDedupeScope, undefined, 'the marker must not reach the client');
+});
+
+test('a row with no title is passed through rather than dropped', () => {
+  const rows = streams._test.mergePipelineRows([['torbox', [{ name: 'odd' }, null]]]);
+  assert.equal(rows.length, 2, 'a malformed row is the pipeline\'s problem, not the merge\'s');
+});
