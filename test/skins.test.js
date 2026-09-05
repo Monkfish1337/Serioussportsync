@@ -2,12 +2,11 @@
 
 // The admin skin.
 //
-// Tabler is themed through CSS custom properties, not swappable stylesheets, so
-// a skin is a small variable block layered over the one vendored
-// tabler.min.css. The tests that matter are about what a skin must NOT do:
-// break the page when settings are unreadable, accept an arbitrary value from
-// a form post, or reintroduce a remote font request — the last of which would
-// undo the whole reason Tabler was vendored in 0.90.0.
+// A skin supplies an accent triple, a corner radius and a mode; lib/ui/tokens
+// turns that into the variable set every page renders through. The tests that
+// matter are about what a skin must NOT do: break the page when settings are
+// unreadable, accept an arbitrary value from a form post, or reintroduce a
+// remote asset — the last of which would undo the reason the UI ships inline.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -47,8 +46,16 @@ test('the variable block carries the accent in both hex and rgb', () => {
   const css = skins.cssVariables(skins.get('newsprint'));
   assert.match(css, /--tblr-primary: #4263eb;/);
   assert.match(css, /--tblr-primary-rgb: 66, 99, 235;/);
-  assert.match(css, /--tblr-border-radius: 10px;/);
-  assert.match(css, /--sss-accent: #4263eb;/);
+
+  // 0.92.0 — the same skin drives the new token set, which is what every page
+  // now renders through. A skin that coloured only the retired variables would
+  // pass the assertions above and change nothing on screen.
+  const tokens = require('../lib/ui/tokens');
+  const vars = tokens.variables(skins.get('newsprint'));
+  assert.match(vars, /--accent: #4263eb;/);
+  assert.match(vars, /--accent-rgb: 66, 99, 235;/, 'tints are mixed from the rgb triple');
+  assert.match(vars, /--r: 10px;/);
+  assert.match(vars, /--ground: #f2f4f8;/, 'a light skin must bring the light ground with it');
 });
 
 test('hexToRgb handles both shorthand and full notation', () => {
@@ -58,20 +65,22 @@ test('hexToRgb handles both shorthand and full notation', () => {
   assert.equal(skins.hexToRgb('nonsense'), '0, 0, 0');
 });
 
-test('a light skin actually switches Tabler into light mode', () => {
+test('a light skin switches the whole token set, not just the accent', () => {
   const page = (id) => chrome.tablerPage('T', '<p>body</p>', {
     user: { username: 'a', role: 'admin' }, skin: skins.get(id),
   });
-  assert.match(page('newsprint'), /<html lang="en" data-bs-theme="light">/);
-  assert.match(page('sportsroom'), /<html lang="en" data-bs-theme="dark">/);
-  // The sidebar stays dark in both — it is chrome, and its white text and
-  // brand mark depend on it.
-  assert.match(page('newsprint'), /navbar-vertical[^>]*data-bs-theme="dark"/);
+  assert.match(page('newsprint'), /<html lang="en" data-mode="light">/);
+  assert.match(page('sportsroom'), /<html lang="en" data-mode="dark">/);
+  // The whole token set swaps, not just the accent — a light mode that kept
+  // the dark ground would be an unreadable page, which is the classic bug.
+  assert.match(page('newsprint'), /--ground: #f2f4f8;/);
+  assert.match(page('sportsroom'), /--ground: #0a111c;/);
 });
 
 test('the login page is skinned too, not left on the default', () => {
   const auth = chrome.authShell('Sign in', '<form></form>', skins.get('pitch'));
-  assert.match(auth, /--tblr-primary: #2fbf71;/);
+  assert.match(auth, /--accent: #/, 'the sign-in page renders through the design system');
+  assert.match(auth, /--ground: #/);
 });
 
 test('no skin reintroduces a remote asset', () => {
@@ -89,7 +98,10 @@ test('a broken settings file leaves the chrome renderable', () => {
   // activeSkin is called on every page render. If it could throw, an
   // unreadable settings file would take down the admin entirely — including
   // the page an operator would use to fix it.
-  assert.doesNotThrow(() => chrome.activeSkin());
-  assert.ok(chrome.themeCss(null).includes('--tblr-primary'));
-  assert.ok(chrome.themeCss(undefined).includes('--sss-accent'));
+  const shell = require('../lib/ui/shell');
+  assert.doesNotThrow(() => shell.activeSkin());
+  assert.doesNotThrow(() => shell.page({ user: null, title: 'x', body: '' }));
+  const css = require('../lib/ui/css');
+  assert.ok(css.stylesheet(null).includes('--accent'));
+  assert.ok(css.stylesheet(undefined).includes('--ground'));
 });

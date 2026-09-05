@@ -81,29 +81,35 @@ test('preserves a pre-existing custom ucl promotion over the new shipped default
   assert.deepEqual(shipped.source, { type: 'uefa', competitionId: '1' });
 });
 
-test('retired expert tools are absent from the admin sidebar', () => {
-  const labels = chrome.ADMIN_SECTIONS.map((item) => item.label);
-  assert.ok(labels.includes('Promotions'));
-  assert.ok(labels.includes('Database'));
+test('every admin page is reachable from the rail, and nothing retired is', () => {
+  // 0.92.0 — the rail replaced the Tabler sidebar. This is the check that
+  // caught the migration dropping Metadata and Backup: a page with a route and
+  // no destination is a page nobody can find.
+  const uiShell = require('../lib/ui/shell');
+  const ids = uiShell.destinations(true).map((item) => item.id);
+  for (const page of ['promotions', 'database', 'sport-video', 'nuvio-collections',
+    'metadata', 'logs', 'backup', 'admin']) {
+    assert.ok(ids.includes(page), page + ' has no rail destination');
+  }
+  const labels = uiShell.destinations(true).map((item) => item.label);
   assert.ok(!labels.includes('Health'));
   for (const retired of ['Power Tool', 'Search', 'Match Editor', 'Content Studio']) {
     assert.ok(!labels.includes(retired));
   }
 });
 
-test('account identity and POST-only logout live in the sidebar, not the topbar', () => {
-  const user = { username: 'tester', role: 'admin' };
-  const sidebar = chrome.buildSidebar('account', user, true);
-  const topbar = chrome.buildTopbar(user, true);
-  assert.match(sidebar, /href="\/account"/);
-  assert.match(sidebar, /aria-label="Profile"/);
-  assert.match(sidebar, /method="POST" action="\/logout"/);
-  assert.match(sidebar, />Log out</);
-  assert.doesNotMatch(topbar, /tester|\/account|\/logout/);
+test('logout is POST-only, and a non-admin sees no operator destinations', () => {
+  const uiShell = require('../lib/ui/shell');
+  const admin = uiShell.page({ user: { username: 'tester', role: 'admin' }, title: 'T', body: '' });
+  assert.match(admin, /method="POST" action="\/logout"/,
+    'logout must never be a link — a GET logout is triggerable cross-site');
+  assert.match(admin, /Log out tester/);
+  assert.match(admin, /href="\/admin\/promotions"/);
 
-  const userSidebar = chrome.buildSidebar('account', { username: 'viewer', role: 'user' }, false);
-  assert.match(userSidebar, />Account</);
-  assert.doesNotMatch(userSidebar, />Admin</);
+  const plain = uiShell.page({ user: { username: 'viewer', role: 'user' }, title: 'T', body: '' });
+  assert.match(plain, /href="\/account"/);
+  assert.doesNotMatch(plain, /href="\/admin/,
+    'a non-admin must not be shown operator pages they cannot open');
 });
 
 test('retired expert UI modules have been deleted while data layers remain', () => {
@@ -164,7 +170,8 @@ test('wizard rolls back a newly created source when promotion validation fails',
 test('creates a no-key MLB source and exposes Metadata navigation', () => {
   const created = sources.add({ id: 'mlb-secondary', name: 'Secondary MLB schedule', type: 'mlb' });
   assert.deepEqual(created.source, { type: 'mlb' });
-  assert.ok(chrome.ADMIN_SECTIONS.some((item) => item.id === 'metadata'));
+  assert.ok(require('../lib/ui/shell').destinations(true).some((item) => item.id === 'metadata'),
+    'Metadata must be reachable from the rail');
   const html = adminMetadata.renderBody({});
   assert.match(html, /MLB official schedule/);
   assert.match(html, /Provider creator/);

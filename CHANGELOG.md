@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.92.0 — everything on the new design system
+
+Tabler is gone: the dependency, the stylesheet, the JavaScript and the static
+mount. Every page in SSS now renders through `lib/ui`.
+
+Nine pages of admin markup are written in Tabler's vocabulary — `.card`,
+`.form-control`, `.btn-primary`, `.row`/`.col-md-6`. Rewriting all of it at once
+would be a diff nobody could review, and leaving it would mean half the product
+looked new and half did not, which is worse than either. So `lib/ui/compat.js`
+maps those class names onto the new tokens: every page gets the new palette,
+type, spacing and controls with its own markup untouched, and pages can be
+rewritten in the native vocabulary one at a time with no visible jump when each
+lands. The file is a bridge and it is meant to shrink.
+
+`lib/tabler-chrome.js` is now a thin adapter over `lib/ui/shell` — thirteen call
+sites unchanged, one file to review.
+
+### What the self-review caught
+
+**Two admin pages had no way to reach them.** The new rail shipped in 0.91.0
+with six operator destinations; the sidebar it replaced had eight. Metadata and
+Backup still had routes and no link — findable only by typing the URL. Both are
+back, and a test now asserts that every admin route has a rail destination,
+because "a page with a route and no destination is a page nobody can find" is
+not something to rediscover by hand.
+
+**Seventy classes were about to render unstyled.** Diffing every class used in
+`lib/` and `addon.js` against everything the stylesheets define turned up
+progress bars, select groups, status dots, `.display-6` stat figures and a pile
+of utilities that had been coming from `tabler.min.css`. All now mapped.
+
+**Dead scenery removed.** `buildSidebar` and `buildTopbar` emitted navbar markup
+nothing styles any more. Deleted rather than left behind.
+
+### Also
+
+Logout stays POST-only and a non-admin is shown no operator destinations —
+both now asserted against the rail rather than the retired sidebar.
+
 ## 0.91.0 — Configure, rebuilt
 
 The first release of the new design system, and the first page moved onto it.

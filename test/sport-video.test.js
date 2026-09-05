@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const sportVideo = require('../lib/sources/sport-video');
 const promotions = require('../lib/promotions');
 const admin = require('../lib/admin-sport-video');
-const chrome = require('../lib/tabler-chrome');
+const uiShell = require('../lib/ui/shell');
 const settings = require('../lib/settings');
 const streams = require('../lib/streams');
 
@@ -97,7 +97,8 @@ test('renders a dedicated, filterable source console without exposing torrent UR
   for (const script of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
     assert.doesNotThrow(() => new vm.Script(script[1]));
   }
-  assert.ok(chrome.ADMIN_SECTIONS.some((section) => section.id === 'sport-video'));
+  assert.ok(uiShell.destinations(true).some((section) => section.id === 'sport-video'),
+    'Sport-Video must be reachable from the rail');
 });
 
 test('feeds a matched direct release into TorBox discovery without Companion or Prowlarr', async () => {

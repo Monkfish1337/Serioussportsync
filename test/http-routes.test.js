@@ -381,10 +381,16 @@ test('no page depends on a CDN to render itself', async () => {
     assert.doesNotMatch(html, /jsdelivr|unpkg|cdnjs|fonts\.googleapis/,
       pathname + ' still pulls an asset from a CDN');
     for (const url of html.match(/\/assets\/vendor\/[^"']+/g) || []) referenced.add(url);
-  }
-  assert.ok(referenced.size >= 2, 'expected the vendored CSS and JS to be referenced');
 
-  // Referenced is not enough — they have to actually be served.
+    // 0.92.0 — the design system ships inline with the page. Nothing is
+    // fetched from anywhere: no stylesheet link, no external script, no font.
+    assert.doesNotMatch(html, /<link[^>]+href="https?:\/\//,
+      pathname + ' links an external stylesheet');
+    assert.doesNotMatch(html, /<script[^>]+src="https?:\/\//,
+      pathname + ' loads an external script');
+  }
+
+  // Anything still referenced from /assets/vendor has to actually be served.
   for (const url of referenced) {
     const response = await get(url);
     assert.equal(response.status, 200, url + ' is referenced but not served');
@@ -508,8 +514,8 @@ test('the skin picker applies a known skin and refuses anything else', async () 
 
   // The chosen skin is in force on the very next page, in light mode.
   const light = await (await get('/admin', { headers: { cookie } })).text();
-  assert.match(light, /data-bs-theme="light"/);
-  assert.match(light, /--tblr-primary: #4263eb;/);
+  assert.match(light, /data-mode="light"/);
+  assert.match(light, /--accent: #4263eb;/);
 
   // A value that is not a skin must not reach the stylesheet.
   const bad = await apply('"><script>alert(1)</script>');
@@ -517,7 +523,7 @@ test('the skin picker applies a known skin and refuses anything else', async () 
   assert.match(decodeURIComponent(bad.headers.get('location')), /Unknown skin/);
   const after = await (await get('/admin', { headers: { cookie } })).text();
   assert.doesNotMatch(after, /alert\(1\)/);
-  assert.match(after, /--tblr-primary: #4263eb;/, 'a refused skin leaves the previous one in place');
+  assert.match(after, /--accent: #4263eb;/, 'a refused skin leaves the previous one in place');
 
   await apply('sportsroom');
 });

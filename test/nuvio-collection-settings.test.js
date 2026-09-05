@@ -14,7 +14,7 @@ config.nuvioCollectionsFile = path.join(testDir, 'nuvio-collections.json');
 const settings = require('../lib/nuvio-collection-settings');
 const collections = require('../lib/nuvio-collections');
 const promotions = require('../lib/promotions');
-const chrome = require('../lib/tabler-chrome');
+const uiShell = require('../lib/ui/shell');
 const admin = require('../lib/admin-nuvio-collections');
 
 test.after(() => {
@@ -53,7 +53,8 @@ test('adds a new promotion folder with selected artwork and exports it', () => {
 
 test('validates collection artwork and exposes the admin workflow', () => {
   assert.throws(() => settings.cleanImage('javascript:alert(1)', true), /Image must be/);
-  assert.ok(chrome.ADMIN_SECTIONS.some((item) => item.id === 'nuvio-collections'));
+  assert.ok(uiShell.destinations(true).some((item) => item.id === 'nuvio-collections'),
+    'Collections must be reachable from the rail');
   const html = admin.renderBody({});
   assert.match(html, /Nuvio Collections/);
   assert.match(html, /Add collection folder/);

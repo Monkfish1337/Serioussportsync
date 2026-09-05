@@ -167,17 +167,9 @@ function createApp() {
   // Branded artwork (UFC/WWE upcoming logo cards, etc). Public, no auth.
   app.use('/assets', express.static(path.join(__dirname, 'public'), { maxAge: '7d' }));
 
-  // Tabler, served from the installed package rather than a CDN.
-  //
-  // Loading the admin's entire stylesheet from cdn.jsdelivr.net at runtime meant
-  // a self-hosted addon on a network that cannot reach it rendered as unstyled
-  // HTML — a wall of raw form controls, with no clue as to why. This is a
-  // self-hosted product; depending on the public internet to draw its own admin
-  // page was the wrong trade. Immutable because the path carries the version.
-  app.use('/assets/vendor/tabler', express.static(
-    path.join(__dirname, 'node_modules', '@tabler', 'core', 'dist'),
-    { maxAge: '365d', immutable: true, index: false }
-  ));
+  // 0.92.0 — the Tabler static mount is gone with the dependency. The design
+  // system ships inline with each page, so there is nothing to serve and
+  // nothing to cache-bust.
 
   // Default caching for addon payloads.
   //
