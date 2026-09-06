@@ -12,7 +12,8 @@
         "test:nuvio": "node scripts/test-nuvio-collections.js",
         "test:account": "node scripts/test-account-configure-page.js",
         "test:prowlarr": "node scripts/test-prowlarr-hydration.js",
-        "test:unit": "node --test test/*.test.js"
+        "test:unit": "node --test test/*.test.js",
+        "mine": "node scripts/mine-bitmagnet.js"
     },
     "keywords": [
         "stremio",
