@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.94.0 — EPL releases named with three-letter codes are no longer discarded
+
+Found by eye, in a Bitmagnet listing: the 2160p EPL releases are all named
+`EPL.26-27.5th.round.ARS-CHE_06.09.26_2160.mkv`. Bare three-letter codes, joined
+by a separator. SSS was finding these and throwing them away.
+
+Two independent causes, both silent.
+
+**A club's code preceded by the opponent's code.** `teamPresent` inspects the
+word before a match to stop "Inter Milan" being read as an AC Milan fixture. In
+`ARS-CHE` the word before `CHE` is `ars` — not a word Chelsea owns, not a
+competition word, not a number — so the release was rejected as belonging to a
+different club. The opponent in the same fixture is the strongest evidence
+there is, and it was the one case the guard did not allow. Now it does, and
+only for the actual opponent: a different pairing, or the right pairing on the
+wrong date, is still rejected.
+
+**Compact dates.** Football sets `requireDateInTitle`, and the date extractor
+required separators, so rgfootball.net's leading `20260905` read as no date at
+all. Every release from that group was rejected as `no-date-in-title` even when
+the teams matched perfectly. `YYYYMMDD` is now recognised, anchored tightly
+enough that other eight-digit runs are not mistaken for dates.
+
+**And the searches never asked for the format.** `rankForSearch` drops
+three-letter codes, correctly — `ARS` alone is a hopeless query. But dropping
+them individually dropped the pair too, so not one of the 37 queries generated
+for an EPL fixture contained `ARS` and `CHE` together. A pair is the opposite of
+ambiguous: only a fixture between those two clubs contains both. Code-pair
+queries are now emitted with the date, and two of the four query slots for an
+EPL fixture go to them.
+
+F1 was checked against the same listing and does not share the problem — round
+numbers and `Round 10` forms already match, and the practice/qualifying/sprint
+rejections are the deliberate session filter working. The one gap there is
+non-Latin titles (a Bulgarian Chinese GP release), which is a separate piece of
+work.
+
 ## 0.93.3 — Easynews rows no longer vanish when Usenet Ultimate catches up
 
 Reported as: refresh so UU can catch up, and the Easynews links that were there
