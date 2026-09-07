@@ -15,6 +15,9 @@ function setFreshStreamHeaders(res) {
   res.setHeader('Expires', '0');
 }
 const store = require('./lib/store');
+const contentStore = require('./lib/content-store');
+const eventEditor = require('./lib/event-editor');
+const uiShell = require('./lib/ui/shell');
 const settings = require('./lib/settings');
 const eventAvailability = require('./lib/event-availability');
 const customPromotions = require('./lib/custom-promotions');
@@ -1560,6 +1563,46 @@ function createApp() {
   const adminMetadata = require('./lib/admin-metadata');
   const adminNuvioCollections = require('./lib/admin-nuvio-collections');
   const nuvioCollectionSettings = require('./lib/nuvio-collection-settings');
+
+  function eventEditorReturnPath(value) {
+    const path = String(value || '');
+    return path.startsWith('/admin/events') ? path : '/admin/events';
+  }
+
+  app.get('/admin/events', requireAdmin, (req, res) => {
+    const sourceEvents = (store.loadFromDisk().events || []);
+    const body = eventEditor.renderBody({
+      events: sourceEvents,
+      overrides: contentStore.load().eventOverrides,
+      promotions: promotions.enabled,
+      query: req.query || {},
+      flash: req.query.flash || null,
+      error: req.query.error === '1',
+    });
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(uiShell.page({ user: req.user, section: 'events', title: 'Event Editor', body }));
+  });
+
+  app.post('/admin/events/:id/date', requireAdmin, (req, res) => {
+    const id = String(req.params.id || '');
+    const sourceEvent = (store.loadFromDisk().events || []).find((event) => event.id === id);
+    const back = eventEditorReturnPath(req.body && req.body.returnTo);
+    if (!sourceEvent) return res.redirect(back + (back.includes('?') ? '&' : '?') + 'flash=' + encodeURIComponent('Event not found.') + '&error=1');
+    try {
+      contentStore.setOverride(id, { date: req.body && req.body.date });
+      res.redirect(back + (back.includes('?') ? '&' : '?') + 'flash=' + encodeURIComponent('Date override saved. It will survive source refreshes.'));
+    } catch (error) {
+      res.redirect(back + (back.includes('?') ? '&' : '?') + 'flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(error)) + '&error=1');
+    }
+  });
+
+  app.post('/admin/events/:id/date/reset', requireAdmin, (req, res) => {
+    const id = String(req.params.id || '');
+    const back = eventEditorReturnPath(req.body && req.body.returnTo);
+    contentStore.removeOverride(id);
+    res.redirect(back + (back.includes('?') ? '&' : '?') + 'flash=' + encodeURIComponent('Source date restored.'));
+  });
 
   app.get('/admin/metadata', requireAdmin, (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
