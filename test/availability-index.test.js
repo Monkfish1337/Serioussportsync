@@ -107,7 +107,8 @@ test('clears cached discoveries and availability only for the selected promotion
 
     const removed = fixture.index.clearPromotion('wwe');
     assert.equal(removed.searches, 1);
-    assert.equal(removed.observations, 1);
+    assert.equal(removed.observations, 2,
+      'clearing a discovery also removes its source and TorBox availability records');
     assert.equal(fixture.index.getSearch(wweInput).hit, false);
     assert.equal(fixture.index.getSearch(ufcInput).hit, true);
     assert.equal(fixture.index.availabilityFor({ provider: 'torbox', scope: 'account', candidates: [wwe] }).size, 0);
