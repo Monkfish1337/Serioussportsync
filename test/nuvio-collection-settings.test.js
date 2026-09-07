@@ -16,6 +16,7 @@ const collections = require('../lib/nuvio-collections');
 const promotions = require('../lib/promotions');
 const uiShell = require('../lib/ui/shell');
 const admin = require('../lib/admin-nuvio-collections');
+const configurePage = require('../lib/configure-page');
 
 test.after(() => {
   config.nuvioCollectionsFile = originalFile;
@@ -62,6 +63,23 @@ test('validates collection artwork and exposes the admin workflow', () => {
   const script = html.match(/<script>([\s\S]*?)<\/script>/);
   assert.ok(script);
   assert.doesNotThrow(() => new Function(script[1])); // eslint-disable-line no-new-func
+});
+
+test('accepts the wizard artwork field when saving a folder', () => {
+  const input = admin.folderInput({
+    title: 'Wizard folder', promotions: ['ufc'], artwork: '/assets/logo-banner.png', tileShape: 'landscape',
+  });
+  assert.equal(input.artwork, '/assets/logo-banner.png');
+});
+
+test('the collections wizard posts the field expected by the folder endpoint', () => {
+  const html = configurePage.render({
+    isAdmin: true,
+    collections: { folders: [{
+      id: 'folder-1', title: 'Folder', promotions: [], artwork: '/assets/logo-banner.png', tileShape: 'landscape',
+    }] },
+  });
+  assert.match(html, /body\.append\('artworkChoice', box\.getAttribute\('data-artwork'\)\)/);
 });
 
 // Emptying a folder was refused outright, and any folder emptied as a
