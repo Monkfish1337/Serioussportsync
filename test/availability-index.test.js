@@ -70,6 +70,51 @@ test('negative searches expire sooner and query changes miss safely', () => {
   } finally { fixture.close(); }
 });
 
+test('unusable cached torrent candidates are discarded and searched again', async () => {
+  let invalidated = 0;
+  let produced = 0;
+  const index = {
+    getSearch() { return { hit: true, results: [{ title: 'WWE result without a magnet hash' }] }; },
+    invalidateSearch() { invalidated++; },
+    searchKey() { return { key: 'torrent-test' }; },
+    recordSearch() {},
+  };
+  const out = await streamInternals.cachedProviderSearch({
+    event: { id: 'wwe:2514762' }, promo: { id: 'wwe' }, provider: 'torrent', scope: 'scope',
+    queries: ['WWE Sunday Nights Main Event'], index, log() {},
+    validateCachedResults: (results) => results.some((row) => /^[a-f0-9]{40}$/i.test(row.infoHash || '')),
+    producer: async () => {
+      produced++;
+      return { ok: true, results: [{ title: 'WWE Sunday Nights Main Event', infoHash: 'f'.repeat(40) }] };
+    },
+  });
+  assert.equal(invalidated, 1);
+  assert.equal(produced, 1);
+  assert.equal(out.results[0].infoHash, 'f'.repeat(40));
+});
+
+test('clears cached discoveries and availability only for the selected promotion', () => {
+  const fixture = temporaryIndex();
+  try {
+    const wwe = { title: 'WWE Sunday Nights Main Event 2026 09 06', infoHash: 'd'.repeat(40) };
+    const ufc = { title: 'UFC 300 Main Card', infoHash: 'e'.repeat(40) };
+    const wweInput = { eventId: 'wwe:2514762', promotionId: 'wwe', provider: 'torrent', scope: 'source', queries: ['WWE Sunday Nights Main Event'], results: [wwe] };
+    const ufcInput = { eventId: 'ufc:300', promotionId: 'ufc', provider: 'torrent', scope: 'source', queries: ['UFC 300'], results: [ufc] };
+    fixture.index.recordSearch(wweInput);
+    fixture.index.recordSearch(ufcInput);
+    fixture.index.observe({ provider: 'torbox', scope: 'account', state: 'unavailable', candidate: wwe });
+    fixture.index.observe({ provider: 'torbox', scope: 'account', state: 'cached', candidate: ufc });
+
+    const removed = fixture.index.clearPromotion('wwe');
+    assert.equal(removed.searches, 1);
+    assert.equal(removed.observations, 1);
+    assert.equal(fixture.index.getSearch(wweInput).hit, false);
+    assert.equal(fixture.index.getSearch(ufcInput).hit, true);
+    assert.equal(fixture.index.availabilityFor({ provider: 'torbox', scope: 'account', candidates: [wwe] }).size, 0);
+    assert.equal(fixture.index.availabilityFor({ provider: 'torbox', scope: 'account', candidates: [ufc] }).size, 1);
+  } finally { fixture.close(); }
+});
+
 test('tracks fresh availability independently for each credential scope', () => {
   const fixture = temporaryIndex();
   try {
