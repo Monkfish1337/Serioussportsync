@@ -39,3 +39,19 @@ test('migrates and encrypts admin source credentials at rest', () => {
   const saved = fs.readFileSync(file, 'utf8');
   assert.doesNotMatch(saved, /new-(?:prowlarr|companion|football|api-football)-secret/);
 });
+
+test('an explicitly blank Companion URL disables an environment default', () => {
+  const previousUrl = process.env.COMPANION_URL;
+  const previousToken = process.env.COMPANION_AUTH_TOKEN;
+  process.env.COMPANION_URL = 'http://companion-from-compose:8080';
+  process.env.COMPANION_AUTH_TOKEN = 'compose-token';
+  try {
+    settings.setCompanion({ url: '', authToken: '' });
+    assert.deepEqual(settings.getCompanion(), { url: '', authToken: '' });
+  } finally {
+    if (previousUrl === undefined) delete process.env.COMPANION_URL;
+    else process.env.COMPANION_URL = previousUrl;
+    if (previousToken === undefined) delete process.env.COMPANION_AUTH_TOKEN;
+    else process.env.COMPANION_AUTH_TOKEN = previousToken;
+  }
+});
