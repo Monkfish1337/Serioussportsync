@@ -93,7 +93,7 @@ test('unusable cached torrent candidates are discarded and searched again', asyn
   assert.equal(out.results[0].infoHash, 'f'.repeat(40));
 });
 
-test('clears cached discoveries and availability only for the selected promotion', () => {
+test('clears cached discoveries only for the selected promotion', () => {
   const fixture = temporaryIndex();
   try {
     const wwe = { title: 'WWE Sunday Nights Main Event 2026 09 06', infoHash: 'd'.repeat(40) };
@@ -107,11 +107,11 @@ test('clears cached discoveries and availability only for the selected promotion
 
     const removed = fixture.index.clearPromotion('wwe');
     assert.equal(removed.searches, 1);
-    assert.equal(removed.observations, 2,
-      'clearing a discovery also removes its source and TorBox availability records');
+    assert.equal(removed.observations, 0,
+      'shared account availability is retained so the cache clear stays lightweight');
     assert.equal(fixture.index.getSearch(wweInput).hit, false);
     assert.equal(fixture.index.getSearch(ufcInput).hit, true);
-    assert.equal(fixture.index.availabilityFor({ provider: 'torbox', scope: 'account', candidates: [wwe] }).size, 0);
+    assert.equal(fixture.index.availabilityFor({ provider: 'torbox', scope: 'account', candidates: [wwe] }).size, 1);
     assert.equal(fixture.index.availabilityFor({ provider: 'torbox', scope: 'account', candidates: [ufc] }).size, 1);
   } finally { fixture.close(); }
 });

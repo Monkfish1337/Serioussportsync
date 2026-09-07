@@ -1586,7 +1586,7 @@ function createApp() {
 
   // Recovery hatch for a stale or malformed discovery cache.  It is scoped to
   // the selected promotion, so an operator can retry one event family without
-  // flushing every provider result or every user's availability observations.
+  // touching shared release history or any user's account availability state.
   app.post('/admin/promotions/:id/clear-cache', requireAdmin, (req, res) => {
     const id = String(req.params.id || '').trim();
     const promotion = promotions.all.find((item) => item.id === id);
@@ -1597,7 +1597,6 @@ function createApp() {
       const removed = availabilityStore.getDefault().clearPromotion(id);
       const summary = 'Cleared source cache for "' + promotion.name + '" ('
         + removed.searches + ' search' + (removed.searches === 1 ? '' : 'es')
-        + ', ' + removed.observations + ' availability record' + (removed.observations === 1 ? '' : 's')
         + '). The next stream request will search again.';
       res.redirect('/admin/promotions?flash=' + encodeURIComponent(summary));
     } catch (error) {
