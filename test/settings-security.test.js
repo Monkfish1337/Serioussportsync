@@ -47,7 +47,8 @@ test('an explicitly blank Companion URL disables an environment default', () => 
   process.env.COMPANION_AUTH_TOKEN = 'compose-token';
   try {
     settings.setCompanion({ url: '', authToken: '' });
-    assert.deepEqual(settings.getCompanion(), { url: '', authToken: '' });
+    // `enabled` defaults to true and is untouched by a save that omits it.
+    assert.deepEqual(settings.getCompanion(), { url: '', authToken: '', enabled: true });
   } finally {
     if (previousUrl === undefined) delete process.env.COMPANION_URL;
     else process.env.COMPANION_URL = previousUrl;

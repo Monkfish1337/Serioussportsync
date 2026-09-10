@@ -1519,19 +1519,28 @@ function createApp() {
   app.post('/admin/sources', requireAdmin, (req, res) => {
     const b = req.body || {};
     try {
+      // An unticked checkbox submits nothing, so absence means "off" — but only
+      // for a submission from the current form. `sourceToggles` marks that;
+      // without it the stored value is left alone, so a stale cached form or an
+      // older client cannot silently disable every source.
+      const hasToggles = b.sourceToggles === '1';
+      const toggle = (value) => (hasToggles ? (value === '1' ? '1' : '0') : undefined);
       settings.setCompanion({
         url: security.cleanHttpUrl(b.companionUrl, { label: 'Companion URL' }),
         authToken: String(b.companionAuthToken || ''),
+        enabled: toggle(b.companionEnabled),
       });
       settings.setProwlarr({
         url: security.cleanHttpUrl(b.prowlarrUrl, { label: 'Prowlarr URL' }),
         apiKey: String(b.prowlarrApiKey || ''),
+        enabled: toggle(b.prowlarrEnabled),
       });
       // 0.95.0: direct Bitmagnet. URL only — no database credentials.
       settings.setBitmagnet({
         url: security.cleanHttpUrl(b.bitmagnetUrl, { label: 'Bitmagnet URL' }),
         limit: b.bitmagnetLimit,
         videoOnly: b.bitmagnetVideoOnly,
+        enabled: toggle(b.bitmagnetEnabled),
       });
       // 0.38.1: football-data.org API key — admin-saved value wins over the
       // FOOTBALL_DATA_API_KEY env var. Empty input is allowed (falls back to env).
@@ -1930,6 +1939,18 @@ function createApp() {
   return app;
 }
 
+// Enable/disable toggle for a discovery source. Keeping the credentials while
+// removing the source from the pipeline is the point: comparing sources means
+// switching them off and on repeatedly, and deleting a URL to do that loses it.
+function sourceToggle(name, label, enabled, hint) {
+  return '<label class="form-check mb-2">'
+    + '<input class="form-check-input" type="checkbox" name="' + escapeHtml(name) + '" value="1"'
+    + (enabled ? ' checked' : '') + '>'
+    + '<span class="form-check-label"><strong>' + escapeHtml(label) + '</strong></span>'
+    + '</label>'
+    + (hint ? '<div class="form-hint mb-3">' + escapeHtml(hint) + '</div>' : '');
+}
+
 function renderAdminPage(currentUser, opts) {
   opts = opts || {};
   const all = users.listUsers();
@@ -2096,6 +2117,9 @@ function renderAdminPage(currentUser, opts) {
     +   '<div class="card-body">'
     +     '<p class="text-secondary small mb-3">URL of the SeriousSportScraper companion service you have deployed. The metadata addon delegates content discovery to it and resolves the returned hashes through each user\'s own TorBox key. Leave blank if you only want to use direct Prowlarr.</p>'
     +     '<form method="POST" action="/admin/sources">'
+    +       '<input type="hidden" name="sourceToggles" value="1">'
+    +       sourceToggle('companionEnabled', 'Companion scraper enabled', _comp.enabled,
+    +         'Unticking keeps the URL and token but takes the companion out of discovery.')
     +       '<div class="mb-3">'
     +         '<label class="form-label">Companion URL</label>'
     +         '<input class="form-control text-mono" name="companionUrl" value="' + escapeHtml(_comp.url) + '" placeholder="http://scraper:8080" autocomplete="off">'
@@ -2104,14 +2128,19 @@ function renderAdminPage(currentUser, opts) {
 
     +       '<hr class="my-4">'
     +       '<h4 class="mb-2">Direct Prowlarr (optional)</h4>'
+    +       sourceToggle('prowlarrEnabled', 'Direct Prowlarr enabled', _prowlarr.enabled,
+    +         'Unticking keeps the URL and API key but takes Prowlarr out of discovery.')
     +       '<p class="text-secondary small mb-3">Query Prowlarr directly when a user opens an event. Discovery is request-only and limited to that event. Results are filtered and checked against each user\'s TorBox account; raw torrent rows are never returned. The URL must be reachable from this container. For a separate Dockge stack, use a shared Docker network or the server address; <code>localhost</code> refers to this container.</p>'
     +       '<div class="mb-3">'
     +         '<label class="form-label">Prowlarr URL</label>'
     +         '<input class="form-control text-mono" type="url" name="prowlarrUrl" value="' + escapeHtml(_prowlarr.url) + '" placeholder="http://prowlarr:9696" autocomplete="off">'
     +       '</div>'
 
+    +       secretField('Prowlarr API key', 'prowlarrApiKey', _prowlarr.apiKey, 'Settings → General → Security')
     +       '<hr class="my-4">'
     +       '<h4 class="mb-2">Direct Bitmagnet (optional)</h4>'
+    +       sourceToggle('bitmagnetEnabled', 'Direct Bitmagnet enabled', _bitmagnet.enabled,
+    +         'Unticking keeps the URL and settings but takes Bitmagnet out of discovery.')
     +       '<p class="text-secondary small mb-3">Query your own Bitmagnet instance directly over its GraphQL API. Unlike Prowlarr this is a single local index rather than a fan-out to remote trackers, so it answers in milliseconds and returns info hashes without a hydration pass. Results are ordered by seeders server-side, then filtered by the same relevance matcher as every other source. Enter the Bitmagnet base URL; <code>/graphql</code> is appended automatically.</p>'
     +       '<div class="mb-3">'
     +         '<label class="form-label">Bitmagnet URL</label>'
@@ -2127,7 +2156,6 @@ function renderAdminPage(currentUser, opts) {
     +         '<span class="form-check-label">Video files only</span>'
     +       '</label>'
     +       '<div class="form-hint mb-3">Narrows to torrents Bitmagnet has classified as video. Leave off unless you see non-video noise: a freshly crawled torrent has no file list yet, so this can hide the newest releases.</div>'
-    +       secretField('Prowlarr API key', 'prowlarrApiKey', _prowlarr.apiKey, 'Settings → General → Security')
 
     // 0.38.1: football-data.org API key block. Saved value overrides
     // FOOTBALL_DATA_API_KEY env var. Used by custom promotions whose source

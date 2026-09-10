@@ -38,7 +38,7 @@ test('warming replaces a stale negative observation so Refresh Links rechecks To
   availabilityStore.getDefault = () => index;
   settings.getCompanion = () => companion;
   settings.getProwlarr = () => prowlarr;
-  settings.getBitmagnet = () => ({ url: '', limit: 300, concurrency: 4, timeoutMs: 15000, videoOnly: false });
+  settings.getBitmagnet = () => ({ url: '', limit: 300, concurrency: 4, timeoutMs: 15000, videoOnly: false, enabled: true });
   let checks = 0;
   torbox.checkCachedBatch = async () => (++checks < 3 ? new Set() : new Set([candidate.infoHash]));
   torbox.createTorrent = async () => 91;
@@ -142,7 +142,7 @@ test('serves an account-scoped confirmed TorBox row while reusing full stored di
   availabilityStore.getDefault = () => index;
   settings.getCompanion = () => companion;
   settings.getProwlarr = () => prowlarr;
-  settings.getBitmagnet = () => ({ url: '', limit: 300, concurrency: 4, timeoutMs: 15000, videoOnly: false });
+  settings.getBitmagnet = () => ({ url: '', limit: 300, concurrency: 4, timeoutMs: 15000, videoOnly: false, enabled: true });
   settings.getAvailabilityWarm = () => ({ serveConfirmed: true });
   torbox.checkCachedBatch = async () => { cacheChecks++; return new Set(); };
   try {
@@ -201,7 +201,7 @@ test('a confirmed row does not hide another matched candidate that just finished
   availabilityStore.getDefault = () => index;
   settings.getCompanion = () => companion;
   settings.getProwlarr = () => prowlarr;
-  settings.getBitmagnet = () => ({ url: '', limit: 300, concurrency: 4, timeoutMs: 15000, videoOnly: false });
+  settings.getBitmagnet = () => ({ url: '', limit: 300, concurrency: 4, timeoutMs: 15000, videoOnly: false, enabled: true });
   let checked = [];
   torbox.checkCachedBatch = async (hashes) => {
     checked = hashes;
@@ -240,9 +240,9 @@ test('background mode ignores confirmed rows so discovery can refresh the index'
   const originalAvailability = settings.getAvailabilityWarm;
   const originalCheck = torbox.checkCachedBatch;
   availabilityStore.getDefault = () => index;
-  settings.getCompanion = () => ({ url: '', authToken: '' });
-  settings.getProwlarr = () => ({ url: '', apiKey: '' });
-  settings.getBitmagnet = () => ({ url: '', limit: 300, concurrency: 4, timeoutMs: 15000, videoOnly: false });
+  settings.getCompanion = () => ({ url: '', authToken: '', enabled: true });
+  settings.getProwlarr = () => ({ url: '', apiKey: '', enabled: true });
+  settings.getBitmagnet = () => ({ url: '', limit: 300, concurrency: 4, timeoutMs: 15000, videoOnly: false, enabled: true });
   settings.getAvailabilityWarm = () => ({ serveConfirmed: true });
   torbox.checkCachedBatch = async () => new Set();
   const candidate = {
@@ -268,7 +268,7 @@ test('background mode ignores confirmed rows so discovery can refresh the index'
       log: (message) => messages.push(message),
     });
     assert.equal(rows.length, 0);
-    assert.ok(messages.some((message) => /no companion, direct Prowlarr or Bitmagnet configured/.test(message)));
+    assert.ok(messages.some((message) => /no enabled companion, Prowlarr or Bitmagnet source/.test(message)));
     assert.ok(!messages.some((message) => /recovered .* confirmed/.test(message)));
   } finally {
     availabilityStore.getDefault = originalDefault;
@@ -296,7 +296,7 @@ test('full Torrent/TorBox discovery records discovered, matched, and ready count
   ];
   availabilityStore.getDefault = () => index;
   settings.getCompanion = () => ({ url: 'http://scraper:8080', authToken: '' });
-  settings.getProwlarr = () => ({ url: '', apiKey: '' });
+  settings.getProwlarr = () => ({ url: '', apiKey: '', enabled: true });
   companionClient.scrape = async () => candidates;
   torbox.checkCachedBatch = async () => new Set(['a'.repeat(40)]);
   try {
