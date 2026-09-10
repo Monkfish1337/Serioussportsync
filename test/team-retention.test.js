@@ -32,7 +32,7 @@ const COWBOYS = {
   names: ['Dallas Cowboys', 'Dallas', 'Cowboys', 'DAL'],
 };
 
-test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+test.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
 
 test('a team pick creates a served catalog', () => {
   const spec = teamPicker.specFor('nfl', COWBOYS);

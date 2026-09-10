@@ -20,7 +20,7 @@ const configurePage = require('../lib/configure-page');
 
 test.after(() => {
   config.nuvioCollectionsFile = originalFile;
-  fs.rmSync(testDir, { recursive: true, force: true });
+  fs.rmSync(testDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 test('keeps the existing four-folder Nuvio layout as the upgrade default', () => {

@@ -12,7 +12,7 @@ process.env.SETTINGS_FILE = path.join(dir, 'settings.json');
 const settings = require('../lib/settings');
 const adminDatabase = require('../lib/admin-database');
 
-test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+test.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
 
 test('persists validated warmer settings and restores environment defaults', () => {
   const saved = settings.setAvailabilityWarm({

@@ -24,7 +24,9 @@ function temporaryIndex(start) {
   return {
     index,
     advance(ms) { timestamp += ms; },
-    close() { index.close(); fs.rmSync(dir, { recursive: true, force: true }); },
+    // close() before rmSync, and retries after: Windows refuses to unlink a
+    // file whose handle is still open, and can hold one briefly even after.
+    close() { index.close(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); },
   };
 }
 
@@ -224,7 +226,7 @@ test('refuses to downgrade a database created by a newer SSS schema', () => {
     assert.throws(() => createAvailabilityIndex({
       file, secret: process.env.SESSION_SECRET,
     }), /newer than supported/);
-  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  } finally { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); }
 });
 
 test('upgrades v1 search rows with discovery funnel columns', () => {
@@ -252,6 +254,6 @@ test('upgrades v1 search rows with discovery funnel columns', () => {
     assert.deepEqual(index.recentSearches(1).map((row) => [row.matchedCount, row.readyCount]), [[2, 1]]);
   } finally {
     index.close();
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });

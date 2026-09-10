@@ -12,7 +12,7 @@ process.env.SESSION_SECRET = process.env.SESSION_SECRET
   || 'sport-video-settings-test-secret-000000000000000000000000000000';
 const settings = require('../lib/settings');
 
-test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+test.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
 
 test('Sport-Video is opt-in with conservative automatic scan defaults', () => {
   const value = settings.getSportVideo();

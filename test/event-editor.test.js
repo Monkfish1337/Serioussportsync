@@ -20,7 +20,7 @@ test('date overrides are composed over refresh-owned source events', () => {
     assert.equal(event.date, '2026-10-10');
   } finally {
     config.contentStudioFile = original;
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 

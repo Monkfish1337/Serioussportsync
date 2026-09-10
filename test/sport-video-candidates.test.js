@@ -13,7 +13,7 @@ process.env.SESSION_SECRET = process.env.SESSION_SECRET
 const settings = require('../lib/settings');
 const sportVideo = require('../lib/sources/sport-video');
 
-test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+test.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
 
 function seed(releases) {
   fs.writeFileSync(process.env.SPORT_VIDEO_FILE, JSON.stringify({

@@ -47,7 +47,7 @@ const store = require('../lib/store');
 store.loadFromDisk();
 const { handleCatalog } = require('../lib/catalog');
 
-test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+test.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
 
 const AVAILABLE = new Set(['nfl:has-content', 'nfl:future-covered']);
 

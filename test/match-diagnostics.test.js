@@ -13,7 +13,7 @@ process.env.SESSION_SECRET = process.env.SESSION_SECRET
 const diagnostics = require('../lib/match-diagnostics');
 const promotions = require('../lib/promotions');
 
-test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+test.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
 
 function today(offsetDays) {
   return new Date(Date.now() + (offsetDays || 0) * 86400000).toISOString().slice(0, 10);

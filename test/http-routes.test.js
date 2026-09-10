@@ -43,9 +43,23 @@ test.before(async () => {
   base = 'http://127.0.0.1:' + server.address().port;
 });
 
-test.after(() => {
-  if (server) server.close();
-  fs.rmSync(dir, { recursive: true, force: true });
+test.after(async () => {
+  // Teardown has to actually finish before the directory goes. Windows cannot
+  // unlink a file that still has an open handle, and this test opens two: the
+  // listening server and the SQLite availability index. `server.close()` is
+  // asynchronous and was not awaited, and the index was never closed at all —
+  // on Linux both are unlinkable while open, so the bug was invisible there and
+  // failed every run on Windows.
+  if (server) {
+    // Without this, close() waits on keep-alive sockets that fetch leaves open.
+    if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
+  require('../lib/availability-index').closeDefault();
+  // Even with both closed, Windows can hold a handle for a moment longer —
+  // a virus scanner or the search indexer looking at a just-written file. Retry
+  // rather than fail a whole test file in its cleanup.
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 // `redirect: manual` throughout: a 302 to /login is the authorisation result
