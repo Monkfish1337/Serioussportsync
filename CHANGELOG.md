@@ -1,5 +1,103 @@
 # Changelog
 
+## 0.95.0 — Bitmagnet becomes a first-class source, and the queries finally ask for what releases are called
+
+**Direct Bitmagnet discovery.** Bitmagnet is a self-hosted DHT crawler with its
+own Postgres index. Unlike Prowlarr it is not a fan-out to remote trackers, and
+the difference is not subtle. Measured against the same 10.1M-row database on
+the same fixture: Bitmagnet returned 1,837 results in 65ms; the Torznab endpoint
+in front of it returned 100, and Prowlarr 175, in 20,086ms. The Torznab path was
+showing 5.4% of what was already indexed locally.
+
+Two properties are why it is worth talking to directly. Info hashes come back in
+the search response, so none of the `/download` hydration Prowlarr needs applies.
+And results can be ordered server-side, which is the difference between a
+truncated result set that is useful and one that is not: whatever the limit is,
+a bare term like `EPL` will hit it, and ordering by seeders means the cut falls
+on the tail rather than an arbitrary slice.
+
+It talks GraphQL rather than Postgres deliberately — the operator supplies one
+URL, exactly like Prowlarr and Zilean, rather than database credentials. The
+source does no relevance filtering of its own; `isRelevantStreamTitle` is the
+matcher and is far better at this than a query string can be.
+
+One trap worth recording: Bitmagnet reports GraphQL errors with HTTP 200. A
+mistyped field name is indistinguishable from an empty index unless the errors
+array is checked, so it is.
+
+**Enable toggles on every discovery source.** Comparing sources means switching
+them on and off repeatedly, and the only way to do that was to delete the URL and
+credentials and type them back in. Companion, direct Prowlarr and direct
+Bitmagnet each have a toggle now. A config saved before the toggles existed is
+treated as enabled, a save that does not mention the flag leaves it alone, and
+disabling a source changes the discovery cache fingerprint — otherwise a search
+cached while a source was enabled would keep being served after it was turned
+off, and the comparison the toggle exists for would be meaningless.
+
+**The Prowlarr API key had been cut from its own section.** Restored.
+
+## Query shapes: asking for what the release is actually called
+
+Bitmagnet ANDs every term of a query. Every word must appear in the release name,
+so each extra word is one more thing that has to be spelled the same way. Against
+the live index:
+
+| Query | Results |
+| --- | --- |
+| `MCI COV` | 2 |
+| `EPL MCI COV` | 2 |
+| `MCI COV 20260905` | 2 |
+| `Premier League MCI COV` | **0** |
+| `MCI COV 2026-09-05` | **0** |
+| `Man City vs Coventry City` | **0** |
+
+And from a real discovery log of 832 queries: 9.4% productive overall,
+league-prefixed 2.0%, dated 2.8%, and the 169 queries carrying **both** a league
+prefix and a date returned nothing at all between them.
+
+Four things follow.
+
+**The club alias table was never wired into the Premier League promotion.** Every
+code-pair query in `searchTitles` is gated on it. So the code form the EPL scene
+actually names its releases with — the form 0.94.0 was written specifically to
+handle — had never once been emitted for an EPL fixture. This was the largest
+single cause of missed events, and it is the whole of the improvement seen on the
+first fixture tested: an event that returned zero results now returns four.
+
+**Compact dates are now emitted.** rgfootball and most of the football scene name
+files `20260823_EPL_26.27.R.01_MCI_vs_BOU_[rgfootball.net]_1080i.ts`. Of those 832
+queries, 340 were dotted, 279 spaced, 26 short day-month-year, 22 ISO — and none
+compact. The one form that works was the one form never sent.
+
+**Bare code pairs are now emitted.** `ARS-CHE` is more specific than
+`Arsenal vs Chelsea`, not less: only a fixture between those two clubs contains
+both codes, and it adds no word a release might spell differently. They are also
+generated last in `searchTitles`, which meant the 60-query-per-event cap discarded
+them first; they now go out ahead of the template output.
+
+**League prefix and date are no longer stacked.** Each is productive alone. Only
+the combination was dead, and the football leagues no longer emit it.
+
+Narrowing league prefixes to single tokens inside dated templates generally was
+tried and reverted. Champions League releases genuinely are named
+`UEFA.Champions.League.<date>.<matchup>`, and the UCL overlay reorders on that
+exact string. Where a prefix-plus-date combination is unproductive the fix is to
+drop that template, not to silently rewrite what a promotion asked for. The
+narrowing that remains applies only where a prefix is bolted onto an
+already-constrained matchup, and falls back to the full list for leagues with no
+single-token form — "Serie A" and "Ligue 1" really are named that way.
+
+`scripts/mine-query-shapes.js` is the tool this came from: it classifies emitted
+queries by shape, measures unique hash contribution rather than hit rate, and
+tests mechanical transforms against a live index.
+
+## The test suite passes on Windows
+
+`rmSync` failed with EPERM in teardown. Not a Windows quirk to work around — a
+real handle leak, an un-awaited `server.close()` and an unclosed SQLite index.
+Linux tolerates unlinking open files, which is why CI never saw it and a
+contributor on Windows saw it every time.
+
 ## 0.94.0 — EPL releases named with three-letter codes are no longer discarded
 
 Found by eye, in a Bitmagnet listing: the 2160p EPL releases are all named

@@ -1,0 +1,83 @@
+const fetch = require('node-fetch'); // Assuming node-fetch is available or polyfilled
+const config = require('../config');
+
+/**
+ * @module BitMagnetSource
+ * @description Source module for querying the external Bitmagnet metadata API via GraphQL.
+ */
+class BitMagnetSource {
+  constructor() {
+    this.API_URL = 'http://192.168.1.16:3333/graphql'; // Hardcoded IP based on user input
+    // TODO: Set the necessary headers here (e.g., API Key, Content-Type)
+  }
+
+  /**
+   * Executes a GraphQL search query against Bitmagnet for the given promotion's text query.
+   * @param {string} query - The formatted text string from the promotion (e.g., "UFC 298").
+   * @param {object} promotion - The current Promotion object to guide the request context.
+   * @returns {Promise<Array>} A promise that resolves to an array of raw event data objects.
+   */
+  async fetchAll({ query, promotion }) {
+    if (!query || !promotion) {
+      console.log('BitMagnet Source: Skipping due to missing query or promotion context.');
+      return [];
+    }
+
+    // !!! CRITICAL STEP 1: Define the GraphQL Query !!!
+    // This MUST match what you see/expect in the playground based on Bitmagnet's API documentation.
+    // We are using a placeholder structure here.
+    const GRAPHQL_QUERY = `query SearchEvents($searchQuery: String!) {
+      search(query: $searchQuery) {
+        events {
+          id # Example field, replace with actual ID field
+          title
+          date
+          sportType
+          # Add other fields you need for the event object (e.g., artworkUrl, venueName)
+          ... on EventMetadata {
+            full_details # Use fragments if multiple types exist
+            description
+          }
+        }
+      }
+    }`;
+
+    // !!! CRITICAL STEP 2: Define Variables !!!
+    const variables = JSON.stringify({ searchQuery: query }); // Ensure variable names match the $ in the query
+
+    try {
+      console.log(`BitMagnet Source: Searching for "${query}" at ${this.API_URL}`);
+      
+      // In a real environment, you might need to pass auth tokens or session keys here.
+      const response = await fetch(this.API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // TODO: Add Authorization header if required by Bitmagnet API
+        },
+        body: JSON.stringify({ query: GRAPHQL_QUERY, variables: variables }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status} ${await response.text()}`);
+      }
+
+      const result = await response.json();
+      // Assuming the successful search results are nested under 'data' -> 'search' -> 'events'
+      if (result.data && result.data.search && Array.isArray(result.data.search.events)) {
+        console.log(`BitMagnet Source: Successfully retrieved ${result.data.search.events.length} raw events.`);
+        return result.data.search.events;
+      } else {
+        console.warn('BitMagnet Source: Could not find the expected event list in the GraphQL response structure.');
+        // If we can't parse it, return an empty array to allow refresh process to continue.
+        return [];
+      }
+
+    } catch (error) {
+      console.error('[BitmagnetSource] Failed to fetch data from Bitmagnet:', error);
+      throw error; // Re-throw the error so refresh.js knows to log it as a failure.
+    }
+  }
+}
+
+module.exports = BitMagnetSource;

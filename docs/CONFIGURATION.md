@@ -30,9 +30,9 @@ development only. It must never be used for a real deployment.
 | --- | --- | --- |
 | `TSDB_API_KEY` | `123` | TheSportsDB API key. Replace with your own key when available. |
 | `TSDB_SEASONS` | `auto` | Derive relevant seasons from the event window, or use a comma-separated list. |
-| `FOOTBALL_DATA_API_KEY` | none | Optional football-data.org key for assigned metadata sources. |
-| `API_FOOTBALL_API_KEY` | none | API-Football key used by the shipped UEFA Champions League promotion and assigned API-Football sources. It can also be saved in Admin. |
-| `TMDB_API_KEY` | none | Optional TMDB key for assigned television-style metadata sources. |
+| `FOOTBALL_DATA_API_KEY` | none | football-data.org key. Required by the eight shipped domestic league promotions and by assigned football-data.org sources. It can also be saved in Admin. |
+| `API_FOOTBALL_API_KEY` | none | API-Football key for assigned API-Football sources. It can also be saved in Admin. The shipped UEFA Champions League promotion does not use it -- that reads UEFA's own public feed and needs no key. |
+| `TMDB_API_KEY` | none | TMDB key. Required by the shipped Match of the Day promotion and by assigned television-style metadata sources. There is no field for it in Admin. |
 | `EVENT_WINDOW_DAYS_BACK` | `30` | Number of previous days retained in the catalog. |
 | `EVENT_WINDOW_DAYS_AHEAD` | `90` | Number of future days retained in the catalog. |
 | `EVENT_WINDOW_START_DATE` | `2025-01-01` | Hard lower date boundary used by built-in refresh logic. |

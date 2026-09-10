@@ -1,0 +1,35 @@
+0.95.0 - Bitmagnet source, query shapes, and a README that matches the code
+
+Version bump and documentation catch-up. The last tagged release was v0.81.0,
+48 commits and 13 versions ago, and the README had drifted further than that:
+its badge said 0.79.0, it listed 11 promotions where 29 ship, it still
+advertised Manchester United (removed in 0.89.1), and it did not mention
+Bitmagnet at all.
+
+CHANGELOG gains the 0.95.0 entry covering the direct Bitmagnet source, the
+discovery source enable toggles, the Prowlarr API key fix, the Windows test
+teardown fix, and the query-shape work with the measurements behind it.
+
+README rewritten top to bottom. Fact-checked against the code rather than
+against the previous README, which turned up six claims that were not true:
+
+* AEW "Zero Hour pre-shows" -- no pre-show handling exists, and the only
+  pre-show logic in the file is WWE rejecting them.
+* Backup "export and restore" -- there is only a GET that streams a tarball.
+  Restore is a manual host-side procedure.
+* An "import and matching assistant" for ICS, CSV or JSON calendars -- no
+  calendar import exists anywhere in the repo.
+* A missing-event inbox for "accepting, merging, or ignoring" -- items are
+  recorded, but updateInbox has no callers and no page reads them.
+* Match of the Day needs TMDB_API_KEY, which the README did not say and the
+  Server page has no field for.
+* football-data.org and API-Football do not have enable toggles; only the three
+  torrent discovery sources do.
+
+Also corrected .env.example and docs/CONFIGURATION.md, which both still claimed
+API_FOOTBALL_API_KEY is required for the shipped Champions League promotion. It
+moved to UEFA's own public feed and needs no key -- the Server page already says
+so.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU
