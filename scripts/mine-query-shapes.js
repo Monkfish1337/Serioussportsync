@@ -48,6 +48,10 @@
 //   --candidates  Also test transformed variants of each query. Default on;
 //                 --no-candidates measures only what is emitted today.
 //   --json        Also write the full machine-readable report here.
+//
+// The events come from SSS's own store, so DATA_FILE must point at the
+// deployment's events.json — running from a source checkout it defaults to
+// ./data/events.json, which is not where the schedule lives.
 
 const fs = require('fs');
 const path = require('path');
@@ -445,11 +449,35 @@ async function main() {
     throw new Error('Bitmagnet URL required: --url http://bitmagnet:3333 (or set BITMAGNET_URL)');
   }
 
+  // Distinguish "the store has no events at all" from "none are in the window".
+  // Run from a source checkout, DATA_FILE defaults to ./data/events.json, which
+  // does not exist there — the real events live in the deployment's data volume.
+  // Reporting that as "no events in the last 30 days" sends you looking at the
+  // window instead of at the path.
+  const allEvents = store.getEvents();
+  if (!allEvents.length) {
+    throw new Error('no events in the store at ' + store.dataFilePath()
+      + '\n  This is almost certainly the wrong data file rather than an empty schedule.'
+      + '\n  Point DATA_FILE at the deployment\'s events.json, e.g.'
+      + '\n    DATA_FILE=/mnt/storage/stremio-stack/serioussportsync-data/events.json node ' + path.basename(__filename) + ' ...'
+      + '\n  or run this inside the container, where /app/data/events.json is mounted.');
+  }
+
   const eventsByPromotion = new Map();
-  for (const event of store.getEvents()) {
+  let inWindow = 0;
+  for (const event of allEvents) {
     if (!withinWindow(event, options.days)) continue;
+    inWindow += 1;
     if (!eventsByPromotion.has(event.promotion)) eventsByPromotion.set(event.promotion, []);
     eventsByPromotion.get(event.promotion).push(event);
+  }
+  console.error(allEvents.length + ' event(s) in the store, ' + inWindow
+    + ' within the last ' + options.days + ' day(s)');
+  if (!inWindow) {
+    const dated = allEvents.filter((e) => e && e.date).map((e) => e.date).sort();
+    throw new Error('no events within the last ' + options.days + ' days'
+      + (dated.length ? ' (the store spans ' + dated[0] + ' to ' + dated[dated.length - 1]
+        + '; widen with --days)' : ' (no event in the store carries a date)'));
   }
 
   let targets = promotions.all;
@@ -477,7 +505,11 @@ async function main() {
     }
   }
 
-  if (!reports.length) throw new Error('nothing to report — no promotion had events in the window');
+  if (!reports.length) {
+    throw new Error('nothing to report — events exist, but none belong to the requested promotion(s).'
+      + '\n  Promotions with events in the window: '
+      + (Array.from(eventsByPromotion.keys()).sort().join(', ') || '(none)'));
+  }
 
   console.log(renderReport(reports, options));
   console.error('\n' + budget.spent + ' queries issued');
