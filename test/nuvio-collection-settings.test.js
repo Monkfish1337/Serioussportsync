@@ -72,14 +72,21 @@ test('accepts the wizard artwork field when saving a folder', () => {
   assert.equal(input.artwork, '/assets/logo-banner.png');
 });
 
-test('the collections wizard posts the field expected by the folder endpoint', () => {
+test('the collections wizard posts the fields expected by the folder endpoint', () => {
   const html = configurePage.render({
     isAdmin: true,
     collections: { folders: [{
       id: 'folder-1', title: 'Folder', promotions: [], artwork: '/assets/logo-banner.png', tileShape: 'landscape',
     }] },
   });
-  assert.match(html, /body\.append\('artworkChoice', box\.getAttribute\('data-artwork'\)\)/);
+  // 0.95.0 — these are read from real controls on the step rather than from
+  // data-attributes echoing what the server already had, because the step is
+  // now the editor rather than a viewer with one button.
+  assert.match(html, /body\.append\('artworkChoice', get\('artworkChoice'\)\.value\)/);
+  assert.match(html, /body\.append\('customArtwork'/);
+  assert.match(html, /body\.append\('title', get\('title'\)\.value\)/);
+  // Sent only when ticked, which is what the endpoint reads.
+  assert.match(html, /body\.append\('hideTitle', '1'\)/);
 });
 
 // Emptying a folder was refused outright, and any folder emptied as a

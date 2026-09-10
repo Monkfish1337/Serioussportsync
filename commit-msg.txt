@@ -1,35 +1,48 @@
-0.95.0 - Bitmagnet source, query shapes, and a README that matches the code
+Make the Collections step actually edit collections
 
-Version bump and documentation catch-up. The last tagged release was v0.81.0,
-48 commits and 13 versions ago, and the README had drifted further than that:
-its badge said 0.79.0, it listed 11 promotions where 29 ship, it still
-advertised Manchester United (removed in 0.89.1), and it did not mention
-Bitmagnet at all.
+Four reported faults, all real.
 
-CHANGELOG gains the 0.95.0 entry covering the direct Bitmagnet source, the
-discovery source enable toggles, the Prowlarr API key fix, the Windows test
-teardown fix, and the query-shape work with the measurements behind it.
+The push mode could not be chosen. Merge, Add only and Replace all were radios
+inside `.sw` labels, but that class styles an `<i>` element the radios did not
+have and hides the input itself (position:absolute;opacity:0;width:0;height:0).
+The modes rendered as plain text with nothing to click, and every push silently
+used whichever was `checked`. Merge was the only mode that had ever run. Now a
+<select>, with the selected mode's explanation below it.
 
-README rewritten top to bottom. Fact-checked against the code rather than
-against the previous README, which turned up six claims that were not true:
+Enter did not sign in to Nuvio. The inputs sit inside the Configure form, so
+Enter either did nothing or submitted the whole five-step form and navigated
+away from a half-finished sign-in.
 
-* AEW "Zero Hour pre-shows" -- no pre-show handling exists, and the only
-  pre-show logic in the file is WWE rejecting them.
-* Backup "export and restore" -- there is only a GET that streams a tarball.
-  Restore is a manual host-side procedure.
-* An "import and matching assistant" for ICS, CSV or JSON calendars -- no
-  calendar import exists anywhere in the repo.
-* A missing-event inbox for "accepting, merging, or ignoring" -- items are
-  recorded, but updateInbox has no callers and no page reads them.
-* Match of the Day needs TMDB_API_KEY, which the README did not say and the
-  Server page has no field for.
-* football-data.org and API-Football do not have enable toggles; only the three
-  torrent discovery sources do.
+A rejected folder save reported "Saved". The folder endpoints answer 302 to the
+admin page; the wizard posts by fetch with redirect:'follow', so a rejection was
+chased to a page returning 200 and read as success, with the reason left in a
+query string nobody read. Those endpoints now return JSON to a client that asks
+for it. This is why folder edits appeared to save and then had no effect.
 
-Also corrected .env.example and docs/CONFIGURATION.md, which both still claimed
-API_FOOTBALL_API_KEY is required for the shipped Champions League promotion. It
-moved to UEFA's own public feed and needs no key -- the Server page already says
-so.
+hideTitle was reset by every save from the step -- the client never sent the
+field, and a missing checkbox reads as false.
+
+Then the larger half: the step was a read-only list with one Save button per
+folder. Renaming a folder, its artwork, its tile shape, creating one, deleting
+one, and the collection's own title, backdrop, pin and All-tab settings all
+lived on /admin/nuvio-collections, still in the Tabler markup 0.92.0 replaced
+everywhere else. The step about Nuvio folders could not edit them. All of it is
+on the step now, same endpoints, current design system. The standalone admin
+page still works and still redirects as before.
+
+Three things fell out of doing it:
+
+* The member list is capped in height with its own scroll. Unbounded, a
+  29-promotion list grew past its grid cell and rendered across the folders
+  beside it.
+* A folder holding a promotion that no longer exists says so. The live instance
+  showed a chip reading "1" above "Empty - not exported".
+* Catalogs in no folder are named rather than counted, and the editor says out
+  loud that a promotion belongs to one folder, so adding it here takes it out of
+  another. That rule was enforced and entirely invisible, which is the likeliest
+  way a folder ends up empty without anyone emptying it.
+
+374 unit tests pass.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

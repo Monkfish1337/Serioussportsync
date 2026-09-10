@@ -140,5 +140,8 @@ test('the panel adds no form, because it lives inside the Configure form', () =>
 
 test('the three push modes are offered and merge is the default', () => {
   assert.deepEqual(nuvio.MODES.map((m) => m.id), ['merge', 'add', 'replace']);
-  assert.match(nuvio.panel(), /value="merge"[^>]*checked/);
+  // 0.95.0 — a <select>, not radios. The radios were `.sw` labels with no `<i>`
+  // element, and that class hides the input outright, so no mode but the
+  // default could ever be chosen.
+  assert.match(nuvio.panel(), /value="merge"[^>]*selected/);
 });

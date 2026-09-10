@@ -1660,6 +1660,27 @@ function createApp() {
     }));
   });
 
+  // These three are posted from two places: the standalone admin page, which is
+  // an ordinary form and wants a redirect, and the Collections step of
+  // Configure, which is a fetch and wants an answer.
+  //
+  // Answering a fetch with a redirect is how "Saved" came to be printed after
+  // every failure: `redirect: 'follow'` chases the 302 to the admin page, that
+  // page returns 200, and the caller reads success. The rejection reason was
+  // sitting in a query string nobody read. A client that asks for JSON gets the
+  // actual outcome.
+  function wantsJson(req) {
+    return String(req.headers.accept || '').toLowerCase().includes('application/json');
+  }
+
+  function collectionsResult(req, res, outcome) {
+    if (wantsJson(req)) {
+      return res.status(outcome.ok ? 200 : 400)
+        .json({ ok: outcome.ok, error: outcome.ok ? null : outcome.message });
+    }
+    return res.redirect('/admin/nuvio-collections?flash=' + encodeURIComponent(outcome.message));
+  }
+
   app.post('/admin/nuvio-collections/save', requireAdmin, (req, res) => {
     try {
       const body = req.body || {};
@@ -1669,9 +1690,10 @@ function createApp() {
         pinToTop: body.pinToTop === '1' || body.pinToTop === 'on',
         showAllTab: body.showAllTab === '1' || body.showAllTab === 'on',
       });
-      res.redirect('/admin/nuvio-collections?flash=' + encodeURIComponent('Collection settings saved. Export JSON again in Account to apply it in Nuvio.'));
+      collectionsResult(req, res, { ok: true,
+        message: 'Collection settings saved. Push to Nuvio again to apply it.' });
     } catch (err) {
-      res.redirect('/admin/nuvio-collections?flash=' + encodeURIComponent('Save failed: ' + err.message));
+      collectionsResult(req, res, { ok: false, message: 'Save failed: ' + err.message });
     }
   });
 
@@ -1680,10 +1702,11 @@ function createApp() {
       const validIds = new Set(promotions.enabled.map((promotion) => promotion.id));
       const input = adminNuvioCollections.folderInput(req.body || {});
       nuvioCollectionSettings.upsertFolder(folderId, input, validIds);
-      res.redirect('/admin/nuvio-collections?flash=' + encodeURIComponent(
-        (folderId ? 'Collection folder updated.' : 'Collection folder added.') + ' Export JSON again in Account to apply it in Nuvio.'));
+      collectionsResult(req, res, { ok: true,
+        message: (folderId ? 'Collection folder updated.' : 'Collection folder added.')
+          + ' Push to Nuvio again to apply it.' });
     } catch (err) {
-      res.redirect('/admin/nuvio-collections?flash=' + encodeURIComponent('Folder save failed: ' + err.message));
+      collectionsResult(req, res, { ok: false, message: 'Folder save failed: ' + err.message });
     }
   }
 
@@ -1691,8 +1714,9 @@ function createApp() {
   app.post('/admin/nuvio-collections/folders/:id/save', requireAdmin, (req, res) => saveNuvioFolder(req, res, req.params.id));
   app.post('/admin/nuvio-collections/folders/:id/delete', requireAdmin, (req, res) => {
     const removed = nuvioCollectionSettings.removeFolder(String(req.params.id || ''));
-    res.redirect('/admin/nuvio-collections?flash=' + encodeURIComponent(
-      removed ? 'Collection folder removed. Promotions and events were not deleted.' : 'Collection folder not found.'));
+    collectionsResult(req, res, removed
+      ? { ok: true, message: 'Collection folder removed. Promotions and events were not deleted.' }
+      : { ok: false, message: 'Collection folder not found.' });
   });
 
   app.get('/admin/promotions', requireAdmin, (req, res) => {

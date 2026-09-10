@@ -91,6 +91,63 @@ single-token form — "Serie A" and "Ligue 1" really are named that way.
 queries by shape, measures unique hash contribution rather than hit rate, and
 tests mechanical transforms against a live index.
 
+## Nuvio collections: the step that could not edit collections
+
+Reported from the Configure wizard, and all four turned out to be real.
+
+**The push mode could not be chosen.** Merge, Add only and Replace all were
+radios inside `.sw` labels — but that class styles an `<i>` element the radios
+did not have, and it hides the input itself:
+
+    .sw input { position: absolute; opacity: 0; width: 0; height: 0 }
+
+So the three modes rendered as plain text with nothing to click, and every push
+silently used whichever was `checked` in the HTML. Merge was the only mode that
+had ever run. It is a `<select>` now, with the explanation for the selected mode
+below it.
+
+**Enter did not sign in to Nuvio.** The email and password inputs sit inside the
+Configure form, so pressing Enter either did nothing or submitted the whole
+five-step form and navigated away from a half-finished sign-in. Enter now
+submits the sign-in and nothing else.
+
+**A rejected folder save reported "Saved".** The folder endpoints answer with a
+302 to the admin page. The wizard posts by `fetch` with `redirect: 'follow'`, so
+a rejection was chased to a page that returns 200 and read as success, with the
+reason left in a query string nobody read. Those endpoints now return JSON to a
+client that asks for it, and the step reports what actually happened. This is
+why folder edits appeared to save and then had no effect.
+
+**`hideTitle` was reset by every save from the step.** The client never sent the
+field, and a missing checkbox reads as false, so "hide the title over the
+artwork" was switched off every time a folder was saved from Configure.
+
+## The collections step is now the collections editor
+
+The step was a read-only list with one Save button per folder. Renaming a
+folder, changing its artwork or tile shape, creating one, deleting one, and the
+collection's own title, backdrop, pin and All-tab settings all lived on
+`/admin/nuvio-collections` — a page still in the old Tabler markup that 0.92.0
+replaced everywhere else. So the step *about* Nuvio folders could not edit them,
+and the two screens disagreed about what a folder was.
+
+All of it is on the step now, against the same endpoints, in the current design
+system. The standalone admin page still works and still redirects as it did.
+
+Three smaller things fell out of doing it:
+
+* The member list is capped in height with its own scroll. Unbounded, a
+  29-promotion list grew past its grid cell and rendered down across the
+  folders beside it.
+* A folder holding a promotion that no longer exists says so. The live instance
+  showed a chip reading "1" above the words "Empty — not exported": the count
+  included an id whose promotion had gone and the name list did not.
+* Catalogs in no folder are named rather than counted, and the folder editor
+  says out loud that a promotion belongs to one folder, so moving it here takes
+  it out of another. That rule was already enforced and entirely invisible,
+  which is the most likely way a folder ends up empty without anyone emptying
+  it.
+
 ## The test suite passes on Windows
 
 `rmSync` failed with EPERM in teardown. Not a Windows quirk to work around — a
