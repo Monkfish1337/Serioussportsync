@@ -1527,6 +1527,12 @@ function createApp() {
         url: security.cleanHttpUrl(b.prowlarrUrl, { label: 'Prowlarr URL' }),
         apiKey: String(b.prowlarrApiKey || ''),
       });
+      // 0.95.0: direct Bitmagnet. URL only — no database credentials.
+      settings.setBitmagnet({
+        url: security.cleanHttpUrl(b.bitmagnetUrl, { label: 'Bitmagnet URL' }),
+        limit: b.bitmagnetLimit,
+        videoOnly: b.bitmagnetVideoOnly,
+      });
       // 0.38.1: football-data.org API key — admin-saved value wins over the
       // FOOTBALL_DATA_API_KEY env var. Empty input is allowed (falls back to env).
       settings.setFootballData({
@@ -2067,6 +2073,7 @@ function renderAdminPage(currentUser, opts) {
   // Torrent discovery endpoints are optional and may be used together.
   const _comp = settings.getCompanion();
   const _prowlarr = settings.getProwlarr();
+  const _bitmagnet = settings.getBitmagnet();
   // 0.38.1: football-data.org API key field on /admin Sources so admins can
   // save/rotate the key without editing docker-compose.yml.
   const _fd = settings.getFootballData();
@@ -2102,6 +2109,24 @@ function renderAdminPage(currentUser, opts) {
     +         '<label class="form-label">Prowlarr URL</label>'
     +         '<input class="form-control text-mono" type="url" name="prowlarrUrl" value="' + escapeHtml(_prowlarr.url) + '" placeholder="http://prowlarr:9696" autocomplete="off">'
     +       '</div>'
+
+    +       '<hr class="my-4">'
+    +       '<h4 class="mb-2">Direct Bitmagnet (optional)</h4>'
+    +       '<p class="text-secondary small mb-3">Query your own Bitmagnet instance directly over its GraphQL API. Unlike Prowlarr this is a single local index rather than a fan-out to remote trackers, so it answers in milliseconds and returns info hashes without a hydration pass. Results are ordered by seeders server-side, then filtered by the same relevance matcher as every other source. Enter the Bitmagnet base URL; <code>/graphql</code> is appended automatically.</p>'
+    +       '<div class="mb-3">'
+    +         '<label class="form-label">Bitmagnet URL</label>'
+    +         '<input class="form-control text-mono" type="url" name="bitmagnetUrl" value="' + escapeHtml(_bitmagnet.url) + '" placeholder="http://bitmagnet:3333" autocomplete="off">'
+    +       '</div>'
+    +       '<div class="mb-3">'
+    +         '<label class="form-label">Results per query</label>'
+    +         '<input class="form-control text-mono" type="number" name="bitmagnetLimit" value="' + escapeHtml(String(_bitmagnet.limit)) + '" min="1" max="5000" autocomplete="off">'
+    +         '<div class="form-hint">Ordered by seeders, so a lower limit drops the tail rather than an arbitrary slice. Over-fetching against a local index is cheap.</div>'
+    +       '</div>'
+    +       '<label class="form-check mb-3">'
+    +         '<input class="form-check-input" type="checkbox" name="bitmagnetVideoOnly" value="1"' + (_bitmagnet.videoOnly ? ' checked' : '') + '>'
+    +         '<span class="form-check-label">Video files only</span>'
+    +       '</label>'
+    +       '<div class="form-hint mb-3">Narrows to torrents Bitmagnet has classified as video. Leave off unless you see non-video noise: a freshly crawled torrent has no file list yet, so this can hide the newest releases.</div>'
     +       secretField('Prowlarr API key', 'prowlarrApiKey', _prowlarr.apiKey, 'Settings → General → Security')
 
     // 0.38.1: football-data.org API key block. Saved value overrides

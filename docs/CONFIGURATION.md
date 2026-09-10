@@ -54,6 +54,8 @@ should normally be managed from **Metadata**, **Promotions**, and
 | `COMPANION_RESEARCH_TIMEOUT_MS` | `60000` | Hard client timeout for explicit Promotion Wizard research only; it does not affect playback. |
 | `PROMOTION_OVERRIDES_FILE` | `data/promotion-overrides.json` | Optional path for upgrade-safe matching overlays applied to shipped promotions. |
 | `PROWLARR_URL` / `PROWLARR_API_KEY` | none | Optional direct Prowlarr discovery bootstrap. These can be saved in Admin instead. |
+| `BITMAGNET_URL` | none | Optional direct Bitmagnet discovery bootstrap — the base URL of your own instance; `/graphql` is appended. Can be saved in Admin instead. |
+| `BITMAGNET_LIMIT` | `300` | Results per query variant. Ordered by seeders server-side, so a lower value drops the tail rather than an arbitrary slice. |
 | `ZILEAN_URL` | none | Optional direct Zilean endpoint for legacy/bootstrap discovery. |
 | `STREAM_MAX_ROWS` | `20` | Maximum rows returned for an event. |
 | `STREAM_PIPELINE_TIMEOUT_MS` | `8000` | Maximum duration of each interactive playback pipeline. |

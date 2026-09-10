@@ -17,6 +17,7 @@ test('warming replaces a stale negative observation so Refresh Links rechecks To
   const originalDefault = availabilityStore.getDefault;
   const originalCompanion = settings.getCompanion;
   const originalProwlarr = settings.getProwlarr;
+  const originalBitmagnet = settings.getBitmagnet;
   const originalCheck = torbox.checkCachedBatch;
   const originalCreate = torbox.createTorrent;
   const candidate = {
@@ -37,6 +38,7 @@ test('warming replaces a stale negative observation so Refresh Links rechecks To
   availabilityStore.getDefault = () => index;
   settings.getCompanion = () => companion;
   settings.getProwlarr = () => prowlarr;
+  settings.getBitmagnet = () => ({ url: '', limit: 300, concurrency: 4, timeoutMs: 15000, videoOnly: false });
   let checks = 0;
   torbox.checkCachedBatch = async () => (++checks < 3 ? new Set() : new Set([candidate.infoHash]));
   torbox.createTorrent = async () => 91;
@@ -76,6 +78,7 @@ test('warming replaces a stale negative observation so Refresh Links rechecks To
     availabilityStore.getDefault = originalDefault;
     settings.getCompanion = originalCompanion;
     settings.getProwlarr = originalProwlarr;
+    settings.getBitmagnet = originalBitmagnet;
     torbox.checkCachedBatch = originalCheck;
     torbox.createTorrent = originalCreate;
     index.close();
@@ -117,6 +120,7 @@ test('serves an account-scoped confirmed TorBox row while reusing full stored di
   const originalDefault = availabilityStore.getDefault;
   const originalCompanion = settings.getCompanion;
   const originalProwlarr = settings.getProwlarr;
+  const originalBitmagnet = settings.getBitmagnet;
   const originalAvailability = settings.getAvailabilityWarm;
   const originalCheck = torbox.checkCachedBatch;
   const companion = { url: 'http://scraper:8080', authToken: 'token' };
@@ -138,6 +142,7 @@ test('serves an account-scoped confirmed TorBox row while reusing full stored di
   availabilityStore.getDefault = () => index;
   settings.getCompanion = () => companion;
   settings.getProwlarr = () => prowlarr;
+  settings.getBitmagnet = () => ({ url: '', limit: 300, concurrency: 4, timeoutMs: 15000, videoOnly: false });
   settings.getAvailabilityWarm = () => ({ serveConfirmed: true });
   torbox.checkCachedBatch = async () => { cacheChecks++; return new Set(); };
   try {
@@ -160,6 +165,7 @@ test('serves an account-scoped confirmed TorBox row while reusing full stored di
     availabilityStore.getDefault = originalDefault;
     settings.getCompanion = originalCompanion;
     settings.getProwlarr = originalProwlarr;
+    settings.getBitmagnet = originalBitmagnet;
     settings.getAvailabilityWarm = originalAvailability;
     torbox.checkCachedBatch = originalCheck;
     index.close();
@@ -171,6 +177,7 @@ test('a confirmed row does not hide another matched candidate that just finished
   const originalDefault = availabilityStore.getDefault;
   const originalCompanion = settings.getCompanion;
   const originalProwlarr = settings.getProwlarr;
+  const originalBitmagnet = settings.getBitmagnet;
   const originalCheck = torbox.checkCachedBatch;
   const companion = { url: 'http://scraper:8080', authToken: 'token' };
   const prowlarr = { url: '', apiKey: '' };
@@ -194,6 +201,7 @@ test('a confirmed row does not hide another matched candidate that just finished
   availabilityStore.getDefault = () => index;
   settings.getCompanion = () => companion;
   settings.getProwlarr = () => prowlarr;
+  settings.getBitmagnet = () => ({ url: '', limit: 300, concurrency: 4, timeoutMs: 15000, videoOnly: false });
   let checked = [];
   torbox.checkCachedBatch = async (hashes) => {
     checked = hashes;
@@ -217,6 +225,7 @@ test('a confirmed row does not hide another matched candidate that just finished
     availabilityStore.getDefault = originalDefault;
     settings.getCompanion = originalCompanion;
     settings.getProwlarr = originalProwlarr;
+    settings.getBitmagnet = originalBitmagnet;
     torbox.checkCachedBatch = originalCheck;
     index.close();
   }
@@ -227,11 +236,13 @@ test('background mode ignores confirmed rows so discovery can refresh the index'
   const originalDefault = availabilityStore.getDefault;
   const originalCompanion = settings.getCompanion;
   const originalProwlarr = settings.getProwlarr;
+  const originalBitmagnet = settings.getBitmagnet;
   const originalAvailability = settings.getAvailabilityWarm;
   const originalCheck = torbox.checkCachedBatch;
   availabilityStore.getDefault = () => index;
   settings.getCompanion = () => ({ url: '', authToken: '' });
   settings.getProwlarr = () => ({ url: '', apiKey: '' });
+  settings.getBitmagnet = () => ({ url: '', limit: 300, concurrency: 4, timeoutMs: 15000, videoOnly: false });
   settings.getAvailabilityWarm = () => ({ serveConfirmed: true });
   torbox.checkCachedBatch = async () => new Set();
   const candidate = {
@@ -257,12 +268,13 @@ test('background mode ignores confirmed rows so discovery can refresh the index'
       log: (message) => messages.push(message),
     });
     assert.equal(rows.length, 0);
-    assert.ok(messages.some((message) => /no companion or direct Prowlarr configured/.test(message)));
+    assert.ok(messages.some((message) => /no companion, direct Prowlarr or Bitmagnet configured/.test(message)));
     assert.ok(!messages.some((message) => /recovered .* confirmed/.test(message)));
   } finally {
     availabilityStore.getDefault = originalDefault;
     settings.getCompanion = originalCompanion;
     settings.getProwlarr = originalProwlarr;
+    settings.getBitmagnet = originalBitmagnet;
     settings.getAvailabilityWarm = originalAvailability;
     torbox.checkCachedBatch = originalCheck;
     index.close();
@@ -274,6 +286,7 @@ test('full Torrent/TorBox discovery records discovered, matched, and ready count
   const originalDefault = availabilityStore.getDefault;
   const originalCompanion = settings.getCompanion;
   const originalProwlarr = settings.getProwlarr;
+  const originalBitmagnet = settings.getBitmagnet;
   const originalScrape = companionClient.scrape;
   const originalCheck = torbox.checkCachedBatch;
   const candidates = [
@@ -304,6 +317,7 @@ test('full Torrent/TorBox discovery records discovered, matched, and ready count
     availabilityStore.getDefault = originalDefault;
     settings.getCompanion = originalCompanion;
     settings.getProwlarr = originalProwlarr;
+    settings.getBitmagnet = originalBitmagnet;
     companionClient.scrape = originalScrape;
     torbox.checkCachedBatch = originalCheck;
     index.close();
