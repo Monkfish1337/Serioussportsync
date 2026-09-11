@@ -1,36 +1,46 @@
-Make the Promotions table fit, and stop previews outrunning their deadline
+NFL, NBA and MLB: measure the gap, then close it
 
-Three reported faults, each measured rather than guessed at.
+Reported as "very hit and miss ... isn't worth putting out in its current
+state", with the real question attached: indexer problem or alias problem?
 
-Promotions table cut off. The previous fix made the table scroll; it did
-not make it fit. Measured in a headless browser at a 1440px viewport: the
-table wanted 1386px inside a 1018px card, of which the action buttons were
-690px on one `text-nowrap` line. It did scroll — but the scrollbar sits
-beneath a 34-row table where nobody finds it, so Refresh and Edit simply
-read as chopped off. Cut the columns down instead. Poster and Catalogs were
-one short value each and neither can answer "is this promotion working";
-both moved onto the name cell's secondary line. The action buttons wrap in
-a 250px column. Six columns, 1018px of content in a 1018px card, nothing
-overflowing. The responsive scroller stays as the narrow-viewport fallback.
+Measured. One NFL fixture against the live Prowlarr/Usenet stack returned,
+among others:
 
-Source preview timing out at 60s. WWE has no known-card list, so the named
-lookups gated in the previous commit could not have been the cause. The
-per-round season walk is: one request per round, config.tsdb.requestDelayMs
-(3000ms) apart, continuing until five rounds in a row come back empty. For
-a league running weekly TV that is forty-odd requests — over two minutes on
-its own. A preview now takes the list endpoints only and carries a 45s
-budget, so a slow source degrades to a partial answer instead of an error.
+  NFL.Pre.Season.2026.08.28.Arizona.Cardinals.Vs.Green.Bay.Packers.720p...
+  NFL.2021.10.28.Cardinals.Vs.Packers.1080p.WEB.h264-SPORTSNET
+  NFL.2021.10.28.Packers.at.Cardinals.720p.HDTV.AAC2.0.H264-720pier
 
-AEW still showing nothing upcoming. The named-lookup gate was wrong in the
-one case the feature exists for. It skipped the lookups whenever any future
-event came back, and AEW's list endpoints DO reach the future — they return
-the next Dynamite or Collision, because AEW runs weekly TV — while All Out
-never appears in them at all. One future taping satisfied the gate and the
-PPVs stayed missing. The gate now asks which known cards are absent by name
-and looks up only those, so the steady state costs nothing and a missing
-card is actually fetched.
+Coverage was never the problem. SSS matched the first and rejected the other
+two with `no-home-team`: it knew only the full "City Nickname" that ESPN and
+the MLB schedule supply, while two of the most prolific groups name releases
+by nickname alone. And since every query it emitted carried the full name, an
+ANDing index could not have returned them either. Both halves were broken.
 
-436 tests passing.
+Alias tables for all 92 franchises — nickname, city, abbreviation — through
+the same preset mechanism the football leagues already use. A bare name that
+is ambiguous inside its own league is omitted on purpose: "Chicago" is the
+Cubs and the White Sox, "New York" the Mets and the Yankees. The same word
+stays where only one team carries it.
+
+Nickname-pair queries: "NFL 2021.10.28 Packers Cardinals". No separator — the
+same fixture ships as .Vs. and as .at., so an AND term there halves the reach
+for nothing — and always dated, or the pair matches every meeting of those
+teams in the index's history. Verified live: that query returns all three
+releases above.
+
+One trap closed on the way. The nickname blocklist was written for football
+fan names, and four entries collide with American teams: Eagles, Saints, Reds
+and Tigers are Crystal Palace, Southampton, Liverpool and Hull, but equally
+Philadelphia, New Orleans, Cincinnati and Detroit, where the nickname IS the
+release name. Applied globally it would have silently removed the very queries
+these tables were added to emit. Now scoped to the presets it was written for,
+with the football behaviour pinned by a test.
+
+League prefix plus date stays off where it was measured to lose (169 such
+queries returned nothing between them in the last full football run) and is
+enabled only for these three, whose releases begin with exactly that pair.
+
+447 tests passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

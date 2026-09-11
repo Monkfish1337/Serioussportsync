@@ -1,5 +1,54 @@
 # Changelog
 
+## Unreleased — NFL, NBA and MLB: measured, then fixed
+
+The American big three were reported as "very hit and miss", with an open
+question attached: is there simply nothing on the indexers, or is SSS failing to
+recognise what is there?
+
+Measured rather than guessed. One NFL fixture, searched against the live
+Prowlarr/Usenet stack, returned among others:
+
+    NFL.Pre.Season.2026.08.28.Arizona.Cardinals.Vs.Green.Bay.Packers.720p...
+    NFL.2021.10.28.Cardinals.Vs.Packers.1080p.WEB.h264-SPORTSNET
+    NFL.2021.10.28.Packers.at.Cardinals.720p.HDTV.AAC2.0.H264-720pier
+
+The coverage was never the problem. SSS matched the first of those and rejected
+the other two with `no-home-team`. It knew only the full "City Nickname" form
+that ESPN and the MLB schedule supply, while two of the most prolific groups
+name their releases by nickname alone — and because every query it emitted
+carried the full name, an ANDing index could not have returned them either. The
+fault was on both halves of the round trip.
+
+**Alias tables for all 92 franchises.** Nickname, city and abbreviation for
+every NFL, NBA and MLB team, using the same preset mechanism the football
+leagues already use. Where a bare name is ambiguous *within its own league* it is
+left out on purpose: "Chicago" is both the Cubs and the White Sox, "New York"
+both the Mets and the Yankees. The same word is kept where only one team carries
+it.
+
+**Nickname-pair queries.** `NFL 2021.10.28 Packers Cardinals`, with no separator
+— the same fixture ships as `.Vs.` from one group and `.at.` from another, so an
+AND term for the separator halves the reach and buys nothing — and always with
+the date, or a nickname pair matches every meeting of those two teams in the
+index's history. Verified live: that query returns all three releases above.
+
+**One trap closed on the way.** The list of nicknames deliberately kept out of
+search queries was written for football fans' names — nobody searches for
+"Gunners vs Toffees". Four of its entries collide with American teams: Eagles,
+Saints, Reds and Tigers are Crystal Palace, Southampton, Liverpool and Hull, but
+equally Philadelphia, New Orleans, Cincinnati and Detroit, where the nickname IS
+the release name. Applied globally it would have silently removed exactly the
+queries these tables were added to produce. It is now scoped to the presets it
+was written for, and the football behaviour is pinned by a test.
+
+Combining a league prefix with a date stays off everywhere it was measured to
+lose (169 such queries returned nothing between them in the last full football
+run) and is enabled only for these three leagues, whose releases begin with
+precisely that pair.
+
+447 tests passing.
+
 ## 0.95.0 — Bitmagnet becomes a first-class source, and the queries finally ask for what releases are called
 
 **Direct Bitmagnet discovery.** Bitmagnet is a self-hosted DHT crawler with its
