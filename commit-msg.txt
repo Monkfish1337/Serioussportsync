@@ -1,48 +1,37 @@
-Make the Collections step actually edit collections
+Four discovery pipelines, one card, four collapsible blocks
 
-Four reported faults, all real.
+Reported as "the Sport-Video pipeline has no disable toggle". It always had
+one, but only on its own page, so the Server page carried enable toggles for
+the companion, Prowlarr and Bitmagnet and silently omitted the fourth source.
+From the only screen where a user compares sources, Sport-Video looked like the
+one that could not be switched off.
 
-The push mode could not be chosen. Merge, Add only and Replace all were radios
-inside `.sw` labels, but that class styles an `<i>` element the radios did not
-have and hides the input itself (position:absolute;opacity:0;width:0;height:0).
-The modes rendered as plain text with nothing to click, and every push silently
-used whichever was `checked`. Merge was the only mode that had ever run. Now a
-<select>, with the selected mode's explanation below it.
+Sport-Video now sits with the other three, and what runs the pipeline came with
+it: the switch, the scan schedule, the per-scan limits, the sports to scan.
+What it does with a matched release -- team filters, auto-warm, per-release
+TorBox actions -- stays on its own page, because those are drawn from the
+promotion list rather than being properties of the pipeline.
 
-Enter did not sign in to Nuvio. The inputs sit inside the Configure form, so
-Enter either did nothing or submitted the whole five-step form and navigated
-away from a half-finished sign-in.
+That needed a setter that patches rather than replaces. setSportVideo rejects a
+submission with no categories, correctly, and replaces the whole object, so a
+save from the Server card would have blanked the fields that card never showed.
+updateSportVideo merges a patch over what is stored and validates the result.
+The switch keeps a setter of its own that validates nothing, because "turn this
+off" must not depend on the validity of some other field -- or on a field
+inside a collapsed block.
 
-A rejected folder save reported "Saved". The folder endpoints answer 302 to the
-admin page; the wizard posts by fetch with redirect:'follow', so a rejection was
-chased to a page returning 200 and read as success, with the reason left in a
-query string nobody read. Those endpoints now return JSON to a client that asks
-for it. This is why folder edits appeared to save and then had no effect.
+Each pipeline is a <details> block. Flat, with a switch, credentials and an
+explanation each, this had become the longest card on the page and the question
+an operator usually comes here to answer -- which sources are on -- was buried
+in the middle of it. Each summary carries the name and the state. A pipeline
+that is enabled but has no URL reads as off, because it is, and opens by
+default since that is the case someone is most likely here to fix.
 
-hideTitle was reset by every save from the step -- the client never sent the
-field, and a missing checkbox reads as false.
+The two metadata API keys moved to the bottom under a heading that says what
+they are: they fetch fixtures, not releases, and sitting them among the
+discovery sources implied they were one.
 
-Then the larger half: the step was a read-only list with one Save button per
-folder. Renaming a folder, its artwork, its tile shape, creating one, deleting
-one, and the collection's own title, backdrop, pin and All-tab settings all
-lived on /admin/nuvio-collections, still in the Tabler markup 0.92.0 replaced
-everywhere else. The step about Nuvio folders could not edit them. All of it is
-on the step now, same endpoints, current design system. The standalone admin
-page still works and still redirects as before.
-
-Three things fell out of doing it:
-
-* The member list is capped in height with its own scroll. Unbounded, a
-  29-promotion list grew past its grid cell and rendered across the folders
-  beside it.
-* A folder holding a promotion that no longer exists says so. The live instance
-  showed a chip reading "1" above "Empty - not exported".
-* Catalogs in no folder are named rather than counted, and the editor says out
-  loud that a promotion belongs to one folder, so adding it here takes it out of
-  another. That rule was enforced and entirely invisible, which is the likeliest
-  way a folder ends up empty without anyone emptying it.
-
-374 unit tests pass.
+394 unit tests pass.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

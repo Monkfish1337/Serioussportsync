@@ -116,3 +116,75 @@ test('disabling a source changes the discovery cache fingerprint', () => {
     settings.getSportVideo = original.sportVideo;
   }
 });
+
+// 0.95.0 — Sport-Video's switch was the one missing from the Server page.
+//
+// It always existed, but only on the Sport-Video page's own form, so the
+// discovery-sources card listed three toggles and silently omitted the fourth.
+// Reported as "the Sport-Video pipeline has no disable toggle", which is what
+// it looked like from the only screen where the other three live.
+
+test('Sport-Video can be switched without resubmitting its whole form', () => {
+  // setSportVideo refuses a save with no categories — correctly, since a scan
+  // with nothing to scan is a mis-filled form. That is exactly why the switch
+  // could not be mirrored onto the Server page until it had a setter of its
+  // own, and why this one must not touch any other field.
+  writeRaw({
+    sportVideo: {
+      enabled: false, autoScan: true, intervalHours: 12,
+      categories: ['football', 'rugby'], maxDetailsPerScan: 25,
+    },
+  });
+  const on = settings.setSportVideoEnabled(true);
+  assert.equal(on.enabled, true);
+  assert.equal(on.intervalHours, 12, 'the scan settings must survive a toggle');
+  assert.deepEqual(on.categories, ['football', 'rugby']);
+  assert.equal(on.maxDetailsPerScan, 25);
+
+  assert.equal(settings.setSportVideoEnabled(false).enabled, false);
+  assert.deepEqual(settings.getSportVideo().categories, ['football', 'rugby'],
+    'disabling must not discard what was configured');
+});
+
+test('Sport-Video is off until switched on, unlike the other three', () => {
+  // The asymmetry is deliberate and worth pinning: companion, Prowlarr and
+  // Bitmagnet are enabled unless a flag says otherwise, because they predate
+  // the toggles. Sport-Video reaches a third-party site on a schedule, so it
+  // stays opt-in.
+  writeRaw({});
+  assert.equal(settings.getSportVideo().enabled, false);
+  assert.equal(settings.getCompanion().enabled, true);
+});
+
+test('a partial Sport-Video save keeps what this form does not carry', () => {
+  // The Server card owns the pipeline settings — does it run, how often, which
+  // sports. Team filters and auto-warm are drawn from the promotion list and
+  // stay on the Sport-Video page, so a save from the Server card must patch
+  // rather than replace. setSportVideo replaces, which is why updateSportVideo
+  // exists.
+  writeRaw({
+    sportVideo: {
+      enabled: true, autoScan: true, intervalHours: 6,
+      categories: ['football'], autoWarmPromotions: ['epl', 'ucl'],
+      autoWarmPerScan: 3,
+    },
+  });
+  const saved = settings.updateSportVideo({
+    enabled: true, autoScan: false, intervalHours: 24, categories: ['football', 'rugby'],
+  });
+  assert.equal(saved.autoScan, false);
+  assert.equal(saved.intervalHours, 24);
+  assert.deepEqual(saved.categories, ['football', 'rugby']);
+  assert.deepEqual(saved.autoWarmPromotions, ['epl', 'ucl'],
+    'a field this form never showed must not be blanked by saving it');
+  assert.equal(saved.autoWarmPerScan, 3);
+});
+
+test('the switch works even when no category is posted', () => {
+  // The Sport-Video block is collapsed by default, so a save from a Server page
+  // where nobody opened it carries the switch and nothing else. Refusing that
+  // save would make "turn this off" depend on a field in a closed block.
+  writeRaw({ sportVideo: { enabled: true, categories: ['football'] } });
+  assert.equal(settings.setSportVideoEnabled(false).enabled, false);
+  assert.deepEqual(settings.getSportVideo().categories, ['football']);
+});

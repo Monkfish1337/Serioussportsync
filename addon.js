@@ -620,6 +620,13 @@ function createApp() {
     // interprets as "all enabled catalogs" — keeps the file small + lets new
     // catalogs auto-enable without the user re-saving.
     const finalCats = (cleanCats.length === allCatalogIds.size) ? [] : cleanCats;
+    // ...and if they picked NOTHING, [] would say "all" as well, which is how
+    // switching every row off came back with every row on. The Configure form
+    // always posts `catalogSelection` as a marker that it carried the catalog
+    // step at all, so an empty list from that form is a real choice rather than
+    // a form that simply had no catalog fields in it.
+    const sentCatalogStep = b.catalogSelection != null;
+    const catalogsNone = sentCatalogStep && cleanCats.length === 0 && allCatalogIds.size > 0;
     // maxStreams: 0 = unlimited, 1-20 cap. Anything else is rejected silently.
     const maxStreamsRaw = parseInt(String(b.maxStreams || '0'), 10);
     const maxStreams = (Number.isFinite(maxStreamsRaw) && maxStreamsRaw >= 0 && maxStreamsRaw <= 20) ? maxStreamsRaw : 0;
@@ -651,6 +658,7 @@ function createApp() {
         diyUsenetEnabled: b.diyUsenetEnabled === 'on'
           || b.diyUsenetEnabled === '1' || b.diyUsenetEnabled === 'true',
         catalogs: finalCats,
+        catalogsNone,
         catalogDefaultsVersion: CURRENT_DEFAULTS_VERSION,
         showCatalogsOnHome: b.showCatalogsOnHome === 'on' || b.showCatalogsOnHome === '1' || b.showCatalogsOnHome === 'true',
         promotionOrder: cleanOrder(b.promotionOrder, allPromotionIds),
@@ -1542,6 +1550,29 @@ function createApp() {
         videoOnly: b.bitmagnetVideoOnly,
         enabled: toggle(b.bitmagnetEnabled),
       });
+      // Sport-Video's pipeline settings now live on this card too. A patch,
+      // not a replace: team filters and auto-warm are still owned by the
+      // Sport-Video page's own form and must survive a save from here.
+      if (hasToggles) {
+        const categories = [].concat(b.sportVideoCategories || []);
+        if (categories.length) {
+          settings.updateSportVideo({
+            enabled: b.sportVideoEnabled === '1',
+            autoScan: b.sportVideoAutoScan === '1',
+            intervalHours: b.sportVideoIntervalHours,
+            maxDetailsPerScan: b.sportVideoMaxDetailsPerScan,
+            archivePages: b.sportVideoArchivePages,
+            categories,
+          });
+        } else {
+          // No categories posted: either the section was never opened, or the
+          // user emptied it. Either way the switch must still work — refusing
+          // the whole save would make "turn this off" depend on a field in a
+          // collapsed block.
+          settings.setSportVideoEnabled(b.sportVideoEnabled === '1');
+        }
+        sportVideo.startScheduler();
+      }
       // 0.38.1: football-data.org API key — admin-saved value wins over the
       // FOOTBALL_DATA_API_KEY env var. Empty input is allowed (falls back to env).
       settings.setFootballData({
@@ -1966,6 +1997,32 @@ function createApp() {
 // Enable/disable toggle for a discovery source. Keeping the credentials while
 // removing the source from the pipeline is the point: comparing sources means
 // switching them off and on repeatedly, and deleting a URL to do that loses it.
+// 0.95.0 — one collapsible block per pipeline.
+//
+// Four discovery sources, each with a switch, credentials and an explanation,
+// stacked flat made this the longest card on the page and buried the one thing
+// an operator usually came for: which sources are on. Collapsed, the card is a
+// four-line summary that opens to the detail. The state chip is in the summary
+// so the answer is visible without opening anything.
+//
+// `open` when the source is configured-but-off or misconfigured, because that
+// is the case someone is most likely to be here to fix.
+function pipelineSection(opts) {
+  const tone = opts.enabled ? 'ok' : 'off';
+  const state = opts.enabled ? 'On' : 'Off';
+  return '<details class="mb-3" ' + (opts.open ? 'open' : '') + '>'
+    + '<summary class="d-flex align-items-center gap-2" style="cursor:pointer">'
+    + '<strong>' + escapeHtml(opts.title) + '</strong>'
+    + '<span class="badge bg-' + (opts.enabled ? 'green' : 'secondary') + '-lt ms-auto">'
+    + escapeHtml(state) + '</span>'
+    + '</summary>'
+    + '<div class="pt-3">'
+    + (opts.summary ? '<p class="text-secondary small mb-3">' + opts.summary + '</p>' : '')
+    + opts.body
+    + '</div></details>'
+    + (tone ? '' : '');
+}
+
 function sourceToggle(name, label, enabled, hint) {
   return '<label class="form-check mb-2">'
     + '<input class="form-check-input" type="checkbox" name="' + escapeHtml(name) + '" value="1"'
@@ -2119,6 +2176,7 @@ function renderAdminPage(currentUser, opts) {
   const _comp = settings.getCompanion();
   const _prowlarr = settings.getProwlarr();
   const _bitmagnet = settings.getBitmagnet();
+  const _sportVideo = settings.getSportVideo();
   // 0.38.1: football-data.org API key field on /admin Sources so admins can
   // save/rotate the key without editing docker-compose.yml.
   const _fd = settings.getFootballData();
@@ -2135,63 +2193,114 @@ function renderAdminPage(currentUser, opts) {
     + '</div>'
     + flashHtml
 
-    // Companion scraper config
+    // Discovery pipelines, one collapsible block each.
+    //
+    // Flat, four sources with switches, credentials and explanations made this
+    // the longest card on the page, and the question an operator usually comes
+    // here to answer — which sources are on — was buried in the middle of it.
+    // Each pipeline is now a <details> whose summary carries its name and its
+    // state, so that question is answered without opening anything.
     + '<div class="card mb-3">'
-    +   '<div class="card-header"><h3 class="card-title">Torrent discovery and metadata sources</h3></div>'
+    +   '<div class="card-header"><h3 class="card-title">Discovery pipelines</h3></div>'
     +   '<div class="card-body">'
-    +     '<p class="text-secondary small mb-3">URL of the SeriousSportScraper companion service you have deployed. The metadata addon delegates content discovery to it and resolves the returned hashes through each user\'s own TorBox key. Leave blank if you only want to use direct Prowlarr.</p>'
+    +     '<p class="text-secondary small mb-3">Four ways to find releases for an event. Each can be switched off without losing what you configured, which is the point — comparing them means turning them on and off repeatedly.</p>'
     +     '<form method="POST" action="/admin/sources">'
     +       '<input type="hidden" name="sourceToggles" value="1">'
-    +       sourceToggle('companionEnabled', 'Companion scraper enabled', _comp.enabled,
-    +         'Unticking keeps the URL and token but takes the companion out of discovery.')
-    +       '<div class="mb-3">'
-    +         '<label class="form-label">Companion URL</label>'
-    +         '<input class="form-control text-mono" name="companionUrl" value="' + escapeHtml(_comp.url) + '" placeholder="http://scraper:8080" autocomplete="off">'
-    +       '</div>'
-    +       secretField('Companion auth token (optional)', 'companionAuthToken', _comp.authToken, 'shared bearer if scraper is internet-exposed')
 
-    +       '<hr class="my-4">'
-    +       '<h4 class="mb-2">Direct Prowlarr (optional)</h4>'
-    +       sourceToggle('prowlarrEnabled', 'Direct Prowlarr enabled', _prowlarr.enabled,
-    +         'Unticking keeps the URL and API key but takes Prowlarr out of discovery.')
-    +       '<p class="text-secondary small mb-3">Query Prowlarr directly when a user opens an event. Discovery is request-only and limited to that event. Results are filtered and checked against each user\'s TorBox account; raw torrent rows are never returned. The URL must be reachable from this container. For a separate Dockge stack, use a shared Docker network or the server address; <code>localhost</code> refers to this container.</p>'
-    +       '<div class="mb-3">'
-    +         '<label class="form-label">Prowlarr URL</label>'
-    +         '<input class="form-control text-mono" type="url" name="prowlarrUrl" value="' + escapeHtml(_prowlarr.url) + '" placeholder="http://prowlarr:9696" autocomplete="off">'
-    +       '</div>'
+    +       pipelineSection({
+          title: 'Companion scraper',
+          enabled: _comp.enabled && !!_comp.url,
+          open: !_comp.url,
+          summary: 'The SeriousSportSync-Scraper service, if you run one. It combines Prowlarr, Zilean, Torznab and its own sources behind a single endpoint; SSS resolves the hashes it returns through each user\'s own TorBox key.',
+          body: sourceToggle('companionEnabled', 'Companion scraper enabled', _comp.enabled,
+          'Unticking keeps the URL and token but takes the companion out of discovery.')
+          + '<div class="mb-3">'
+          + '<label class="form-label">Companion URL</label>'
+          + '<input class="form-control text-mono" name="companionUrl" value="' + escapeHtml(_comp.url) + '" placeholder="http://scraper:8080" autocomplete="off">'
+          + '</div>'
+          + secretField('Companion auth token (optional)', 'companionAuthToken', _comp.authToken, 'shared bearer if scraper is internet-exposed'),
+          })
 
-    +       secretField('Prowlarr API key', 'prowlarrApiKey', _prowlarr.apiKey, 'Settings → General → Security')
-    +       '<hr class="my-4">'
-    +       '<h4 class="mb-2">Direct Bitmagnet (optional)</h4>'
-    +       sourceToggle('bitmagnetEnabled', 'Direct Bitmagnet enabled', _bitmagnet.enabled,
-    +         'Unticking keeps the URL and settings but takes Bitmagnet out of discovery.')
-    +       '<p class="text-secondary small mb-3">Query your own Bitmagnet instance directly over its GraphQL API. Unlike Prowlarr this is a single local index rather than a fan-out to remote trackers, so it answers in milliseconds and returns info hashes without a hydration pass. Results are ordered by seeders server-side, then filtered by the same relevance matcher as every other source. Enter the Bitmagnet base URL; <code>/graphql</code> is appended automatically.</p>'
-    +       '<div class="mb-3">'
-    +         '<label class="form-label">Bitmagnet URL</label>'
-    +         '<input class="form-control text-mono" type="url" name="bitmagnetUrl" value="' + escapeHtml(_bitmagnet.url) + '" placeholder="http://bitmagnet:3333" autocomplete="off">'
-    +       '</div>'
-    +       '<div class="mb-3">'
-    +         '<label class="form-label">Results per query</label>'
-    +         '<input class="form-control text-mono" type="number" name="bitmagnetLimit" value="' + escapeHtml(String(_bitmagnet.limit)) + '" min="1" max="5000" autocomplete="off">'
-    +         '<div class="form-hint">Ordered by seeders, so a lower limit drops the tail rather than an arbitrary slice. Over-fetching against a local index is cheap.</div>'
-    +       '</div>'
-    +       '<label class="form-check mb-3">'
-    +         '<input class="form-check-input" type="checkbox" name="bitmagnetVideoOnly" value="1"' + (_bitmagnet.videoOnly ? ' checked' : '') + '>'
-    +         '<span class="form-check-label">Video files only</span>'
-    +       '</label>'
-    +       '<div class="form-hint mb-3">Narrows to torrents Bitmagnet has classified as video. Leave off unless you see non-video noise: a freshly crawled torrent has no file list yet, so this can hide the newest releases.</div>'
+    +       pipelineSection({
+          title: 'Direct Bitmagnet',
+          enabled: _bitmagnet.enabled && !!_bitmagnet.url,
+          open: !_bitmagnet.url,
+          summary: 'Your own Bitmagnet index over its GraphQL API. One local database rather than a fan-out to remote trackers, so it answers in milliseconds and returns info hashes without a hydration pass. Results are ordered by seeders server-side, then filtered by the same relevance matcher as every other source. Enter the base URL; <code>/graphql</code> is appended automatically.',
+          body: sourceToggle('bitmagnetEnabled', 'Direct Bitmagnet enabled', _bitmagnet.enabled,
+          'Unticking keeps the URL and settings but takes Bitmagnet out of discovery.')
+          + '<div class="mb-3">'
+          + '<label class="form-label">Bitmagnet URL</label>'
+          + '<input class="form-control text-mono" type="url" name="bitmagnetUrl" value="' + escapeHtml(_bitmagnet.url) + '" placeholder="http://bitmagnet:3333" autocomplete="off">'
+          + '</div>'
+          + '<div class="mb-3">'
+          + '<label class="form-label">Results per query</label>'
+          + '<input class="form-control text-mono" type="number" name="bitmagnetLimit" value="' + escapeHtml(String(_bitmagnet.limit)) + '" min="1" max="5000" autocomplete="off">'
+          + '<div class="form-hint">Ordered by seeders, so a lower limit drops the tail rather than an arbitrary slice. Over-fetching against a local index is cheap.</div>'
+          + '</div>'
+          + '<label class="form-check mb-1">'
+          + '<input class="form-check-input" type="checkbox" name="bitmagnetVideoOnly" value="1"' + (_bitmagnet.videoOnly ? ' checked' : '') + '>'
+          + '<span class="form-check-label">Video files only</span>'
+          + '</label>'
+          + '<div class="form-hint">Narrows to torrents Bitmagnet has classified as video. Leave off unless you see non-video noise: a freshly crawled torrent has no file list yet, so this can hide the newest releases.</div>',
+          })
+
+    +       pipelineSection({
+          title: 'Direct Prowlarr',
+          enabled: _prowlarr.enabled && !!(_prowlarr.url && _prowlarr.apiKey),
+          open: !(_prowlarr.url && _prowlarr.apiKey),
+          summary: 'Query Prowlarr directly when a user opens an event. Discovery is request-only and limited to that event. Results are filtered and checked against each user\'s TorBox account; raw torrent rows are never returned. The URL must be reachable from this container — for a separate Dockge stack use a shared Docker network or the server address, since <code>localhost</code> means this container.',
+          body: sourceToggle('prowlarrEnabled', 'Direct Prowlarr enabled', _prowlarr.enabled,
+          'Unticking keeps the URL and API key but takes Prowlarr out of discovery.')
+          + '<div class="mb-3">'
+          + '<label class="form-label">Prowlarr URL</label>'
+          + '<input class="form-control text-mono" type="url" name="prowlarrUrl" value="' + escapeHtml(_prowlarr.url) + '" placeholder="http://prowlarr:9696" autocomplete="off">'
+          + '</div>'
+          + secretField('Prowlarr API key', 'prowlarrApiKey', _prowlarr.apiKey, 'Settings → General → Security'),
+          })
+
+    // Sport-Video's settings used to live entirely on their own page, so this
+    // card listed three pipelines and silently omitted the fourth. What runs
+    // the pipeline belongs here with the rest; what it does with a matched
+    // release — team filters, auto-warm, the per-release TorBox actions — stays
+    // on its own page, because those are drawn from the promotion list.
+    +       pipelineSection({
+          title: 'Sport-Video',
+          enabled: _sportVideo.enabled,
+          open: false,
+          summary: 'A curated, event-specific torrent catalogue. SSS reads its public index, matches releases against events you already have, and only then fetches torrent metadata. Nothing is ever added to TorBox automatically. Off until you turn it on, unlike the three above, because it reaches a third-party site on a schedule.',
+          body: sourceToggle('sportVideoEnabled', 'Sport-Video enabled', _sportVideo.enabled,
+          'Unticking keeps every Sport-Video setting and takes it out of discovery.')
+          + '<label class="form-check mb-2">'
+          + '<input class="form-check-input" type="checkbox" name="sportVideoAutoScan" value="1"' + (_sportVideo.autoScan ? ' checked' : '') + '>'
+          + '<span class="form-check-label">Scan on a schedule</span>'
+          + '</label>'
+          + '<div class="form-hint mb-3">With this off the pipeline still serves what it has already matched; it just stops going back for more on its own.</div>'
+          + '<div class="row g-3 mb-3">'
+          + '<div class="col-md-4"><label class="form-label">Scan every (hours)</label>'
+          + '<input class="form-control" type="number" name="sportVideoIntervalHours" value="' + escapeHtml(String(_sportVideo.intervalHours)) + '" min="1" max="168"></div>'
+          + '<div class="col-md-4"><label class="form-label">Prepared releases per scan</label>'
+          + '<input class="form-control" type="number" name="sportVideoMaxDetailsPerScan" value="' + escapeHtml(String(_sportVideo.maxDetailsPerScan)) + '" min="1" max="200"></div>'
+          + '<div class="col-md-4"><label class="form-label">Archive pages per scan</label>'
+          + '<input class="form-control" type="number" name="sportVideoArchivePages" value="' + escapeHtml(String(_sportVideo.archivePages)) + '" min="0" max="60"></div>'
+          + '</div>'
+          + '<label class="form-label">Sports to scan</label>'
+          + '<div class="form-selectgroup mb-2">'
+          + settings.SPORT_VIDEO_CATEGORIES.map((category) => '<label class="form-selectgroup-item">'
+          + '<input type="checkbox" name="sportVideoCategories" value="' + escapeHtml(category) + '" class="form-selectgroup-input"'
+          + ((_sportVideo.categories || []).includes(category) ? ' checked' : '') + '>'
+          + '<span class="form-selectgroup-label">' + escapeHtml(category) + '</span></label>').join('')
+          + '</div>'
+          + '<div class="form-hint mb-3">At least one, or the save is rejected — a scan with nothing to scan is a mis-filled form.</div>'
+          + '<a class="btn btn-outline-secondary btn-sm" href="/admin/sport-video">Scans, matches and TorBox actions</a>',
+          })
 
     // 0.38.1: football-data.org API key block. Saved value overrides
     // FOOTBALL_DATA_API_KEY env var. Used by custom promotions whose source
     // === 'football-data' (FIFA WC, EPL, Champions League, etc.).
     +       '<hr class="my-4">'
-    +       '<h4 class="mb-2">football-data.org</h4>'
-    +       '<p class="text-secondary small mb-3">API key for the football-data.org parallel source — used by custom promotions whose source is set to football-data (FIFA WC, EPL, Champions League, etc.). Free tier covers ~10 req/min. Sign up at <a href="https://www.football-data.org/client/register" target="_blank" rel="noopener" class="link-primary">football-data.org/client/register</a>. Saving here overrides the FOOTBALL_DATA_API_KEY env var.</p>'
+    +       '<h4 class="mb-2">Metadata API keys</h4>'
+    +       '<p class="text-secondary small mb-3">Not discovery — these fetch the fixtures themselves. football-data.org backs the eight shipped domestic leagues; its free tier covers about 10 requests a minute (<a href="https://www.football-data.org/client/register" target="_blank" rel="noopener" class="link-primary">register</a>). API-Football is only used by providers you create in Metadata; the shipped Champions League provider reads UEFA directly and needs no key. Either value saved here overrides its environment variable.</p>'
     +       secretField('football-data.org API key', 'footballDataApiKey', _fd.apiKey, 'paste your football-data.org token')
-
-    +       '<hr class="my-4">'
-    +       '<h4 class="mb-2">API-Football</h4>'
-    +       '<p class="text-secondary small mb-3">Optional key for API-Football providers created in Metadata. Current-season access depends on your API-Football plan; its free plan may be limited to historical seasons. The shipped Champions League provider now uses UEFA directly and needs no key. Create a key at <a href="https://dashboard.api-football.com/register" target="_blank" rel="noopener" class="link-primary">dashboard.api-football.com</a>. Saving here overrides <code>API_FOOTBALL_API_KEY</code>.</p>'
     +       secretField('API-Football API key', 'apiFootballApiKey', _apiFootball.apiKey, 'paste your API-Football key')
 
     +       '<hr class="my-4">'

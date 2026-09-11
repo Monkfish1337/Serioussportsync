@@ -91,6 +91,105 @@ single-token form — "Serie A" and "Ligue 1" really are named that way.
 queries by shape, measures unique hash contribution rather than hit rate, and
 tests mechanical transforms against a live index.
 
+## Switching every catalog off now stays off
+
+Reported as: turn them all off one by one, save, and they all come back on.
+
+An empty `catalogs` array has always meant "all" — the right default for a new
+account and for a user who ticks everything — and it was also exactly what
+unticking everything produced. "None" was the one selection the interface could
+not express, so the save round-tripped straight back to "everything".
+
+It now has a flag of its own rather than a new meaning for `[]`, because every
+existing install has `[]` on disk meaning "all" and reinterpreting it would
+empty every catalog on upgrade. The Configure form marks that it carried the
+catalog step, so zero catalogs posted is a real choice rather than a form that
+had no catalog fields in it.
+
+**Enable all / Disable all** on the Catalogs step, since twenty-nine promotions
+is a lot of clicking to reach "just the two I watch" and the same again to undo
+it. With nothing selected the step says what will happen rather than showing a
+silent zero.
+
+## The discovery pipelines are one card, four collapsible blocks
+
+Reported as "the Sport-Video pipeline has no disable toggle". It always had
+one — but only on its own page, so the Server page listed enable toggles for the
+companion, Prowlarr and Bitmagnet and silently omitted the fourth source. From
+the only screen where a user compares sources, Sport-Video looked like the one
+that could not be switched off.
+
+Sport-Video now sits on that card with the other three, and what runs the
+pipeline came with it: the switch, the scan schedule, the per-scan limits and
+the sports to scan. What it does with a matched release — team filters,
+auto-warm, the per-release TorBox actions — stays on its own page, because
+those are drawn from the promotion list rather than being properties of the
+pipeline.
+
+That needed a setter that patches rather than replaces. `setSportVideo` rejects
+a submission with no categories, correctly, and replaces the whole object; a
+save from the Server card would therefore have blanked the fields that card
+never showed. `updateSportVideo` merges a patch over what is stored and
+validates the result. The switch keeps a setter of its own that validates
+nothing, because "turn this off" must not depend on the validity of some other
+field — or, now, on a field inside a collapsed block.
+
+**Four pipelines, four collapsible blocks.** Flat, with a switch, credentials
+and an explanation each, this had become the longest card on the page, and the
+question an operator usually comes here to answer — which sources are on — was
+buried in the middle of it. Each block's summary carries its name and its
+state, so that question is answered without opening anything. A pipeline that
+is enabled but has no URL reads as off, because it is, and opens by default
+since that is the case someone is most likely here to fix.
+
+One deliberate asymmetry, now stated on the card: the companion, Prowlarr and
+Bitmagnet are enabled unless a flag says otherwise, because they predate the
+toggles and an install upgrading into them has to keep working. Sport-Video
+reaches a third-party site on a schedule, so it stays off until turned on.
+
+The two metadata API keys moved to the bottom under a heading that says what
+they are — they fetch fixtures, not releases, and sitting them among the
+discovery sources implied they were one.
+
+## AEW's upcoming events were missing
+
+Reported as: All Out on 27 September 2026 is not in Upcoming. It was not a
+matching bug. The instance's own store held 32 AEW events and every one of them
+was in the past, newest 2026-08-30.
+
+Measured against the live API on 2026-09-11:
+
+    eventsnextleague.php?id=4563     -> 1 event  ("Collision #161", weekly TV)
+    eventsseason.php?id=4563&s=2026  -> 15 events, ending 2026-02-19
+    searchevents.php?e=All_Out       -> idEvent 2579127, 2026-09-27, AEW
+
+TheSportsDB's free key caps its list endpoints. AEW runs roughly three weekly
+TV tapings a week, so the 15 slots of a season response are spent before
+February, and the single event `eventsnextleague` returns is a weekly show
+which `includeEvent` correctly discards. What is left is past cards only — an
+Upcoming row with nothing in it, indistinguishable from a broken feed.
+
+The last line above is the fix: the event is in the database, it just cannot be
+reached by listing. A league whose cards have stable recurring names can ask
+for them by name, which is also a better fit for what this promotion wants —
+the named cards, not the weekly filler it throws away. Fourteen names for AEW.
+
+**AEW is the only shipped league that needs this**, and the first version of
+this change got that wrong. A WWE list was added on the assumption that Raw and
+SmackDown would crowd out the PLEs the same way, and then checked against the
+running instance, where WWE had 74 events with future dates out to 2026-12-12.
+It never needed it, so the list was removed rather than kept as a hedge —
+fifteen HTTP requests per refresh is not free. Also checked on the same day:
+UFC 84 events out to 2026-12-12, Boxing 100+ out to 2026-10-31, Formula 1 100+
+out to 2026-12-06.
+
+The names are keyed by league id in `lib/tsdb-known-events.js` rather than
+carried on the source object, because a promotion's source resolves from one of
+three places — its own fallback in `lib/promotions.js`, the system
+metadata-source registry, or a user-created entry — and only the league id is
+common to all three. Putting them on the promotion literal was tried first and
+had no effect at all, since the registry definition wins.
+
 ## Nuvio collections: the step that could not edit collections
 
 Reported from the Configure wizard, and all four turned out to be real.

@@ -2,6 +2,7 @@
 // Multi-promotion refresh.
 
 const tsdb = require('../lib/sources/thesportsdb');
+const tsdbKnownEvents = require('../lib/tsdb-known-events');
 const transform = require('../lib/transform');
 const store = require('../lib/store');
 const promotions = require('../lib/promotions');
@@ -113,7 +114,20 @@ async function refreshPromotion(promotion, log) {
   if (promotion.source.type === 'thesportsdb') {
     const seasons = activeSeasons();
     log('  TSDB seasons: ' + seasons.join(', '));
-    raw = await tsdb.fetchAll({ leagueId: promotion.source.leagueId, seasons, log });
+    raw = await tsdb.fetchAll({
+      leagueId: promotion.source.leagueId,
+      seasons,
+      // Recurring card names for leagues whose schedule is mostly weekly TV.
+      // Keyed off the league id rather than carried on the source, because a
+      // source definition can come from three places — the promotion's own
+      // fallback, the system metadata-source registry, or a user-created entry
+      // — and only the league id is common to all three. See
+      // lib/tsdb-known-events.js for why the list endpoints cannot reach these.
+      knownEvents: (promotion.source.knownEvents && promotion.source.knownEvents.length)
+        ? promotion.source.knownEvents
+        : tsdbKnownEvents.knownEventsFor(promotion.source.leagueId),
+      log,
+    });
   } else if (promotion.source.type === 'wikipedia') {
     if (!wiki) { log('  wikipedia source unavailable — skipping'); return { ok: true }; }
     raw = await wiki.fetchAll({ pattern: promotion.source.yearPagePattern, promotion, log });
