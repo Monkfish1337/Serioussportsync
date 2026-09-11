@@ -107,7 +107,8 @@ function isoDaysFromToday(days) {
   return d.toISOString().slice(0, 10);
 }
 
-async function refreshPromotion(promotion, log) {
+async function refreshPromotion(promotion, log, opts) {
+  opts = opts || {};
   log('==> refreshing ' + promotion.id + ' (' + promotion.name + ')');
   let raw = [];
 
@@ -126,6 +127,9 @@ async function refreshPromotion(promotion, log) {
       knownEvents: (promotion.source.knownEvents && promotion.source.knownEvents.length)
         ? promotion.source.knownEvents
         : tsdbKnownEvents.knownEventsFor(promotion.source.leagueId),
+      // A preview is interactive and has a 60s deadline; named lookups are
+      // one rate-limited request each and can spend all of it.
+      skipNamedLookups: opts.skipNamedLookups === true,
       log,
     });
   } else if (promotion.source.type === 'wikipedia') {

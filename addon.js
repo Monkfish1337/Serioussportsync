@@ -342,6 +342,7 @@ function createApp() {
       })),
       selected: effective || new Set(),
       selectAll: effective === null,
+      hiddenHomeRows: new Set(cfg.homeRowsHidden || []),
       folderOf,
       collections,
       choosers: teamPicker.CHOOSERS.map((c) => ({ key: c.key, label: c.label, hint: c.hint })),
@@ -734,6 +735,12 @@ function createApp() {
           || b.diyUsenetEnabled === '1' || b.diyUsenetEnabled === 'true',
         catalogs: finalCats,
         catalogsNone,
+        // Served and shown are different choices, so they are stored
+        // separately. Only trust this list from a form that carried the
+        // catalog step, for the same reason catalogsNone is gated.
+        homeRowsHidden: sentCatalogStep
+          ? [].concat(b.homeRowsHidden || []).filter((id) => allCatalogIds.has(id))
+          : (req.user.config && req.user.config.homeRowsHidden) || [],
         catalogDefaultsVersion: CURRENT_DEFAULTS_VERSION,
         showCatalogsOnHome: b.showCatalogsOnHome === 'on' || b.showCatalogsOnHome === '1' || b.showCatalogsOnHome === 'true',
         promotionOrder: cleanOrder(b.promotionOrder, allPromotionIds),

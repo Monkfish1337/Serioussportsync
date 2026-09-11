@@ -1,40 +1,43 @@
-Let Bitmagnet and Prowlarr run together; fix two regressions
+Split "served" from "on the home screen"; label torrent rows; stop named
+lookups blowing the refresh deadline
 
-## Bitmagnet + Prowlarr
+## Collections opened empty when home rows were disabled
 
-Reported as: each works alone, both together return nothing.
+There was only one switch. Turning it off removed the catalog from the manifest
+entirely, and a Nuvio collection folder whose source is a catalog the manifest
+no longer declares has nothing to show. showCatalogsOnHome was a single boolean
+for all of them, so "keep this but not on my home screen" could not be said.
+The only working procedure was: enable everything in SSS, then switch each row
+off inside Nuvio by hand.
 
-Promise.all waits for the slowest, and these are nowhere near each other.
-Measured on the same fixture: Bitmagnet 65ms, Prowlarr 20,086ms. Alone,
-Bitmagnet finished inside any budget and Prowlarr had the whole budget to
-itself. Together the combined call inherited Prowlarr's latency, blew the
-stream deadline, and threw away Bitmagnet's results -- which had been sitting
-there since the first 65ms.
+Two switches per promotion now. Served decides whether the catalog exists for
+the client; Home row decides whether it also gets a row on the home screen.
+Stored as hidden ids rather than shown ids, so a catalog added later appears by
+default rather than silently not existing for everyone who saved before it.
+All home rows / No home rows sit beside the existing enable-all pair, and the
+step names the trap instead of leaving it to be discovered.
 
-Only the companion was ever given a budget; prowlarr.multiSearch and
-bitmagnet.multiSearch were awaited with no deadline at all. Each source is now
-raced against the discovery budget and whatever arrived is used; a source still
-running is dropped for that request and named in the log. One source answering
-makes the fan-out a success, or a Prowlarr timeout would still discard a good
-Bitmagnet search.
+## Torrent rows now say which source found them
 
-## Regression: every promotion reported "No events"
+Nuvio already identified UU, DIY, Easynews and Sport-Video rows. Torrents were
+the exception -- Bitmagnet, Prowlarr and the companion all arrived labelled
+"TorBox" -- so "is Bitmagnet finding this, or Prowlarr?" meant reading server
+logs. That is the question most worth answering in the client now the two run
+together. Every source already recorded an indexer on the candidate; both the
+playable row and the warm row surface it.
 
-The Events column read contentStore.load().events, which is undefined -- the
-catalog lives in the event store, contentStore holds the overlay of manual
-events, date overrides and the inbox. The column added to show which promotions
-are broken reported that all of them were, including ones measured at 84 and 74
-events. Now store.loadFromDisk().events, the accessor the Event Editor uses,
-with a test pinning it.
+## Named TheSportsDB lookups were charged to everything
 
-## Regression: the Promotions table ran off the page
+One request per name with config.tsdb.requestDelayMs between them to respect
+the free key's 30/min: at the shipped 3000ms that is 42s for AEW's fourteen
+names, on top of the existing calls, against a 60s interactive preview. A
+preview that times out is worse than the empty Upcoming row this fixed.
 
-It sits in .table-responsive, which sets overflow-x: auto -- but a scroll
-container only scrolls if something stops it growing, and nothing did. Eight
-columns and a row of buttons always exceed a narrow viewport, so the card was
-pushed sideways instead of scrolling inside itself.
+Two gates. They run only when the list endpoints reached no future event --
+the exact condition they exist for, so a healthy league pays nothing -- and
+never during a preview, which is interactive and writes nothing.
 
-420 unit tests pass.
+434 unit tests pass.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

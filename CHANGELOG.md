@@ -191,6 +191,57 @@ where a long comma list wraps under the disclosure marker and indents every line
 but the first. The count stays in the summary; the names moved to a line of
 their own beneath it.
 
+## Served and shown on the home screen are now different choices
+
+Reported as: push collections to Nuvio with home rows disabled and the folders
+open empty; enable everything and they work, but every catalog is duplicated as
+a home row underneath. Which left one usable procedure — enable everything in
+SSS, then switch each row off inside Nuvio by hand.
+
+There was only one switch. Turning it off removed the catalog from the manifest
+entirely, and a Nuvio collection folder whose source is a catalog the manifest
+no longer declares has nothing to show. `showCatalogsOnHome` was a single
+boolean for all of them, so "keep this but not on my home screen" could not be
+said at all.
+
+The Catalogs step now has two switches per promotion. **Served** decides whether
+the catalog exists for your client; **Home row** decides whether it also gets a
+row on the home screen. Filing a catalog into a folder and hiding its home row
+is now the ordinary thing it should always have been, and the step says so
+rather than leaving the trap to be discovered.
+
+Stored as a list of hidden ids rather than shown ids, so a catalog added in a
+later version appears by default instead of silently not existing for everyone
+who saved before it shipped. **All home rows** and **No home rows** sit beside
+the existing enable-all pair.
+
+## Torrent rows say where they came from
+
+Nuvio already identified Usenet Ultimate, the DIY pipeline, Easynews and
+Sport-Video rows. Torrents were the exception: Bitmagnet, Prowlarr and the
+companion all arrived labelled "TorBox" and were indistinguishable, so "is
+Bitmagnet finding this, or Prowlarr?" could only be answered by reading server
+logs — which is the question most worth answering in the client, especially now
+that the two run together.
+
+Every torrent source already recorded an indexer on the candidate: Bitmagnet a
+literal `Bitmagnet`, Prowlarr the tracker's own name, the companion its origins.
+Both the playable row and the warm row now show it.
+
+## Named TheSportsDB lookups no longer blow the refresh deadline
+
+The AEW fix from earlier in this release was charged to everything. Named
+lookups are one request per name with `config.tsdb.requestDelayMs` between them
+to stay inside the free key's 30 a minute, and at the shipped 3000ms that is 42
+seconds for fourteen names — on top of the existing calls, and against an
+interactive source preview with a 60 second deadline. A preview that times out
+is worse than the empty Upcoming row this was built to fix.
+
+Two gates. They run only when the list endpoints failed to reach a single future
+event, which is the exact condition they exist for, so a league whose own
+schedule comes through pays nothing. And never during a preview, which is
+interactive and writes nothing.
+
 ## Bitmagnet and Prowlarr now work together
 
 Reported as: each works alone, both together return nothing.

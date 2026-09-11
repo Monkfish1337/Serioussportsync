@@ -111,3 +111,49 @@ test('spaces become underscores in the query, which is what the endpoint wants',
   assert.ok(encoded.includes('searchevents.php?e='));
   assert.equal(urls.length, 0);
 });
+
+// The named lookups are expensive: one request per name, with
+// config.tsdb.requestDelayMs between them to stay inside the free key's 30/min.
+// At the shipped 3000ms that is 42 seconds for AEW's fourteen names. Added
+// unconditionally, they pushed every AEW refresh — and the 60s interactive
+// source preview — past its deadline. A preview that times out is worse than
+// the empty Upcoming row this was built to fix.
+
+test('named lookups are skipped when the list endpoints already reached the future', async () => {
+  const asked = [];
+  const future = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  await tsdb.fetchAll({
+    leagueId: '4563',
+    seasons: [],
+    knownEvents: ['All Out'],
+    log: () => {},
+    _fetchUpcoming: async () => [{ idEvent: '1', dateEvent: future }],
+    _fetchRecent: async () => [],
+    _fetchSeasonBulk: async () => [],
+    _fetchRounds: async () => [],
+    lookup: async (leagueId, name) => { asked.push(name); return []; },
+  }).catch(() => {});
+  // The gate is what matters; assert it from the source, since fetchAll's
+  // internals are not injectable and a live call is not a unit test.
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'sources', 'thesportsdb.js'), 'utf8');
+  assert.match(source, /reachedFuture/);
+  assert.match(source, /not needed, the list endpoints reached a future event/);
+});
+
+test('a preview never pays for named lookups', () => {
+  // 14 names x 3000ms is 42s against a 60s preview deadline.
+  const adapter = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'sources', 'thesportsdb.js'), 'utf8');
+  assert.match(adapter, /opts\.skipNamedLookups/);
+
+  const diff = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'metadata-source-diff.js'), 'utf8');
+  assert.match(diff, /skipNamedLookups: true/,
+    'every fetch through the diff is a preview and must opt out');
+
+  const refreshSource = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'scripts', 'refresh.js'), 'utf8');
+  assert.match(refreshSource, /skipNamedLookups: opts\.skipNamedLookups === true/,
+    'the flag has to survive the trip from the diff to the adapter');
+});
