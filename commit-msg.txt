@@ -1,46 +1,39 @@
-NFL, NBA and MLB: measure the gap, then close it
+Three faults a stream log showed that no unit test could
 
-Reported as "very hit and miss ... isn't worth putting out in its current
-state", with the real question attached: indexer problem or alias problem?
+From a live log for two NFL events. None of these appeared in a test built
+from a hand-written event: all three need the structured team names a real
+ESPN event carries.
 
-Measured. One NFL fixture against the live Prowlarr/Usenet stack returned,
-among others:
+Each side's alias list held both teams. ESPN names an event "<away> at <home>"
+AND ships teamNames.home/.away. splitMatchup reads the string left to right,
+so its home is ESPN's away. The two were merged without checking, so every
+alias list contained the curated forms of one team and the supplied forms of
+the other, and the cross product produced fixtures against themselves:
 
-  NFL.Pre.Season.2026.08.28.Arizona.Cardinals.Vs.Green.Bay.Packers.720p...
-  NFL.2021.10.28.Cardinals.Vs.Packers.1080p.WEB.h264-SPORTSNET
-  NFL.2021.10.28.Packers.at.Cardinals.720p.HDTV.AAC2.0.H264-720pier
+  -> "ARI-ARI" 0 result(s)
+  -> "NFL 2026.08.29 Arizona Cardinals vs Arizona Cardinals" 0 result(s)
 
-Coverage was never the problem. SSS matched the first and rejected the other
-two with `no-home-team`: it knew only the full "City Nickname" that ESPN and
-the MLB schedule supply, while two of the most prolific groups name releases
-by nickname alone. And since every query it emitted carried the full name, an
-ANDing index could not have returned them either. Both halves were broken.
+The event name wins now, because it is the string that was split. A supplied
+list sharing no form with it belongs to the other side; take that side's list
+if it fits, otherwise use none.
 
-Alias tables for all 92 franchises — nickname, city, abbreviation — through
-the same preset mechanism the football leagues already use. A bare name that
-is ambiguous inside its own league is omitted on purpose: "Chicago" is the
-Cubs and the White Sox, "New York" the Mets and the Yankees. The same word
-stays where only one team carries it.
+"ARI GNB" was the first query sent. On a substring index it matches every
+title containing "ari", so the torrent pipeline came back full of Tai-Ari
+deshita and Ari Aster -- thirty-odd candidates, every one rejected as
+no-home-team-alias, and the real release never made the cut. Three-letter code
+pairs are an EPL 2160p naming convention and now stay there; the American
+leagues name releases "NFL.2026.08.28.Cardinals.Vs.Packers".
 
-Nickname-pair queries: "NFL 2021.10.28 Packers Cardinals". No separator — the
-same fixture ships as .Vs. and as .at., so an AND term there halves the reach
-for nothing — and always dated, or the pair matches every meeting of those
-teams in the index's history. Verified live: that query returns all three
-releases above.
+The stored date can be a day ahead of the release. ESPN timestamps are UTC and
+an American night game kicks off after midnight UTC: Arizona at Green Bay is
+stored as 2026-08-29 while every release of it is named 2026.08.28. Every
+dated query for that fixture missed and the only result came from the undated
+fallback. The day before is asked for as well now -- only backwards, since a
+local date is never ahead of the UTC one. Moving the stored date would move
+the event in the catalog and the calendar and is a separate decision; the
+matcher already tolerated the shift, only the queries did not.
 
-One trap closed on the way. The nickname blocklist was written for football
-fan names, and four entries collide with American teams: Eagles, Saints, Reds
-and Tigers are Crystal Palace, Southampton, Liverpool and Hull, but equally
-Philadelphia, New Orleans, Cincinnati and Detroit, where the nickname IS the
-release name. Applied globally it would have silently removed the very queries
-these tables were added to emit. Now scoped to the presets it was written for,
-with the football behaviour pinned by a test.
-
-League prefix plus date stays off where it was measured to lose (169 such
-queries returned nothing between them in the last full football run) and is
-enabled only for these three, whose releases begin with exactly that pair.
-
-447 tests passing.
+450 tests passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

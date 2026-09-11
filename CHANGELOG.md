@@ -1,5 +1,39 @@
 # Changelog
 
+## Unreleased — three faults a stream log showed that no unit test could
+
+A live stream log for two NFL events exposed three problems, none of which
+appeared in a test built from a hand-written event, because all three needed
+the structured team names a real ESPN event carries.
+
+**Each side's alias list held both teams.** ESPN names an event "&lt;away&gt; at
+&lt;home&gt;" *and* ships `teamNames.home` / `.away`. splitMatchup reads the string
+left to right, so its home is ESPN's away. The two were merged without checking,
+so every alias list contained the curated forms of one team and the supplied
+forms of the other, and the cross product produced fixtures against themselves:
+
+    -> "ARI-ARI" 0 result(s)
+    -> "NFL 2026.08.29 Arizona Cardinals vs Arizona Cardinals" 0 result(s)
+
+The event name wins now, because it is the string that was split; a supplied
+list sharing no form with it belongs to the other side.
+
+**"ARI GNB" was the first query sent.** On a substring index that matches every
+title containing "ari", so the torrent pipeline came back full of *Tai-Ari
+deshita* and *Ari Aster* — thirty-odd candidates, every one rejected as
+`no-home-team-alias`, with the real release nowhere near the cut. Three-letter
+code pairs are an EPL 2160p convention and stay there.
+
+**The stored date can be a day ahead of the release.** ESPN timestamps are UTC
+and an American night game kicks off after midnight UTC: Arizona at Green Bay is
+stored as 2026-08-29 while every release of it is named 2026.08.28. Every dated
+query for that fixture missed; the single result came from the undated fallback.
+The day before is now asked for as well — only backwards, since a local date is
+never ahead of the UTC one. Moving the stored date is a separate decision, and
+the matcher already tolerated the shift; only the queries did not.
+
+450 tests passing.
+
 ## Unreleased — NFL, NBA and MLB: measured, then fixed
 
 The American big three were reported as "very hit and miss", with an open

@@ -109,7 +109,10 @@ test('the pair query keeps the date', () => {
     .filter((q) => /celtics/i.test(q) && /lakers/i.test(q))
     .filter((q) => !/\bvs\b|@|\bat\b/i.test(q));   // the pair queries, not the templated ones
   assert.ok(pairs.length, 'a nickname pair must be emitted');
-  assert.ok(pairs.every((q) => /2021\.12\.07/.test(q)), 'every pair query must be dated');
+  // The stored day and the day before it, both dotted -- see the UTC-shift
+  // test at the bottom of this file for why there are two.
+  assert.ok(pairs.every((q) => /\b2021\.12\.0[67]\b/.test(q)), 'every pair query must be dated');
+  assert.ok(pairs.some((q) => /2021\.12\.07/.test(q)));
 });
 
 test('football fan nicknames no longer suppress American team names', () => {
@@ -181,4 +184,83 @@ test('the Athletics have no city, and both spellings still resolve', () => {
   assert.ok(table.Athletics, 'keyed by the name the schedule now supplies');
   const aliases = table.Athletics.map((a) => a.toLowerCase());
   assert.ok(aliases.includes('oakland athletics'));
+});
+
+// ---------------------------------------------------------------------------
+// Found in a live stream log for two real NFL events (2026-09-11). All three
+// of these were shipped by the change above and all three are in this file
+// because none of them showed up in a unit test built from a hand-written
+// event — they needed the structured team names a real ESPN event carries.
+
+test('a side\'s alias list holds one team, not both', () => {
+  // ESPN names an event "<away> at <home>" AND ships teamNames.home/.away.
+  // splitMatchup reads the string left to right, so its home is ESPN's away.
+  // The two were merged without checking, so each side's list held the curated
+  // forms of one team and the supplied forms of the other. Straight from the
+  // log:
+  //
+  //   -> "ARI-ARI" 0 result(s)
+  //   -> "NFL 2026.08.29 Arizona Cardinals vs Arizona Cardinals" 0 result(s)
+  const event = {
+    promotion: 'nfl',
+    name: 'Arizona Cardinals at Green Bay Packers',
+    date: '2026-08-29',
+    teamNames: {
+      home: ['Green Bay Packers', 'Green Bay', 'Packers', 'GB'],
+      away: ['Arizona Cardinals', 'Arizona', 'Cardinals', 'ARI'],
+    },
+  };
+  for (const query of nfl.searchTitles(event)) {
+    assert.ok(!/\b(ARI|GNB|GB)\W+\1\b/i.test(query), 'team against itself: ' + query);
+    assert.ok(!/Cardinals.*Cardinals|Packers.*Packers/i.test(query),
+      'team against itself: ' + query);
+  }
+});
+
+test('no bare three-letter codes where the releases do not use them', () => {
+  // "ARI GNB" was the first query sent for that fixture. On a substring index
+  // it matches every title containing "ari", so the torrent pipeline came back
+  // full of Tai-Ari deshita and Ari Aster — 30-odd candidates, every one
+  // rejected as no-home-team-alias, and the real release never made the cut.
+  // The code-pair form is an EPL 2160p convention and earns its place there.
+  const event = {
+    promotion: 'nfl', name: 'Arizona Cardinals at Green Bay Packers', date: '2026-08-29',
+  };
+  for (const query of nfl.searchTitles(event)) {
+    assert.ok(!/^[A-Z]{2,4}([ -][A-Z]{2,4})?$/.test(query.trim()),
+      'bare code query: ' + query);
+  }
+  // Football still gets them: "MCI COV" -> 2 results, "Man City vs Coventry
+  // City" -> 0.
+  const epl = promotions.all.find((p) => p.id === 'epl');
+  if (epl) {
+    const eplQueries = epl.searchTitles({
+      promotion: 'epl', name: 'Arsenal FC vs Chelsea FC', date: '2026-09-06',
+    });
+    assert.ok(eplQueries.some((q) => /^[A-Z]{3}-[A-Z]{3}$/.test(q.trim())),
+      'the code pair must survive where it was measured to work');
+  }
+});
+
+test('the day before is asked for too, because the stored date can be a day ahead', () => {
+  // ESPN timestamps are UTC and an American night game kicks off after
+  // midnight UTC. This fixture is stored as 2026-08-29; every release of it is
+  // named 2026.08.28. In the log, every dated query missed and the only one
+  // that returned anything was the undated fallback.
+  const event = {
+    promotion: 'nfl', name: 'Arizona Cardinals at Green Bay Packers', date: '2026-08-29',
+  };
+  const queries = nfl.searchTitles(event);
+  assert.ok(andMatches(queries,
+    'NFL.Pre.Season.2026.08.28.Arizona.Cardinals.Vs.Green.Bay.Packers.720p.WEB.H264-NiGHTNiNJAS').length > 0,
+    'the release as it is actually named must be reachable');
+  assert.ok(queries.some((q) => /2026\.08\.29/.test(q)), 'and the stored date is still asked for');
+
+  // Only backwards: a local date is never ahead of the UTC one, so asking for
+  // the day after would be two more queries that cannot be right.
+  assert.ok(!queries.some((q) => /2026\.08\.30/.test(q)));
+
+  // The matcher already tolerated the shift; only the queries did not.
+  assert.equal(nfl.isRelevantStreamTitle(
+    'NFL.Pre.Season.2026.08.28.Arizona.Cardinals.Vs.Green.Bay.Packers.720p', event).ok, true);
 });
