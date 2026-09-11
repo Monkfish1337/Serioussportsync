@@ -318,10 +318,16 @@ test('rutracker\'s DMY titles are reachable', () => {
   const reaching = andMatches(queries, rutracker);
   assert.ok(reaching.length > 0, 'no query can reach the rutracker title');
 
-  // And it has to be reachable EARLY: Prowlarr, which is how rutracker is
-  // reached, gets a bounded list and may not finish it.
+  // And it has to be reachable in the first TWO queries, not merely inside the
+  // six-query cap. Measured: Prowlarr — the only source that reaches rutracker
+  // — completes about two queries before its deadline, so index 0 and 1 are in
+  // practice everything it asks. With the date formats grouped rather than
+  // alternated, both of those were dotted ISO and the DMY form sat at index 4;
+  // Bitmagnet sent all sixty and found the content, Prowlarr never sent the one
+  // query that matches a rutracker title. That is not a theoretical margin.
   const earliest = queries.findIndex((q) => reaching.includes(q));
-  assert.ok(earliest < 6, 'the DMY form must sit inside the bounded provider list, got ' + earliest);
+  assert.ok(earliest <= 1,
+    'the DMY form must be reachable within two queries, got index ' + earliest);
 
   // Both date formats, because both halves of the index have the content.
   const usenet = 'nfl.pre.season.2026.08.28.houston.texans.vs.carolina.panthers.720p.web.h264-nightninjas';
@@ -354,4 +360,31 @@ test('three-letter code pairs need a curated preset behind them', () => {
     });
     assert.ok(eplQueries.some((q) => /^[A-Z]{3}-[A-Z]{3}$/.test(q.trim())));
   }
+});
+
+test('the first two queries cover both halves of the index', () => {
+  // One dotted ISO (the usenet groups) and one DMY (rutracker). A provider
+  // that manages two queries should not spend both on the same format.
+  const event = {
+    promotion: 'nfl', name: 'Houston Texans at Carolina Panthers', date: '2026-08-29',
+  };
+  const first = nfl.searchTitles(event).slice(0, 2);
+  assert.equal(first.length, 2);
+  assert.ok(first.some((q) => /\d{4}\.\d{2}\.\d{2}/.test(q)), 'one dotted ISO');
+  assert.ok(first.some((q) => /\d{2}\.\d{2}\.\d{4}/.test(q)), 'one DMY');
+});
+
+test('an untried date format outranks a weaker form of a tried one', () => {
+  // The prefixed variant of a date is measurably weaker than the prefix-free
+  // one, so it must never displace a format that has not been tried at all.
+  const event = {
+    promotion: 'nfl', name: 'Houston Texans at Carolina Panthers', date: '2026-08-29',
+  };
+  const queries = nfl.searchTitles(event);
+  const firstPrefixed = queries.findIndex((q) => /^NFL \d/.test(q));
+  const prefixFreeDated = queries
+    .slice(0, firstPrefixed === -1 ? queries.length : firstPrefixed)
+    .filter((q) => /\d/.test(q));
+  assert.ok(prefixFreeDated.length >= 4,
+    'all four date tokens go out bare before any of them goes out prefixed');
 });

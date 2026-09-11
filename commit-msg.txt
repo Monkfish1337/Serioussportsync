@@ -1,28 +1,32 @@
-Name every source that found a torrent, not just the first
+Send the rutracker query, don't just generate it
 
-Reported as: the Bitmagnet rows don't match the name and claim Bitmagnet
-rather than Prowlarr. Three separate things, and only one was a defect.
+Reported bluntly and correctly: rutracker results still are not captured. The
+previous commit's claim that both catalogues were "reachable inside the first
+six queries" was the wrong measurement.
 
-The label was accurate. lib/sources/bitmagnet.js hard-codes
-indexer: 'Bitmagnet'; Prowlarr results carry the real per-indexer name, so a
-Prowlarr row says "RuTracker.org". Bitmagnet is a DHT crawler and rutracker
-torrents are public, so it genuinely has them -- finding the same content is
-not the same as being the same source.
+Six is not the number that matters. Prowlarr -- the only configured source
+that reaches rutracker -- is given six queries and completes about TWO before
+its deadline, so index 0 and 1 are in practice everything it asks. With the
+date formats grouped by type, both of those were dotted ISO and the DMY form
+sat at index 4. Bitmagnet sends all sixty, found the content, and the row was
+labelled Bitmagnet; Prowlarr was never handed the one query that can match a
+rutracker title. The query was generated and then never sent.
 
-The title was the torrent's own name as the index reports it, not the
-rutracker listing's title. A single-file torrent is usually named after its
-file, hence "Houston Texans at Carolina Panthers 28.08.2026 Ad Free.mkv"
-rather than the slash-delimited listing.
+The four date tokens now alternate format instead of grouping, and every
+prefix-free form goes out before any prefixed one -- a prefixed date is
+measurably weaker than the bare one ("NFL 2026.08.28 Cardinals Packers" -> 0,
+"Cardinals Packers 2026.08.28" -> 1), so it must not displace a format that
+has not been tried at all. For Texans at Panthers:
 
-The defect: deduplication by info hash kept the first source's attribution and
-threw the rest away. A torrent returned by BOTH Prowlarr and Bitmagnet was
-labelled with whichever list came first in the fan-out, so the row asserted a
-single origin that was only half true -- which is the exact question these
-labels were added to answer. Every source that returned a hash is now named:
-"Bitmagnet, RuTracker.org". That also gives the single-source case meaning --
-a row saying only Bitmagnet now tells you Prowlarr did not return it.
+  0  Panthers Texans 2026.08.29     dotted ISO, stored day
+  1  Panthers Texans 28.08.2026     DMY, day before   -> rutracker
+  2  Panthers Texans 2026.08.28     dotted ISO        -> the usenet release
+  3  Panthers Texans 29.08.2026     DMY, stored day
 
-466 tests passing.
+The test pins index <= 1 now rather than < 6. The margin that looked
+comfortable was the entire bug.
+
+468 tests passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

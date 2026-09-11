@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased — the rutracker query was being generated and never sent
+
+Reported bluntly and correctly: rutracker results still are not being captured.
+They were not, and the previous entry's claim that both catalogues were "now
+reachable inside the first six queries" was the wrong measurement.
+
+Six is not the number that matters. Prowlarr — the only configured source that
+reaches rutracker — is given six queries but completes about **two** before its
+deadline, so index 0 and 1 are in practice everything it asks. With the date
+formats grouped by type, both of those were dotted ISO and the DMY form sat at
+index 4. Bitmagnet, which sends all sixty, found the content and the row was
+labelled Bitmagnet; Prowlarr was never handed the one query that can match a
+rutracker title. The fix generated the right query and then never sent it.
+
+The four date tokens now alternate format instead of grouping, and every
+prefix-free form goes out before any prefixed one — a prefixed date is
+measurably weaker than the bare one, so it must not displace a format that has
+not been tried at all. For Texans at Panthers:
+
+    0  Panthers Texans 2026.08.29     dotted ISO, stored day
+    1  Panthers Texans 28.08.2026     DMY, day before   -> rutracker
+    2  Panthers Texans 2026.08.28     dotted ISO        -> the usenet release
+    3  Panthers Texans 29.08.2026     DMY, stored day
+
+The test now pins index <= 1 rather than < 6, because the margin that was
+"comfortable" was the entire bug.
+
+468 tests passing.
+
 ## Unreleased — a row now names every source that found it
 
 Reported as: the Bitmagnet rows don't match the name and claim Bitmagnet rather
