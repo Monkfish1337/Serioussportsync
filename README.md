@@ -140,10 +140,12 @@ string is.
 | Companion scraper | Combines Prowlarr, Zilean, Torznab, and other sources configured in the separate [companion service](https://github.com/Monkfish1337/SeriousSportSync-Scraper) |
 | Sport-Video | Reads the public RSS and bounded sport category catalogues, matches releases against existing events before downloading any torrent metadata, then validates same-origin detail pages and bounded bencoded torrent files |
 
-Each of the first three has its own enable toggle in **Server**, so a source can
-be taken out of the pipeline for comparison without deleting its URL and
-credentials. All three are on by default, and a source saved before the toggles
-existed stays enabled.
+All four sit on one card in **Server**, as collapsible blocks whose summaries
+show which are on. Each has an enable toggle, so a source can be taken out of
+the pipeline for comparison without deleting its URL and credentials. The first
+three are on by default and a source saved before the toggles existed stays
+enabled; Sport-Video is off until you turn it on, because it reaches a
+third-party site on a schedule.
 
 Torrent results are checked against each user's TorBox account and resolved on
 play. Discovery never adds content to TorBox automatically; an uncached release

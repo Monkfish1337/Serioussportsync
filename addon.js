@@ -415,7 +415,24 @@ function createApp() {
     const DAY = 24 * 60 * 60 * 1000;
     const settledBefore = now - (7 * DAY);
     const oldestUseful = now - (60 * DAY);
-    let chosen = null;
+
+    // 0.95.0 — try several fixtures, from different promotions.
+    //
+    // Picking the single newest settled fixture selected for recency and
+    // nothing else, and recency is uncorrelated with whether a release exists.
+    // On a fully working install it chose "ONE Friday Fights 169 & The Inner
+    // Circle 29" — about the least-covered card in the catalog — found nothing,
+    // and reported that to a user whose setup was fine. One miss on one fixture
+    // is not evidence of anything, which the old copy admitted in a paragraph
+    // explaining that the red result might not mean what it says.
+    //
+    // There is no reliable way to predict which fixture has a release, so this
+    // stops trying: it takes the newest settled fixture from each of several
+    // different promotions and checks them in turn, stopping at the first hit.
+    // One hit proves the pipeline end to end. Three misses across three
+    // promotions is real evidence; one miss never was.
+    const MAX_ATTEMPTS = 3;
+    const newestPerPromotion = new Map();
     for (const event of store.getEvents()) {
       const prefix = String(event.id || '').split(':')[0];
       if (!servedPrefixes.has(prefix)) continue;
@@ -428,8 +445,15 @@ function createApp() {
       const when = Date.parse(event.date + 'T00:00:00Z');
       if (!Number.isFinite(when)) continue;
       if (when > settledBefore || when < oldestUseful) continue;
-      if (!chosen || when > chosen.when) chosen = { event, when };
+      const held = newestPerPromotion.get(promotion.id);
+      if (!held || when > held.when) {
+        newestPerPromotion.set(promotion.id, { event, when, promotion });
+      }
     }
+    const candidates = Array.from(newestPerPromotion.values())
+      .sort((a, b) => b.when - a.when)
+      .slice(0, MAX_ATTEMPTS);
+    const chosen = candidates[0] || null;
     if (!chosen) {
       return res.send(JSON.stringify({
         ok: false,
@@ -439,26 +463,60 @@ function createApp() {
       }));
     }
 
-    let result;
-    try {
-      result = await handleStream({
-        id: chosen.event.id,
-        // 0.93.2 — the check is not a stream request and nothing is waiting on
-        // it but this page, so it gets the background budget rather than the
-        // one sized for Nuvio's ~10s patience. A pipeline that needs 15s is
-        // exactly what the check exists to tell you about; reporting it as
-        // "nothing found" because we hung up at 9.5s would be the check
-        // producing the very confusion it was built to remove.
-        budgetMs: Math.max(5000,
-          parseInt(process.env.ACCOUNT_VERIFY_TIMEOUT_MS || '30000', 10) || 30000),
-        userConfig: cfg,
-        userId: req.user.id,
-        apiToken: req.user.apiToken,
-        username: req.user.username,
-        origin: publicOriginFromReq(req),
+    // Every attempt, so a failure can show what was actually tried rather than
+    // asking the user to take one fixture's word for it.
+    const attempts = [];
+    let result = null;
+    let used = null;
+    for (const candidate of candidates) {
+      let attempt;
+      try {
+        attempt = await handleStream({
+          id: candidate.event.id,
+          // 0.93.2 — the check is not a stream request and nothing is waiting
+          // on it but this page, so it gets the background budget rather than
+          // the one sized for Nuvio's ~10s patience. A pipeline that needs 15s
+          // is exactly what the check exists to tell you about; reporting it as
+          // "nothing found" because we hung up at 9.5s would be the check
+          // producing the very confusion it was built to remove.
+          //
+          // Later attempts get a shorter budget. The first is the one most
+          // likely to succeed, and three full-length misses in a row would sit
+          // on this page for a minute and a half.
+          budgetMs: attempts.length === 0
+            ? Math.max(5000, parseInt(process.env.ACCOUNT_VERIFY_TIMEOUT_MS || '30000', 10) || 30000)
+            : 12000,
+          userConfig: cfg,
+          userId: req.user.id,
+          apiToken: req.user.apiToken,
+          username: req.user.username,
+          origin: publicOriginFromReq(req),
+        });
+      } catch (err) {
+        attempts.push({
+          name: candidate.event.name, date: candidate.event.date,
+          promotion: candidate.promotion.name, rows: 0,
+          error: security.safeErrorMessage(err),
+        });
+        continue;
+      }
+      const found = ((attempt && attempt.streams) || []).length;
+      attempts.push({
+        name: candidate.event.name, date: candidate.event.date,
+        promotion: candidate.promotion.name, rows: found, error: null,
       });
-    } catch (err) {
-      return res.send(JSON.stringify({ ok: false, error: security.safeErrorMessage(err) }));
+      // Keep the first attempt's numbers as the fallback, so a total miss still
+      // reports a real pipeline breakdown rather than nothing at all.
+      if (!result) { result = attempt; used = candidate; }
+      if (found > 0) { result = attempt; used = candidate; break; }
+    }
+    if (!result) {
+      return res.send(JSON.stringify({
+        ok: false,
+        error: attempts.length && attempts[0].error
+          ? attempts[0].error
+          : 'The check could not run against any fixture.',
+      }));
     }
 
     const rows = (result && result.streams) || [];
@@ -478,16 +536,33 @@ function createApp() {
         detail: cfg.diyUsenetEnabled ? 'Your own indexer' : 'Switched off' },
     ];
 
+    // Which discovery sources were asked at all. "TorBox: nothing found" never
+    // said whether Bitmagnet — the primary source now — was even consulted, so
+    // a switched-off source and an empty index read the same.
+    const _c = settings.getCompanion();
+    const _p = settings.getProwlarr();
+    const _b = settings.getBitmagnet();
+    const discovery = [
+      { name: 'Direct Bitmagnet', asked: !!(_b.url && _b.enabled) },
+      { name: 'Direct Prowlarr', asked: !!(_p.url && _p.apiKey && _p.enabled) },
+      { name: 'Companion scraper', asked: !!(_c.url && _c.enabled) },
+      { name: 'Sport-Video', asked: settings.getSportVideo().enabled === true },
+    ];
+
     res.send(JSON.stringify({
       ok: true,
       event: {
-        name: chosen.event.name,
-        date: chosen.event.date,
-        ageDays: Math.round((now - chosen.when) / DAY),
-        promotion: (promotions.getByEventId(chosen.event.id) || {}).name || '',
+        name: used.event.name,
+        date: used.event.date,
+        ageDays: Math.round((now - used.when) / DAY),
+        promotion: used.promotion.name || '',
       },
       total: rows.length,
       pipelines,
+      discovery,
+      // Every fixture tried, so "no streams" can show it was three misses
+      // across three promotions rather than one unlucky pick.
+      attempts,
     }));
   });
 
@@ -1757,6 +1832,8 @@ function createApp() {
       editId: String(req.query.edit || '').trim() || null,
       create: req.query.create === '1',
       flash:  req.query.flash || null,
+      // So the table can say whether each promotion actually has anything.
+      events: (contentStore.load().events || []),
     });
     res.send(tablerChrome.tablerPage('Promotions', body, { user: req.user, currentSection: 'promotions' }));
   });

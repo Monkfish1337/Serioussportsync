@@ -1,37 +1,33 @@
-Four discovery pipelines, one card, four collapsible blocks
+Stop "Check it works" picking a fixture designed to fail
 
-Reported as "the Sport-Video pipeline has no disable toggle". It always had
-one, but only on its own page, so the Server page carried enable toggles for
-the companion, Prowlarr and Bitmagnet and silently omitted the fourth source.
-From the only screen where a user compares sources, Sport-Video looked like the
-one that could not be switched off.
+The feature whose entire job is telling a new user whether their setup works.
+Pressed on a fully working install it chose "ONE Friday Fights 169 & The Inner
+Circle 29" -- a seven-day-old card from about the least-covered promotion in
+the catalog -- found nothing, and reported No streams. The copy underneath then
+spent a paragraph explaining that the red result might not mean what it says,
+which is a design admitting its own answer is unreliable.
 
-Sport-Video now sits with the other three, and what runs the pipeline came with
-it: the switch, the scan schedule, the per-scan limits, the sports to scan.
-What it does with a matched release -- team filters, auto-warm, per-release
-TorBox actions -- stays on its own page, because those are drawn from the
-promotion list rather than being properties of the pipeline.
+The cause was the selection: newest settled fixture wins, and recency is
+uncorrelated with whether a release exists.
 
-That needed a setter that patches rather than replaces. setSportVideo rejects a
-submission with no categories, correctly, and replaces the whole object, so a
-save from the Server card would have blanked the fields that card never showed.
-updateSportVideo merges a patch over what is stored and validates the result.
-The switch keeps a setter of its own that validates nothing, because "turn this
-off" must not depend on the validity of some other field -- or on a field
-inside a collapsed block.
+There is no reliable way to predict which fixture has one, so this stops
+trying. It takes the newest settled fixture from each of three different
+promotions and checks them in turn, stopping at the first that returns
+something. One hit proves the pipeline end to end; three misses across three
+promotions is real evidence, which one miss never was. Later attempts get a
+shorter deadline so three full-length misses cannot sit on the page for a
+minute and a half.
 
-Each pipeline is a <details> block. Flat, with a switch, credentials and an
-explanation each, this had become the longest card on the page and the question
-an operator usually comes here to answer -- which sources are on -- was buried
-in the middle of it. Each summary carries the name and the state. A pipeline
-that is enabled but has no URL reads as off, because it is, and opens by
-default since that is the case someone is most likely here to fix.
+A failure lists every fixture tried and what each returned, and says the result
+points at the configuration -- because across three promotions it does. The
+hedge goes with the reason for it.
 
-The two metadata API keys moved to the bottom under a heading that says what
-they are: they fetch fixtures, not releases, and sitting them among the
-discovery sources implied they were one.
+Also: the result now says which torrent sources were asked. Every torrent
+source is folded into the TorBox row, so "TorBox: nothing found" never revealed
+whether Bitmagnet -- the primary discovery source now -- had even been
+consulted. A switched-off source and an empty index read identically.
 
-394 unit tests pass.
+407 unit tests pass.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

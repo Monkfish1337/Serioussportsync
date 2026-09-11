@@ -111,6 +111,63 @@ is a lot of clicking to reach "just the two I watch" and the same again to undo
 it. With nothing selected the step says what will happen rather than showing a
 silent zero.
 
+## "Check it works" stops picking a fixture designed to fail
+
+The feature whose entire job is telling a new user whether their setup works.
+Pressed on a fully working install, it chose **ONE Friday Fights 169 & The Inner
+Circle 29** — a seven-day-old card from about the least-covered promotion in the
+catalog — found nothing, and reported No streams. The copy underneath then spent
+a paragraph explaining that the red result might not mean what it says, which is
+a design admitting its own answer is unreliable.
+
+The cause was the selection. It took the newest settled fixture and nothing
+else, and recency is uncorrelated with whether a release exists.
+
+There is no reliable way to predict which fixture has one, so this stops trying.
+It now takes the newest settled fixture from each of three different promotions
+and checks them in turn, stopping at the first that returns something. One hit
+proves the pipeline end to end; three misses across three promotions is real
+evidence, which one miss never was. Later attempts get a shorter deadline, so
+three full-length misses cannot sit on the page for a minute and a half.
+
+A failure now lists every fixture it tried and what each returned, and says the
+result points at the configuration — because across three promotions it does.
+The hedge is gone with the reason for it.
+
+**And it says which torrent sources were asked.** Every torrent source is folded
+into the TorBox row, so "TorBox: nothing found" never revealed whether
+Bitmagnet — the primary discovery source now — had even been consulted. A
+switched-off source and an empty index read identically.
+
+## The Promotions table can tell you a promotion is broken
+
+AEW sat in that list with zero upcoming events and nothing on the page said so.
+It was found because somebody happened to know that All Out exists. At 34
+promotions, "notice it by eye" is not a process.
+
+The table showed a **Catalogs** count — 2, 4, 6 — a property of the promotion's
+definition that never changes and cannot answer the question anyone actually
+brings to this page. There is now an **Events** column, and it distinguishes
+three states rather than printing a number that has to be interpreted:
+
+* **No events** — the refresh has never returned anything. A hard fault.
+* **Nothing upcoming** — events are stored and every one is in the past, with
+  the count and the newest date. This was AEW's shape: 32 events, newest
+  2026-08-30, feed working but not reaching the future. A different fault with
+  a different fix, so the page does not merge it with the one above.
+* **N upcoming** — the number that matters first, the stored total second.
+
+A zero in a column of numbers reads as a value. These read as faults.
+
+## Every metadata source is named
+
+"Embedded source" appeared on 16 of 34 rows — every promotion whose source is
+not in the metadata registry — above a sub-line like `espn` or `competition PD`,
+while the minority named theirs properly as `TheSportsDB · UFC`. The same
+concept had two presentations on one screen and the vaguer one was the
+majority. Each adapter now gives its own name, and the ESPN, Sport-Video and
+MLB sources gained the sub-line they never had.
+
 ## The discovery pipelines are one card, four collapsible blocks
 
 Reported as "the Sport-Video pipeline has no disable toggle". It always had
