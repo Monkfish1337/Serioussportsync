@@ -1833,8 +1833,13 @@ function createApp() {
       editId: String(req.query.edit || '').trim() || null,
       create: req.query.create === '1',
       flash:  req.query.flash || null,
-      // So the table can say whether each promotion actually has anything.
-      events: (contentStore.load().events || []),
+      // store.loadFromDisk(), not contentStore.load(). The events live in the
+      // event store; contentStore holds the overlay — manual events, date
+      // overrides, the inbox — and its `events` key is not the catalog. Reading
+      // the wrong one returned an empty array, so every promotion in the table
+      // reported "No events" including the ones measured at 84 and 74. It is
+      // mtime-cached, so this costs a stat on a warm process.
+      events: (store.loadFromDisk().events || []),
     });
     res.send(tablerChrome.tablerPage('Promotions', body, { user: req.user, currentSection: 'promotions' }));
   });

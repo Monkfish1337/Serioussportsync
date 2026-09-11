@@ -191,6 +191,41 @@ where a long comma list wraps under the disclosure marker and indents every line
 but the first. The count stays in the summary; the names moved to a line of
 their own beneath it.
 
+## Bitmagnet and Prowlarr now work together
+
+Reported as: each works alone, both together return nothing.
+
+`Promise.all` waits for the slowest, and these are nowhere near each other.
+Measured on the same fixture: Bitmagnet answered in **65ms**, Prowlarr in
+**20,086ms**. Alone, Bitmagnet finished inside any budget and Prowlarr had the
+whole budget to itself. Together, the combined call inherited Prowlarr's
+latency, blew the stream deadline, and threw away Bitmagnet's results — which
+had been sitting there since the first 65ms — along with it.
+
+Only the companion was ever given a budget; `prowlarr.multiSearch` and
+`bitmagnet.multiSearch` were awaited with no deadline at all. Each source is now
+raced against the discovery budget, and whatever has arrived when it expires is
+what gets used. A source still running is dropped for that request rather than
+waited on, and the log says which. One source answering is enough for the
+fan-out to count as a success — otherwise a Prowlarr timeout would still discard
+a good Bitmagnet search, which is the bug.
+
+## Two regressions from the previous commits
+
+**Every promotion reported "No events".** The Events column read
+`contentStore.load().events`, which is `undefined` — the catalog lives in the
+event store, `contentStore` holds the overlay of manual events, date overrides
+and the inbox. So the column that was added to show which promotions are broken
+reported that all of them were, including the ones measured at 84 and 74 events.
+It reads `store.loadFromDisk().events` now, the same accessor the Event Editor
+uses, and a test pins it.
+
+**The Promotions table ran off the right of the page.** It sits in
+`.table-responsive`, which sets `overflow-x: auto` — but a scroll container only
+scrolls if something stops it growing, and nothing did. Eight columns and a row
+of buttons always exceed a narrow viewport, so the card was pushed sideways
+instead of scrolling inside itself.
+
 ## The Promotions table can tell you a promotion is broken
 
 AEW sat in that list with zero upcoming events and nothing on the page said so.

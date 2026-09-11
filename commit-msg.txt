@@ -1,38 +1,40 @@
-Three places the interface disagreed with itself
+Let Bitmagnet and Prowlarr run together; fix two regressions
 
-## The Server page called itself Admin
+## Bitmagnet + Prowlarr
 
-The nav rail says Server. The page heading said Admin, and its subtitle said
-"manage users for this SeriousSportSync instance" -- about a quarter of what is
-on it, alongside discovery pipelines, metadata keys, catalogs and appearance.
-Heading matches the rail now, subtitle says what the page is for.
+Reported as: each works alone, both together return nothing.
 
-## The Event Editor printed the same two words twice
+Promise.all waits for the slowest, and these are nowhere near each other.
+Measured on the same fixture: Bitmagnet 65ms, Prowlarr 20,086ms. Alone,
+Bitmagnet finished inside any budget and Prowlarr had the whole budget to
+itself. Together the combined call inherited Prowlarr's latency, blew the
+stream deadline, and threw away Bitmagnet's results -- which had been sitting
+there since the first 65ms.
 
-Every untouched row read
+Only the companion was ever given a budget; prowlarr.multiSearch and
+bitmagnet.multiSearch were awaited with no deadline at all. Each source is now
+raced against the discovery budget and whatever arrived is used; a source still
+running is dropped for that request and named in the log. One source answering
+makes the fan-out a success, or a Prowlarr timeout would still discard a good
+Bitmagnet search.
 
-  Source date
-  Source date
-  2027-03-07
+## Regression: every promotion reported "No events"
 
-because the chip saying whether an event has been touched and the field saying
-what the source gave were both labelled "Source date". Different facts. The
-chip reads Unchanged or Overridden now.
+The Events column read contentStore.load().events, which is undefined -- the
+catalog lives in the event store, contentStore holds the overlay of manual
+events, date overrides and the inbox. The column added to show which promotions
+are broken reported that all of them were, including ones measured at 84 and 74
+events. Now store.loadFromDisk().events, the accessor the Event Editor uses,
+with a test pinning it.
 
-## Match of the Day could not be configured at all
+## Regression: the Promotions table ran off the page
 
-The only shipped promotion whose key had no field anywhere: it needs a TMDB
-key, the Server page offered football-data.org and API-Football and nothing
-else, and an install without TMDB_API_KEY in its environment simply showed no
-events with no way to discover why. The new Events column would have surfaced
-the symptom; the cure was still undiscoverable.
+It sits in .table-responsive, which sets overflow-x: auto -- but a scroll
+container only scrolls if something stops it growing, and nothing did. Eight
+columns and a row of buttons always exceed a narrow viewport, so the card was
+pushed sideways instead of scrolling inside itself.
 
-There is a TMDB field now, and a value saved there wins over the environment
-variable the way the other two keys already do -- which needed the refresh told
-about it as well as the field created, or the field would have saved a value
-nothing ever read.
-
-414 unit tests pass.
+420 unit tests pass.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

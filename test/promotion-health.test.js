@@ -121,3 +121,31 @@ test('the table opts out of middle alignment, and the rule it opts into exists',
   assert.match(String(css), /\.table\.align-top td[^}]*vertical-align: top/,
     'the class the markup asks for must actually be styled');
 });
+
+test('the events actually reach the table', () => {
+  // The first version of this column read contentStore.load().events, which is
+  // undefined — the events live in the event store, contentStore holds the
+  // overlay. Every promotion reported "No events", including ones measured at
+  // 84 and 74. The accessor is the whole feature, so it is worth pinning.
+  const contentStore = require('../lib/content-store');
+  assert.equal(contentStore.load().events, undefined,
+    'if this ever gains an events key, re-check which store the table reads');
+  const store = require('../lib/store');
+  assert.ok(Array.isArray(store.loadFromDisk().events), 'the catalog lives here');
+
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'addon.js'), 'utf8');
+  const promotionsRoute = source.slice(source.indexOf("adminPromotions.renderBody({"));
+  const call = promotionsRoute.slice(0, promotionsRoute.indexOf('});'));
+  assert.match(call, /store\.loadFromDisk\(\)\.events/);
+  assert.ok(!/contentStore\.load\(\)\.events/.test(call));
+});
+
+test('a wide table scrolls instead of pushing the page sideways', () => {
+  // Eight columns and a row of buttons always exceed a narrow viewport, and a
+  // scroll container only scrolls if something stops it growing.
+  const { compatCss } = require('../lib/ui/compat');
+  const css = String(typeof compatCss === 'function' ? compatCss() : compatCss);
+  assert.match(css, /\.table-responsive \{[^}]*max-width: 100%/);
+  assert.match(css, /\.table-responsive > \.table \{[^}]*min-width/);
+});
