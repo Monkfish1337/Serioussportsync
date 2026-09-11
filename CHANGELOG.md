@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased — rutracker's catalogue was never being asked for
+
+rutracker has by far the deepest NFL coverage — every week of 2025-26 and
+2026-27, playoffs included — and not one query SSS emitted could return any of
+it. Its titles are slash-delimited with a DMY date:
+
+    NFL 2026-2027 / Preseason / Week 03 / 28.08.2026 /
+      Houston Texans @ Carolina Panthers [Американский футбол, WEB-DL HD/1080p/30fps, MKV/H.264, EN]
+
+The matcher already accepted that string, Cyrillic and all. The queries were the
+problem, and in a familiar way: every dated one carried dotted ISO, so on an
+ANDing index none of them could match a title dated `28.08.2026`. The same
+failure as the nickname releases, one date format along.
+
+Nickname pairs now carry four date tokens — the stored day and the day before
+it, each in dotted ISO and in DMY. The DMY form for the day before comes first
+of the two, because rutracker names by the American local date, which is the day
+the UTC timestamp has already rolled past. Both catalogues are now reachable
+inside the first six queries, which is what a bounded provider list can actually
+send.
+
+**Also removed: code pairs from leagues that never use them.** The three-letter
+form was measured on EPL 2160p releases. Emitted from ESPN's abbreviations
+instead it is pure noise — a college football fixture opened with `DUQ AFA`,
+`DUQ-AFA`, `DUQ-AFA 20260905`, three of its first queries, all empty, on every
+event of every ESPN promotion without a preset. It now requires the curated
+preset it was built for.
+
+463 tests passing.
+
 ## Unreleased — building the index is Bitmagnet-only
 
 Reported as: the index build is getting Prowlarr's indexers disabled for

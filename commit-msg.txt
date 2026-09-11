@@ -1,28 +1,34 @@
-Build the availability index from Bitmagnet only
+Ask for rutracker's titles, and stop asking for codes nobody uses
 
-Reported as: the index build is getting Prowlarr's indexers disabled for
-over-use.
+rutracker has by far the deepest NFL coverage -- every week of 2025-26 and
+2026-27, playoffs included -- and not one query SSS emitted could return any
+of it. Its titles are slash-delimited with a DMY date:
 
-It runs over every upcoming event of every enabled promotion, unattended, so
-its cost is measured in whole catalogues rather than single requests. Prowlarr
-answers by fanning each query out to remote trackers, and at that volume the
-trackers do what they always do -- the indexers get disabled, which takes
-Prowlarr out of the LIVE path too, the one a person is actually waiting on.
-The background job was starving the foreground one.
+  NFL 2026-2027 / Preseason / Week 03 / 28.08.2026 /
+    Houston Texans @ Carolina Panthers [Американский футбол, WEB-DL HD/1080p...]
 
-Bitmagnet has no such ceiling: a local Postgres index with no remote party to
-annoy, and 65ms against Prowlarr's 20,086ms on the same fixture. It is the
-only source that can sensibly be asked this many times, so it is now the only
-one the index build asks.
+The matcher already accepted that string, Cyrillic and all. The queries were
+the problem, in a familiar way: every dated one carried dotted ISO, so on an
+ANDing index none could match a title dated 28.08.2026. The same failure as
+the nickname releases, one date format along.
 
-Prowlarr is untouched for live requests, where the volume is one event at a
-time and somebody is waiting. The restriction is per-call rather than a
-settings change, so no URL or key has to be re-entered to get it back. With no
-Bitmagnet configured the build says so and skips, rather than quietly falling
-back to the source this exists to protect;
-AVAILABILITY_WARM_ALL_TORRENT_SOURCES=1 restores the old fan-out.
+Nickname pairs now carry four date tokens -- the stored day and the day before
+it, each in dotted ISO and in DMY. DMY for the day before comes first of the
+two, because rutracker names by the American local date, which is the day the
+UTC timestamp has already rolled past. Both catalogues are reachable inside
+the first six queries, which is what a bounded provider list can send.
 
-461 tests passing.
+Also: three-letter code pairs now require the curated preset they were
+measured on. The form belongs to EPL 2160p releases; emitted from ESPN's
+abbreviations it is noise. A college football fixture opened with "DUQ AFA",
+"DUQ-AFA", "DUQ-AFA 20260905" -- three of its first queries, all empty, on
+every event of every ESPN promotion without a preset.
+
+Confirmed from the latest log: the availability build now reports "torrent
+discovery: restricted to bitmagnet" and completed 379 events with no Prowlarr
+call and no errors.
+
+463 tests passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

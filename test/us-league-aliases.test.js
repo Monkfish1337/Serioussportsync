@@ -109,10 +109,13 @@ test('the pair query keeps the date', () => {
     .filter((q) => /celtics/i.test(q) && /lakers/i.test(q))
     .filter((q) => !/\bvs\b|@|\bat\b/i.test(q));   // the pair queries, not the templated ones
   assert.ok(pairs.length, 'a nickname pair must be emitted');
-  // The stored day and the day before it, both dotted -- see the UTC-shift
-  // test at the bottom of this file for why there are two.
-  assert.ok(pairs.every((q) => /\b2021\.12\.0[67]\b/.test(q)), 'every pair query must be dated');
-  assert.ok(pairs.some((q) => /2021\.12\.07/.test(q)));
+  // Four date tokens: the stored day and the day before it, each in dotted ISO
+  // (what the usenet groups use) and DMY (what rutracker uses). See the
+  // UTC-shift and rutracker tests at the bottom of this file.
+  assert.ok(pairs.every((q) => /\b(2021\.12\.0[67]|0[67]\.12\.2021)\b/.test(q)),
+    'every pair query must be dated');
+  assert.ok(pairs.some((q) => /2021\.12\.07/.test(q)), 'dotted ISO, stored day');
+  assert.ok(pairs.some((q) => /06\.12\.2021/.test(q)), 'DMY, day before');
 });
 
 test('football fan nicknames no longer suppress American team names', () => {
@@ -288,4 +291,67 @@ test('the prefix-free dated pair is asked for before the prefixed one', () => {
   assert.ok(firstPrefixFree < firstPrefixed,
     'the form measured to work must go out first');
   assert.equal(firstPrefixFree, 0, 'and it is the single most valuable query available');
+});
+
+test('rutracker\'s DMY titles are reachable', () => {
+  // rutracker has by far the deepest NFL catalogue and none of it was being
+  // asked for. Its titles are slash-delimited with a DMY date:
+  //
+  //   NFL 2026-2027 / Preseason / Week 03 / 28.08.2026 /
+  //     Houston Texans @ Carolina Panthers [Американский футбол, ...]
+  //
+  // The matcher already accepted that string, Cyrillic and all. Not one dated
+  // query could AND-match it, so the whole catalogue was invisible — the same
+  // failure as the nickname releases, one date format along.
+  const event = {
+    promotion: 'nfl', name: 'Houston Texans at Carolina Panthers', date: '2026-08-29',
+    teamNames: {
+      home: ['Carolina Panthers', 'Carolina', 'Panthers', 'CAR'],
+      away: ['Houston Texans', 'Houston', 'Texans', 'HOU'],
+    },
+  };
+  const rutracker = 'NFL 2026-2027 / Preseason / Week 03 / 28.08.2026 / '
+    + 'Houston Texans @ Carolina Panthers [Американский футбол, WEB-DL HD/1080p/30fps, MKV/H.264, EN]';
+  assert.equal(nfl.isRelevantStreamTitle(rutracker, event).ok, true);
+
+  const queries = nfl.searchTitles(event);
+  const reaching = andMatches(queries, rutracker);
+  assert.ok(reaching.length > 0, 'no query can reach the rutracker title');
+
+  // And it has to be reachable EARLY: Prowlarr, which is how rutracker is
+  // reached, gets a bounded list and may not finish it.
+  const earliest = queries.findIndex((q) => reaching.includes(q));
+  assert.ok(earliest < 6, 'the DMY form must sit inside the bounded provider list, got ' + earliest);
+
+  // Both date formats, because both halves of the index have the content.
+  const usenet = 'nfl.pre.season.2026.08.28.houston.texans.vs.carolina.panthers.720p.web.h264-nightninjas';
+  assert.ok(andMatches(queries, usenet).length > 0, 'the dotted form must not regress');
+});
+
+test('three-letter code pairs need a curated preset behind them', () => {
+  // Measured on EPL 2160p releases, which are named "...ARS-CHE_06.09.26...".
+  // Emitted from ESPN's abbreviations instead, they are noise: a college
+  // football fixture opened with "DUQ AFA", "DUQ-AFA", "DUQ-AFA 20260905" —
+  // three of its first queries, all empty, on every event of every ESPN
+  // promotion without a preset.
+  const ncaaf = promotions.all.find((p) => p.id === 'ncaaf');
+  const event = {
+    promotion: 'ncaaf', name: 'Duquesne Dukes at Air Force Falcons', date: '2026-09-05',
+    teamNames: {
+      home: ['Air Force Falcons', 'Air Force', 'Falcons', 'AFA'],
+      away: ['Duquesne Dukes', 'Duquesne', 'Dukes', 'DUQ'],
+    },
+  };
+  if (ncaaf) {
+    const bare = ncaaf.searchTitles(event).filter((q) => /^(DUQ|AFA)[ -](DUQ|AFA)/.test(q));
+    assert.deepEqual(bare, [], 'no preset, no code pairs');
+  }
+  // The preset that was measured keeps them.
+  const epl = promotions.all.find((p) => p.id === 'epl');
+  if (epl) {
+    const eplQueries = epl.searchTitles({
+      promotion: 'epl', name: 'Arsenal FC vs Chelsea FC', date: '2026-09-06',
+    });
+    assert.ok(eplQueries.some((q) => /^[A-Z]{3}-[A-Z]{3}$/.test(q.trim())));
+  }
 });
