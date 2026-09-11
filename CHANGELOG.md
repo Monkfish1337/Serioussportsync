@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased — the queries were right and the pipeline still returned nothing
+
+A second stream log, taken after the query shapes were fixed, showed every
+query correct and every pipeline empty. The fault had moved.
+
+    prowlarr: searching 60 title variant(s)
+      prowlarr: query "NFL 2026.08.29 Packers Cardinals"
+    torrent discovery: prowlarr did not answer within 5000ms — continuing without it
+
+One query issued out of sixty, the budget gone, the answer discarded. Prowlarr
+is a sequential fan-out to remote trackers — 20,086ms measured on a fixture
+where Bitmagnet answered in 65ms — so the variant count multiplies straight into
+wall-clock, and it was being handed every variant the promotion could generate.
+The other 59 then ran on into a result nobody would ever read.
+
+It matters because Prowlarr is the source that *has* these releases. The same
+queries through the same Prowlarr returned them when the Matching Lab gave it
+five queries and twelve seconds.
+
+Prowlarr now takes the head of the list — the priority block, which is the most
+precise queries the promotion can make — capped at the promotion's existing
+`uuMaxQueries`, and stops short of the caller's deadline to return what it
+collected instead of being raced away with everything thrown out. Bitmagnet
+keeps the full list; at 65ms it can afford it.
+
+Also visible in the same log, and left alone deliberately: Bitmagnet has no NFL
+preseason games. Its five candidates were Super Bowl compilations and
+720pier's week-in-40 recaps, all correctly rejected. That is a coverage fact
+about a DHT index, not a matching bug.
+
+453 tests passing.
+
 ## Unreleased — three faults a stream log showed that no unit test could
 
 A live stream log for two NFL events exposed three problems, none of which

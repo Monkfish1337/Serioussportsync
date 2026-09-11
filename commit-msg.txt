@@ -1,39 +1,34 @@
-Three faults a stream log showed that no unit test could
+Stop Prowlarr spending the whole budget on its first query
 
-From a live log for two NFL events. None of these appeared in a test built
-from a hand-written event: all three need the structured team names a real
-ESPN event carries.
+A second stream log, after the query shapes were fixed, showed every query
+correct and every pipeline empty. The fault had moved.
 
-Each side's alias list held both teams. ESPN names an event "<away> at <home>"
-AND ships teamNames.home/.away. splitMatchup reads the string left to right,
-so its home is ESPN's away. The two were merged without checking, so every
-alias list contained the curated forms of one team and the supplied forms of
-the other, and the cross product produced fixtures against themselves:
+  prowlarr: searching 60 title variant(s)
+    prowlarr: query "NFL 2026.08.29 Packers Cardinals"
+  torrent discovery: prowlarr did not answer within 5000ms — continuing without it
 
-  -> "ARI-ARI" 0 result(s)
-  -> "NFL 2026.08.29 Arizona Cardinals vs Arizona Cardinals" 0 result(s)
+One query issued out of sixty, the budget gone, the answer discarded, and the
+remaining 59 still running toward a result nobody would read.
 
-The event name wins now, because it is the string that was split. A supplied
-list sharing no form with it belongs to the other side; take that side's list
-if it fits, otherwise use none.
+Prowlarr is a sequential fan-out to remote trackers — 20,086ms measured on a
+fixture where Bitmagnet answered in 65ms — so the number of variants is a
+direct multiplier on wall-clock, and it was handed every variant a promotion
+could generate. That matters here because Prowlarr is the source that HAS
+these releases: the same queries through the same Prowlarr returned them when
+the Matching Lab gave it five queries and twelve seconds.
 
-"ARI GNB" was the first query sent. On a substring index it matches every
-title containing "ari", so the torrent pipeline came back full of Tai-Ari
-deshita and Ari Aster -- thirty-odd candidates, every one rejected as
-no-home-team-alias, and the real release never made the cut. Three-letter code
-pairs are an EPL 2160p naming convention and now stay there; the American
-leagues name releases "NFL.2026.08.28.Cardinals.Vs.Packers".
+It now takes the head of the list, which is the priority block and therefore
+the most precise queries available, capped at the promotion's existing
+uuMaxQueries; and it stops short of the caller's deadline and returns what it
+collected, rather than being raced away with everything discarded. Bitmagnet
+keeps the full list — at 65ms it can afford it.
 
-The stored date can be a day ahead of the release. ESPN timestamps are UTC and
-an American night game kicks off after midnight UTC: Arizona at Green Bay is
-stored as 2026-08-29 while every release of it is named 2026.08.28. Every
-dated query for that fixture missed and the only result came from the undated
-fallback. The day before is asked for as well now -- only backwards, since a
-local date is never ahead of the UTC one. Moving the stored date would move
-the event in the catalog and the calendar and is a separate decision; the
-matcher already tolerated the shift, only the queries did not.
+Left alone deliberately: Bitmagnet has no NFL preseason games. Its five
+candidates in that log were Super Bowl compilations and 720pier week-in-40
+recaps, all correctly rejected. That is a coverage fact about a DHT index, not
+a matching bug.
 
-450 tests passing.
+453 tests passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

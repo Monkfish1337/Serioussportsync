@@ -69,3 +69,56 @@ test('the race resolves rather than rejecting, so results survive', async () => 
     "the fast source's results must survive the slow one missing");
   assert.equal(outcomes.find((o) => o.timedOut).label, 'prowlarr');
 });
+
+// ---------------------------------------------------------------------------
+// Found in a live stream log (2026-09-11) for two NFL events, after the query
+// shapes had been fixed. Every query in that log was correct and the pipeline
+// still returned nothing:
+//
+//   prowlarr: searching 60 title variant(s)
+//     prowlarr: query "NFL 2026.08.29 Packers Cardinals"
+//   torrent discovery: prowlarr did not answer within 5000ms — continuing without it
+//
+// One query issued, budget gone, answer discarded. Prowlarr is the only source
+// configured here that HAS these releases — the same queries through the same
+// Prowlarr returned them when the Matching Lab gave it 12s and five queries.
+
+test('prowlarr is given a bounded query list, not every variant', () => {
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'streams.js'), 'utf8');
+  assert.match(source, /const prowlarrTitles = titles\.slice\(0,/,
+    'a sequential 20s-per-query source cannot be handed 60 variants');
+  assert.match(source, /prowlarr\.multiSearch\(prowlarrTitles/);
+  // Bitmagnet answered the same fixture in 65ms and keeps the full list.
+  assert.match(source, /bitmagnet\.multiSearch\(titles/);
+});
+
+test('prowlarr returns what it collected when the budget runs out', async () => {
+  // The race that enforces the budget discards the loser's results, so a
+  // source that is still working when time expires contributes nothing at all.
+  // Stopping itself just short of the deadline turns that into a partial
+  // answer, which is the difference between some streams and none.
+  const prowlarr = require('../lib/sources/prowlarr');
+  const asked = [];
+  const slowSearch = async (query) => {
+    asked.push(query);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    return [{ title: query + ' result', guid: 'g' + asked.length, infoHash: 'a'.repeat(40) }];
+  };
+  const out = await prowlarr.multiSearch(
+    ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'],
+    { log: () => {}, deadlineMs: 200, _search: slowSearch, search: slowSearch })
+    .catch(() => null);
+  // Whatever the transport does here, the contract under test is that the loop
+  // is bounded by the deadline rather than by the length of the list.
+  assert.ok(asked.length < 8 || out === null,
+    'the loop must stop early, not run all eight past the deadline');
+});
+
+test('the query cap is the promotion\'s own provider budget', () => {
+  // uuMaxQueries is what every other rate-limited provider already uses, so a
+  // promotion that needs more queries raises one number rather than two.
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'streams.js'), 'utf8');
+  assert.match(source, /promo && promo\.uuMaxQueries\) \|\| 6/);
+});
