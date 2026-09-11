@@ -127,9 +127,14 @@ async function refreshPromotion(promotion, log, opts) {
       knownEvents: (promotion.source.knownEvents && promotion.source.knownEvents.length)
         ? promotion.source.knownEvents
         : tsdbKnownEvents.knownEventsFor(promotion.source.leagueId),
-      // A preview is interactive and has a 60s deadline; named lookups are
-      // one rate-limited request each and can spend all of it.
+      // A preview is interactive and has a 60s deadline. Both of these are
+      // one rate-limited request at a time and either can spend all of it:
+      // named lookups are one per card name, and the per-round walk is one
+      // per round for as long as rounds keep returning events — which for a
+      // weekly-TV league like WWE is well past two minutes.
       skipNamedLookups: opts.skipNamedLookups === true,
+      skipRoundWalk: opts.skipRoundWalk === true,
+      deadlineMs: Number(opts.deadlineMs) > 0 ? Number(opts.deadlineMs) : 0,
       log,
     });
   } else if (promotion.source.type === 'wikipedia') {

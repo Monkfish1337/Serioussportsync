@@ -149,3 +149,31 @@ test('a wide table scrolls instead of pushing the page sideways', () => {
   assert.match(css, /\.table-responsive \{[^}]*max-width: 100%/);
   assert.match(css, /\.table-responsive > \.table \{[^}]*min-width/);
 });
+
+test('the table fits the card instead of relying on the scrollbar', () => {
+  // Scrolling was the previous fix and it did not answer the complaint.
+  // Measured in a headless browser at a 1440px viewport: the table wanted
+  // 1386px inside a 1018px card, of which the action buttons were 690px on one
+  // nowrap line. It scrolled — but the scrollbar sits beneath a 34-row table
+  // where nobody finds it, so Refresh and Edit just read as chopped off.
+  //
+  // Poster and Catalogs came out as columns (both are one short value, both
+  // now sit on the name cell's secondary line) and the buttons wrap. That is
+  // 1018px of content in a 1018px card.
+  const html = adminPromotions.renderBody({ events: [] });
+  const table = html.slice(html.indexOf('<table class="table card-table align-top">'));
+  const head = (table.match(/<thead>[\s\S]*?<\/thead>/) || [''])[0];
+  assert.ok(head, 'the promotions table must be findable');
+  assert.ok(!/<th>Poster<\/th>/.test(head), 'poster shape is one word; it does not need a column');
+  assert.ok(!/<th>Catalogs<\/th>/.test(head), 'a catalog count cannot say whether a promotion works');
+  assert.equal((head.match(/<th[ >]/g) || []).length, 6, 'six columns fit; eight did not');
+  assert.match(html, / catalogs?<\/span>/, 'the count still has to be readable somewhere');
+
+  assert.ok(!/<td class="text-nowrap">/.test(html), 'the action buttons must be allowed to wrap');
+  assert.match(html, /<td class="promo-actions">/);
+
+  const { compatCss } = require('../lib/ui/compat');
+  const css = String(typeof compatCss === 'function' ? compatCss() : compatCss);
+  assert.match(css, /td\.promo-actions \{[^}]*white-space: normal/);
+  assert.match(css, /td\.promo-actions \{[^}]*width: 250px/);
+});

@@ -119,26 +119,44 @@ test('spaces become underscores in the query, which is what the endpoint wants',
 // source preview — past its deadline. A preview that times out is worse than
 // the empty Upcoming row this was built to fix.
 
-test('named lookups are skipped when the list endpoints already reached the future', async () => {
-  const asked = [];
-  const future = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
-  await tsdb.fetchAll({
-    leagueId: '4563',
-    seasons: [],
-    knownEvents: ['All Out'],
-    log: () => {},
-    _fetchUpcoming: async () => [{ idEvent: '1', dateEvent: future }],
-    _fetchRecent: async () => [],
-    _fetchSeasonBulk: async () => [],
-    _fetchRounds: async () => [],
-    lookup: async (leagueId, name) => { asked.push(name); return []; },
-  }).catch(() => {});
-  // The gate is what matters; assert it from the source, since fetchAll's
-  // internals are not injectable and a live call is not a unit test.
+test('only the cards the list endpoints missed are looked up', () => {
+  // The first gate here was "skip if any future event came back", and it was
+  // wrong in exactly the case this exists for. AEW's list endpoints DO reach
+  // the future — they return the next Dynamite or Collision, because AEW runs
+  // weekly TV — while All Out never appears in them at all. One future taping
+  // satisfied the gate and the reported PPV stayed missing.
+  //
+  // The gate is what matters and fetchAll's internals are not injectable, so
+  // assert it from the source rather than making a live call.
   const source = require('fs').readFileSync(
     require('path').join(__dirname, '..', 'lib', 'sources', 'thesportsdb.js'), 'utf8');
-  assert.match(source, /reachedFuture/);
-  assert.match(source, /not needed, the list endpoints reached a future event/);
+  assert.ok(!/reachedFuture/.test(source),
+    'a future event elsewhere in the league does not mean this card was found');
+  assert.match(source, /const missing = opts\.knownEvents/);
+  assert.match(source, /fetchNamedEvents\(leagueId, missing, log\)/,
+    'the lookup must take the missing names, not the whole list');
+  assert.match(source, /returned all/);
+});
+
+test('a preview never pays for the per-round season walk either', () => {
+  // WWE has no name list and still timed out at 60s. The round walk is one
+  // request per round at config.tsdb.requestDelayMs apart, continuing until
+  // five rounds in a row come back empty — for a league with weekly TV that
+  // is forty-odd requests, well over two minutes.
+  const adapter = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'sources', 'thesportsdb.js'), 'utf8');
+  assert.match(adapter, /opts\.skipRoundWalk/);
+  assert.match(adapter, /deadlineAt/, 'a slow source must degrade to a partial answer, not an error');
+
+  const diff = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'metadata-source-diff.js'), 'utf8');
+  assert.match(diff, /skipRoundWalk: true/);
+  assert.match(diff, /deadlineMs/);
+
+  const refreshSource = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'scripts', 'refresh.js'), 'utf8');
+  assert.match(refreshSource, /skipRoundWalk: opts\.skipRoundWalk === true/,
+    'the flag has to survive the trip from the diff to the adapter');
 });
 
 test('a preview never pays for named lookups', () => {

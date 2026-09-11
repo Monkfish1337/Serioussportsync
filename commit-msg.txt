@@ -1,43 +1,36 @@
-Split "served" from "on the home screen"; label torrent rows; stop named
-lookups blowing the refresh deadline
+Make the Promotions table fit, and stop previews outrunning their deadline
 
-## Collections opened empty when home rows were disabled
+Three reported faults, each measured rather than guessed at.
 
-There was only one switch. Turning it off removed the catalog from the manifest
-entirely, and a Nuvio collection folder whose source is a catalog the manifest
-no longer declares has nothing to show. showCatalogsOnHome was a single boolean
-for all of them, so "keep this but not on my home screen" could not be said.
-The only working procedure was: enable everything in SSS, then switch each row
-off inside Nuvio by hand.
+Promotions table cut off. The previous fix made the table scroll; it did
+not make it fit. Measured in a headless browser at a 1440px viewport: the
+table wanted 1386px inside a 1018px card, of which the action buttons were
+690px on one `text-nowrap` line. It did scroll — but the scrollbar sits
+beneath a 34-row table where nobody finds it, so Refresh and Edit simply
+read as chopped off. Cut the columns down instead. Poster and Catalogs were
+one short value each and neither can answer "is this promotion working";
+both moved onto the name cell's secondary line. The action buttons wrap in
+a 250px column. Six columns, 1018px of content in a 1018px card, nothing
+overflowing. The responsive scroller stays as the narrow-viewport fallback.
 
-Two switches per promotion now. Served decides whether the catalog exists for
-the client; Home row decides whether it also gets a row on the home screen.
-Stored as hidden ids rather than shown ids, so a catalog added later appears by
-default rather than silently not existing for everyone who saved before it.
-All home rows / No home rows sit beside the existing enable-all pair, and the
-step names the trap instead of leaving it to be discovered.
+Source preview timing out at 60s. WWE has no known-card list, so the named
+lookups gated in the previous commit could not have been the cause. The
+per-round season walk is: one request per round, config.tsdb.requestDelayMs
+(3000ms) apart, continuing until five rounds in a row come back empty. For
+a league running weekly TV that is forty-odd requests — over two minutes on
+its own. A preview now takes the list endpoints only and carries a 45s
+budget, so a slow source degrades to a partial answer instead of an error.
 
-## Torrent rows now say which source found them
+AEW still showing nothing upcoming. The named-lookup gate was wrong in the
+one case the feature exists for. It skipped the lookups whenever any future
+event came back, and AEW's list endpoints DO reach the future — they return
+the next Dynamite or Collision, because AEW runs weekly TV — while All Out
+never appears in them at all. One future taping satisfied the gate and the
+PPVs stayed missing. The gate now asks which known cards are absent by name
+and looks up only those, so the steady state costs nothing and a missing
+card is actually fetched.
 
-Nuvio already identified UU, DIY, Easynews and Sport-Video rows. Torrents were
-the exception -- Bitmagnet, Prowlarr and the companion all arrived labelled
-"TorBox" -- so "is Bitmagnet finding this, or Prowlarr?" meant reading server
-logs. That is the question most worth answering in the client now the two run
-together. Every source already recorded an indexer on the candidate; both the
-playable row and the warm row surface it.
-
-## Named TheSportsDB lookups were charged to everything
-
-One request per name with config.tsdb.requestDelayMs between them to respect
-the free key's 30/min: at the shipped 3000ms that is 42s for AEW's fourteen
-names, on top of the existing calls, against a 60s interactive preview. A
-preview that times out is worse than the empty Upcoming row this fixed.
-
-Two gates. They run only when the list endpoints reached no future event --
-the exact condition they exist for, so a healthy league pays nothing -- and
-never during a preview, which is interactive and writes nothing.
-
-434 unit tests pass.
+436 tests passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU
