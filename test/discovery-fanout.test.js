@@ -122,3 +122,47 @@ test('the query cap is the promotion\'s own provider budget', () => {
     require('path').join(__dirname, '..', 'lib', 'streams.js'), 'utf8');
   assert.match(source, /promo && promo\.uuMaxQueries\) \|\| 6/);
 });
+
+// ---------------------------------------------------------------------------
+// "Stuck on no sources, doesn't actually initiate a search."
+//
+// Third log, and the sharpest report of the three. Every provider answered
+// from the index with no query going out at all:
+//
+//   torrent: availability-index hit ... cache=hit candidates=5 durationMs=1
+//   uu:      availability-index hit ... cache=hit candidates=0 durationMs=0
+//
+// An earlier request had timed Prowlarr out and kept Bitmagnet's five
+// irrelevant candidates. A non-empty search is cached for six hours (an empty
+// one for thirty minutes), so that half-answer became the event's answer for
+// the rest of the evening — and every query fix shipped that day was invisible
+// behind it.
+
+test('a fan-out that lost a source is marked partial', () => {
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'streams.js'), 'utf8');
+  assert.match(source, /const partial = answered\.length > 0 && \(lateSources\.length > 0 \|\| failed\.length > 0\)/,
+    'answered-but-incomplete is a distinct state from answered and from failed');
+  assert.match(source, /partial,/, 'and it has to travel with the result');
+});
+
+test('a partial search is never written to the availability index', () => {
+  // ok:false was already excluded. `partial` is the case that was not: the
+  // fan-out answered, but only because some of its sources did.
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'streams.js'), 'utf8');
+  assert.match(source,
+    /if \(index && normalized\.ok !== false && normalized\.partial !== true\)/);
+  assert.match(source, /not caching a partial search/);
+});
+
+test('a complete search is still cached', () => {
+  // The index is what keeps a second viewer of the same event off the
+  // indexers; this fix must not turn it off.
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'streams.js'), 'utf8');
+  const write = source.slice(source.indexOf('index.recordSearch'));
+  assert.ok(write.length > 0, 'recordSearch must still be reachable');
+  assert.ok(!/normalized\.partial !== true[\s\S]{0,40}return;/.test(source),
+    'the guard must skip the write, not abandon the search');
+});

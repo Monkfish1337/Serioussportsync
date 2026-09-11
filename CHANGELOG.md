@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased — a half-finished search was being cached as the answer
+
+Reported as "stuck on no sources, doesn't actually initiate a search", which is
+exactly what the log showed — every provider answering from the index with no
+query going out at all:
+
+    torrent: availability-index hit ... cache=hit candidates=5 durationMs=1
+    uu:      availability-index hit ... cache=hit candidates=0 durationMs=0
+
+An earlier request had timed Prowlarr out and kept Bitmagnet's five irrelevant
+candidates. A non-empty search is cached for six hours (an empty one for
+thirty minutes), so that half-answer became the event's answer for the rest of
+the evening — and every query fix shipped that day sat invisible behind it.
+
+A failed search (`ok: false`) was already kept out of the index. The case that
+was not is a fan-out that *answered*, but only because some of its sources did:
+one source timed out, another errored, and the remainder was written down as
+complete. That is now marked partial, used for the request that produced it,
+and cached by nobody, so the next request asks again.
+
+If an event is already stuck, **Clear source cache** on its promotion row drops
+the stored searches and the next request starts fresh.
+
+456 tests passing.
+
 ## Unreleased — the queries were right and the pipeline still returned nothing
 
 A second stream log, taken after the query shapes were fixed, showed every

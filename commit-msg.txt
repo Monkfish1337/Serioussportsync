@@ -1,34 +1,29 @@
-Stop Prowlarr spending the whole budget on its first query
+Never cache a search that lost one of its sources
 
-A second stream log, after the query shapes were fixed, showed every query
-correct and every pipeline empty. The fault had moved.
+Reported as "stuck on no sources, doesn't actually initiate a search". The log
+showed precisely that: every provider answering from the index, no query going
+out at all.
 
-  prowlarr: searching 60 title variant(s)
-    prowlarr: query "NFL 2026.08.29 Packers Cardinals"
-  torrent discovery: prowlarr did not answer within 5000ms — continuing without it
+  torrent: availability-index hit ... cache=hit candidates=5 durationMs=1
+  uu:      availability-index hit ... cache=hit candidates=0 durationMs=0
 
-One query issued out of sixty, the budget gone, the answer discarded, and the
-remaining 59 still running toward a result nobody would read.
+An earlier request had timed Prowlarr out and kept Bitmagnet's five irrelevant
+candidates. A non-empty search is cached for six hours (an empty one for
+thirty minutes), so that half-answer became the event's answer for the rest of
+the evening -- and every query fix shipped that day was invisible behind it.
 
-Prowlarr is a sequential fan-out to remote trackers — 20,086ms measured on a
-fixture where Bitmagnet answered in 65ms — so the number of variants is a
-direct multiplier on wall-clock, and it was handed every variant a promotion
-could generate. That matters here because Prowlarr is the source that HAS
-these releases: the same queries through the same Prowlarr returned them when
-the Matching Lab gave it five queries and twelve seconds.
+A failed search (ok: false) was already kept out of the index. The case that
+was not is a fan-out that ANSWERED, but only because some of its sources did:
+one timed out, another errored, and the remainder was recorded as complete.
+That is now marked partial, used for the request that produced it, and cached
+by nobody, so the next request asks again. A complete search is cached exactly
+as before -- the index is still what keeps a second viewer of the same event
+off the indexers.
 
-It now takes the head of the list, which is the priority block and therefore
-the most precise queries available, capped at the promotion's existing
-uuMaxQueries; and it stops short of the caller's deadline and returns what it
-collected, rather than being raced away with everything discarded. Bitmagnet
-keeps the full list — at 65ms it can afford it.
+For events already stuck, Clear source cache on the promotion row drops the
+stored searches.
 
-Left alone deliberately: Bitmagnet has no NFL preseason games. Its five
-candidates in that log were Super Bowl compilations and 720pier week-in-40
-recaps, all correctly rejected. That is a coverage fact about a DHT index, not
-a matching bug.
-
-453 tests passing.
+456 tests passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU
