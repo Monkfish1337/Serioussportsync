@@ -1656,6 +1656,7 @@ function createApp() {
       settings.setApiFootball({
         apiKey: String(b.apiFootballApiKey || ''),
       });
+      if (settings.setTmdb) settings.setTmdb({ apiKey: String(b.tmdbApiKey || '') });
       res.redirect('/admin?flash=' + encodeURIComponent('Sources saved.'));
     } catch (err) {
       res.redirect('/admin?flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(err)));
@@ -2254,6 +2255,7 @@ function renderAdminPage(currentUser, opts) {
   const _prowlarr = settings.getProwlarr();
   const _bitmagnet = settings.getBitmagnet();
   const _sportVideo = settings.getSportVideo();
+  const _tmdb = settings.getTmdb ? settings.getTmdb() : { apiKey: '' };
   // 0.38.1: football-data.org API key field on /admin Sources so admins can
   // save/rotate the key without editing docker-compose.yml.
   const _fd = settings.getFootballData();
@@ -2263,8 +2265,10 @@ function renderAdminPage(currentUser, opts) {
     + '<div class="page-header">'
     +   '<div class="row align-items-center">'
     +     '<div class="col">'
-    +       '<h2 class="page-title">Admin</h2>'
-    +       '<div class="text-secondary mt-1">Admin panel — manage users for this SeriousSportSync instance. Logged in as <code>' + escapeHtml(currentUser.username) + '</code>.</div>'
+    // The rail calls this page Server; it called itself Admin, and its subtitle
+    // claimed it was for managing users — which is a quarter of it.
+    +       '<h2 class="page-title">Server</h2>'
+    +       '<div class="text-secondary mt-1">Discovery pipelines, metadata keys, catalogs, appearance and users — everything that applies to this whole instance rather than to one account. Signed in as <code>' + escapeHtml(currentUser.username) + '</code>.</div>'
     +     '</div>'
     +   '</div>'
     + '</div>'
@@ -2379,6 +2383,11 @@ function renderAdminPage(currentUser, opts) {
     +       '<p class="text-secondary small mb-3">Not discovery — these fetch the fixtures themselves. football-data.org backs the eight shipped domestic leagues; its free tier covers about 10 requests a minute (<a href="https://www.football-data.org/client/register" target="_blank" rel="noopener" class="link-primary">register</a>). API-Football is only used by providers you create in Metadata; the shipped Champions League provider reads UEFA directly and needs no key. Either value saved here overrides its environment variable.</p>'
     +       secretField('football-data.org API key', 'footballDataApiKey', _fd.apiKey, 'paste your football-data.org token')
     +       secretField('API-Football API key', 'apiFootballApiKey', _apiFootball.apiKey, 'paste your API-Football key')
+    // Match of the Day was the one shipped promotion with no way to configure
+    // it from the interface at all: it needs a TMDB key, there was no field for
+    // one, and nothing said so. On an install without the environment variable
+    // it simply showed no events, with the cure undiscoverable.
+    +       secretField('TMDB API key', 'tmdbApiKey', _tmdb.apiKey, 'used by the shipped Match of the Day promotion')
 
     +       '<hr class="my-4">'
     +       '<button class="btn btn-primary" type="submit">Save sources</button>'
@@ -2445,7 +2454,7 @@ function renderAdminPage(currentUser, opts) {
     + 'document.addEventListener("click",function(e){var c=e.target&&e.target.closest?e.target.closest(".btn-copy"):null;if(!c)return;var u=c.getAttribute("data-copy");if(!u)return;var t=c.textContent;sssCopy(u).then(function(ok){c.textContent=ok?"Copied!":"Press Ctrl+C";setTimeout(function(){c.textContent=t;},1500);});});'
     + '</script>';
 
-  return tablerChrome.tablerPage('Admin', body, { user: currentUser, currentSection: 'admin' });
+  return tablerChrome.tablerPage('Server', body, { user: currentUser, currentSection: 'admin' });
 }
 
 // Operations-console log viewer. The original renderer remains below during

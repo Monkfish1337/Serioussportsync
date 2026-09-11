@@ -1,33 +1,38 @@
-Fix the alignment on Promotions and Collections
+Three places the interface disagreed with itself
 
-## The Promotions table
+## The Server page called itself Admin
 
-A table cell inherits vertical-align: middle from its table, so every row's
-one-line cells -- the kind badge, the poster shape, the catalog count -- floated
-to the vertical centre of rows whose other cells ran to two or three lines.
-Nothing shared a baseline. A badge was worse still: an inline-block sits its
-bottom margin edge on the text baseline, so it hung visibly below the name
-beside it. The Events column added in the previous commit made it worse by
-adding a third line to most rows.
+The nav rail says Server. The page heading said Admin, and its subtitle said
+"manage users for this SeriousSportSync instance" -- about a quarter of what is
+on it, alongside discovery pipelines, metadata keys, catalogs and appearance.
+Heading matches the rail now, subtitle says what the page is for.
 
-Top-aligned now, which needed saying twice: dropping Tabler's .table-vcenter
-leaves the inherited middle in place, so .table.align-top is defined in the
-compat layer rather than assumed to exist. It did not -- Tabler itself has not
-been loaded since 0.90.0; those class names are reimplemented in lib/ui.
+## The Event Editor printed the same two words twice
 
-## The Collections folder cards
+Every untouched row read
 
-`ratio` sizes a box from its aspect ratio with a padding-top pseudo-element;
-`h-100` forced height:100% onto the same element. Inside `row g-0` the column is
-a stretched flex item, so the two rules disagreed about the height and the
-artwork stretched or collapsed depending on how much text the card carried
-beside it. That is why the body text never sat level with the top of the image.
+  Source date
+  Source date
+  2027-03-07
 
-Also there: the included-promotion names lived inside the <summary>, where a
-long comma list wraps under the disclosure marker and indents every line but
-the first. The count stays in the summary, the names moved beneath it.
+because the chip saying whether an event has been touched and the field saying
+what the source gave were both labelled "Source date". Different facts. The
+chip reads Unchanged or Overridden now.
 
-410 unit tests pass.
+## Match of the Day could not be configured at all
+
+The only shipped promotion whose key had no field anywhere: it needs a TMDB
+key, the Server page offered football-data.org and API-Football and nothing
+else, and an install without TMDB_API_KEY in its environment simply showed no
+events with no way to discover why. The new Events column would have surfaced
+the symptom; the cure was still undiscoverable.
+
+There is a TMDB field now, and a value saved there wins over the environment
+variable the way the other two keys already do -- which needed the refresh told
+about it as well as the field created, or the field would have saved a value
+nothing ever read.
+
+414 unit tests pass.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

@@ -261,7 +261,12 @@ async function refreshPromotion(promotion, log) {
     // 0.42.13: TMDB TV show. Fetches all episodes with air dates. Each becomes
     // an event whose date drives DARKSPORT-style search title generation.
     if (!tmdb) throw new Error('TMDB source module is unavailable; promotion was not refreshed');
-    const tk = (config && config.tmdb && config.tmdb.apiKey) || (process.env.TMDB_API_KEY || '');
+    // An admin-saved key wins over the environment variable, the same way the
+    // football-data.org and API-Football keys already do. Without this the
+    // Server page's new TMDB field would save a value nothing ever read.
+    const tk = require('../lib/settings').getTmdb().apiKey
+      || (config && config.tmdb && config.tmdb.apiKey)
+      || (process.env.TMDB_API_KEY || '');
     if (!tk) {
       throw new Error('TMDB_API_KEY is not configured; promotion "' + promotion.id + '" was not refreshed');
     }

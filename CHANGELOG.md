@@ -139,6 +139,32 @@ into the TorBox row, so "TorBox: nothing found" never revealed whether
 Bitmagnet — the primary discovery source now — had even been consulted. A
 switched-off source and an empty index read identically.
 
+## Three places the interface disagreed with itself
+
+**The Server page called itself Admin.** The nav rail says Server; the page
+heading said Admin, and its subtitle said "manage users for this
+SeriousSportSync instance" — which is about a quarter of what is on it. The
+heading matches the rail now and the subtitle says what the page is actually
+for: the things that apply to the whole instance rather than to one account.
+
+**The Event Editor printed the same two words twice.** Every untouched row read
+
+    Source date
+    Source date
+    2027-03-07
+
+because the chip that says whether an event has been touched and the field that
+says what the source gave were both labelled "Source date". They are different
+facts. The chip now reads Unchanged or Overridden.
+
+**Match of the Day could not be configured at all.** It is the only shipped
+promotion whose key had no field anywhere: it needs a TMDB key, the Server page
+offered football-data.org and API-Football and nothing else, and an install
+without `TMDB_API_KEY` in its environment simply showed no events with no way to
+discover why. There is a TMDB field now, and — as with the other two keys — a
+value saved there wins over the environment variable, which needed the refresh
+to be told about it as well as the field to exist.
+
 ## Promotions and Collections: things that did not line up
 
 **The Promotions table.** Reported as a text alignment issue, and it was one. A

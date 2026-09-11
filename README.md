@@ -86,13 +86,12 @@ exceptions are noted in the tables below.
 | Ligue 1 | football-data.org | Fixtures |
 | Eredivisie | football-data.org | Fixtures |
 | Brasileirão | football-data.org | Fixtures |
-| Match of the Day | TMDB | Episodes; needs a `TMDB_API_KEY` set in the environment |
+| Match of the Day | TMDB | Episodes; needs a free TMDB key |
 
-The eight football-data.org promotions need a free API key, set once in
-**Server**. A key without access to a given competition fails only that
-promotion's refresh and leaves the rest working. Match of the Day is the one
-built-in promotion configured only by environment variable — there is no TMDB
-field on the Server page.
+The eight football-data.org promotions need a free API key and Match of the Day
+needs a TMDB one; both are set in **Server**, and a key saved there overrides
+the matching environment variable. A football-data key without access to a given
+competition fails only that promotion's refresh and leaves the rest working.
 
 **North American sport**
 
