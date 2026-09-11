@@ -1,29 +1,29 @@
-Never cache a search that lost one of its sources
+Send the query shape that works first
 
-Reported as "stuck on no sources, doesn't actually initiate a search". The log
-showed precisely that: every provider answering from the index, no query going
-out at all.
+Measured against the live Prowlarr/usenet stack. Same terms, same fixture,
+same provider, only the order different:
 
-  torrent: availability-index hit ... cache=hit candidates=5 durationMs=1
-  uu:      availability-index hit ... cache=hit candidates=0 durationMs=0
+  NFL 2026.08.28 Cardinals Packers  -> 0 results
+  Cardinals Packers 2026.08.28      -> 1, the real release
+  NFL 2021.10.28 Cardinals Packers  -> 3 results
 
-An earlier request had timed Prowlarr out and kept Bitmagnet's five irrelevant
-candidates. A non-empty search is cached for six hours (an empty one for
-thirty minutes), so that half-answer became the event's answer for the rest of
-the evening -- and every query fix shipped that day was invisible behind it.
+The 2026 release is NFL.Pre.Season.2026.08.28.Arizona.Cardinals..., so the
+league name is not adjacent to the date and a query that puts them together
+matches nothing. The 2021 releases ARE named NFL.2021.10.28. and the prefixed
+form works there -- the same rule seen from the other side.
 
-A failed search (ok: false) was already kept out of the index. The case that
-was not is a fan-out that ANSWERED, but only because some of its sources did:
-one timed out, another errored, and the remainder was recorded as complete.
-That is now marked partial, used for the request that produced it, and cached
-by nobody, so the next request asks again. A complete search is cached exactly
-as before -- the index is still what keeps a second viewer of the same event
-off the indexers.
+The prefix-free "<teams> <date>" form is the robust one and now goes out
+first. This matters out of all proportion to its size: a slow provider gets a
+bounded list and may reach only its first query before the budget expires, so
+the order decides whether it finds anything. In the last log Prowlarr managed
+exactly one query, and it was the prefixed one.
 
-For events already stuck, Clear source cache on the promotion row drops the
-stored searches.
+Confirmed while measuring and NOT a defect: a game played the previous day has
+no release yet. "NFL Seahawks Patriots" returns 21 results -- Super Bowl LX
+and a 2024 meeting -- and nothing for the 2026-09-10 fixture under test. An
+empty result for a fresh fixture is the scene, not the matcher.
 
-456 tests passing.
+457 tests passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

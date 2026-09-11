@@ -264,3 +264,28 @@ test('the day before is asked for too, because the stored date can be a day ahea
   assert.equal(nfl.isRelevantStreamTitle(
     'NFL.Pre.Season.2026.08.28.Arizona.Cardinals.Vs.Green.Bay.Packers.720p', event).ok, true);
 });
+
+test('the prefix-free dated pair is asked for before the prefixed one', () => {
+  // Measured against the live Prowlarr/usenet stack. Same terms, same fixture,
+  // only the order different:
+  //
+  //   "NFL 2026.08.28 Cardinals Packers" -> 0 results
+  //   "Cardinals Packers 2026.08.28"     -> 1, the real release
+  //
+  // The release is NFL.Pre.Season.2026.08.28.Arizona.Cardinals..., so the
+  // league name is not adjacent to the date and a query that puts them
+  // together matches nothing. It matters out of all proportion to its size: a
+  // slow provider is given a bounded list and may reach only the first query
+  // before its budget expires, so this order decides whether it finds anything.
+  const event = {
+    promotion: 'nfl', name: 'Arizona Cardinals at Green Bay Packers', date: '2026-08-29',
+  };
+  const queries = nfl.searchTitles(event);
+  const firstPrefixFree = queries.findIndex((q) => /^Packers Cardinals \d/.test(q));
+  const firstPrefixed = queries.findIndex((q) => /^NFL \d+\.\d+\.\d+ Packers Cardinals$/.test(q));
+  assert.ok(firstPrefixFree >= 0, 'the prefix-free form must exist');
+  assert.ok(firstPrefixed >= 0, 'and the prefixed one is still worth sending');
+  assert.ok(firstPrefixFree < firstPrefixed,
+    'the form measured to work must go out first');
+  assert.equal(firstPrefixFree, 0, 'and it is the single most valuable query available');
+});

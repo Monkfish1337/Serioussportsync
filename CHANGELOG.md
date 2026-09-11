@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased — query order decides whether a slow provider finds anything
+
+Measured against the live Prowlarr/usenet stack. Same terms, same fixture, same
+provider, only the order different:
+
+    NFL 2026.08.28 Cardinals Packers  -> 0 results
+    Cardinals Packers 2026.08.28      -> 1, the real release
+    NFL 2021.10.28 Cardinals Packers  -> 3 results
+
+The 2026 release is `NFL.Pre.Season.2026.08.28.Arizona.Cardinals...`, so the
+league name is not adjacent to the date and a query that puts them together
+matches nothing. The 2021 releases *are* named `NFL.2021.10.28.` and the
+prefixed form works there — the same rule seen from the other side.
+
+The prefix-free `<teams> <date>` form is the robust one, and it now goes out
+first. That matters out of all proportion to its size: a slow provider is given
+a bounded list and may reach only its first query before the budget expires, so
+this ordering decides whether it finds anything at all. In the last log Prowlarr
+managed exactly one query — the prefixed one.
+
+Also confirmed while measuring, and **not** a defect: a game played the previous
+day has no release yet. `NFL Seahawks Patriots` returns 21 results — Super Bowl
+LX and a 2024 meeting — and nothing for the 2026-09-10 fixture. An empty result
+for a fresh fixture is the scene, not the matcher.
+
+457 tests passing.
+
 ## Unreleased — a half-finished search was being cached as the answer
 
 Reported as "stuck on no sources, doesn't actually initiate a search", which is
