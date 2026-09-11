@@ -1,29 +1,28 @@
-Send the query shape that works first
+Build the availability index from Bitmagnet only
 
-Measured against the live Prowlarr/usenet stack. Same terms, same fixture,
-same provider, only the order different:
+Reported as: the index build is getting Prowlarr's indexers disabled for
+over-use.
 
-  NFL 2026.08.28 Cardinals Packers  -> 0 results
-  Cardinals Packers 2026.08.28      -> 1, the real release
-  NFL 2021.10.28 Cardinals Packers  -> 3 results
+It runs over every upcoming event of every enabled promotion, unattended, so
+its cost is measured in whole catalogues rather than single requests. Prowlarr
+answers by fanning each query out to remote trackers, and at that volume the
+trackers do what they always do -- the indexers get disabled, which takes
+Prowlarr out of the LIVE path too, the one a person is actually waiting on.
+The background job was starving the foreground one.
 
-The 2026 release is NFL.Pre.Season.2026.08.28.Arizona.Cardinals..., so the
-league name is not adjacent to the date and a query that puts them together
-matches nothing. The 2021 releases ARE named NFL.2021.10.28. and the prefixed
-form works there -- the same rule seen from the other side.
+Bitmagnet has no such ceiling: a local Postgres index with no remote party to
+annoy, and 65ms against Prowlarr's 20,086ms on the same fixture. It is the
+only source that can sensibly be asked this many times, so it is now the only
+one the index build asks.
 
-The prefix-free "<teams> <date>" form is the robust one and now goes out
-first. This matters out of all proportion to its size: a slow provider gets a
-bounded list and may reach only its first query before the budget expires, so
-the order decides whether it finds anything. In the last log Prowlarr managed
-exactly one query, and it was the prefixed one.
+Prowlarr is untouched for live requests, where the volume is one event at a
+time and somebody is waiting. The restriction is per-call rather than a
+settings change, so no URL or key has to be re-entered to get it back. With no
+Bitmagnet configured the build says so and skips, rather than quietly falling
+back to the source this exists to protect;
+AVAILABILITY_WARM_ALL_TORRENT_SOURCES=1 restores the old fan-out.
 
-Confirmed while measuring and NOT a defect: a game played the previous day has
-no release yet. "NFL Seahawks Patriots" returns 21 results -- Super Bowl LX
-and a 2024 meeting -- and nothing for the 2026-09-10 fixture under test. An
-empty result for a fresh fixture is the scene, not the matcher.
-
-457 tests passing.
+461 tests passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

@@ -8,6 +8,7 @@ const companion = require('../lib/sources/companion-scraper');
 const prowlarr = require('../lib/sources/prowlarr');
 const streams = require('../lib/streams');
 const availabilityStore = require('../lib/availability-index');
+const bitmagnet = require('../lib/sources/bitmagnet');
 
 function response(body, status) {
   const code = status || 200;
@@ -61,13 +62,21 @@ test('detailed Prowlarr search reports all-failed instead of a cacheable empty r
 });
 
 test('automatic preparation reports failed torrent discovery instead of a false success', async () => {
+  // Bitmagnet is the failing source here because the index build now asks only
+  // Bitmagnet — running Prowlarr over every event of every promotion was
+  // getting its indexers disabled for over-use, which took Prowlarr out of the
+  // live path too. See the Bitmagnet-only tests in discovery-fanout.
   const originalCompanionConfig = settings.getCompanion;
   const originalProwlarrConfig = settings.getProwlarr;
+  const originalBitmagnetConfig = settings.getBitmagnet;
   const originalScrape = companion.scrape;
+  const originalMultiSearch = bitmagnet.multiSearch;
   const originalIndex = availabilityStore.getDefault;
   settings.getCompanion = () => ({ url: 'http://scraper:8080', authToken: '' });
   settings.getProwlarr = () => ({ url: '', apiKey: '' });
+  settings.getBitmagnet = () => ({ url: 'http://bitmagnet:3333', enabled: true });
   companion.scrape = async () => { throw new Error('companion timeout'); };
+  bitmagnet.multiSearch = async () => { throw new Error('bitmagnet unreachable'); };
   availabilityStore.getDefault = () => null;
   try {
     const result = await streams.prefetchAvailability({
@@ -82,7 +91,9 @@ test('automatic preparation reports failed torrent discovery instead of a false 
   } finally {
     settings.getCompanion = originalCompanionConfig;
     settings.getProwlarr = originalProwlarrConfig;
+    settings.getBitmagnet = originalBitmagnetConfig;
     companion.scrape = originalScrape;
+    bitmagnet.multiSearch = originalMultiSearch;
     availabilityStore.getDefault = originalIndex;
   }
 });

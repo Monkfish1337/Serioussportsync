@@ -166,3 +166,53 @@ test('a complete search is still cached', () => {
   assert.ok(!/normalized\.partial !== true[\s\S]{0,40}return;/.test(source),
     'the guard must skip the write, not abandon the search');
 });
+
+// ---------------------------------------------------------------------------
+// Building the availability index is Bitmagnet-only.
+//
+// Reported as: the index build is getting Prowlarr's indexers disabled for
+// over-use. It runs over every upcoming event of every enabled promotion,
+// unattended, and Prowlarr answers by fanning each query out to remote
+// trackers — so the background job was spending the tracker quota that the
+// live path, where a person is actually waiting, then could not use.
+
+test('the index build asks Bitmagnet and nobody else', () => {
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'streams.js'), 'utf8');
+  assert.match(source, /const warmTorrentSources = warmAllSources \? null : new Set\(\['bitmagnet'\]\)/);
+  assert.match(source, /onlySources: warmTorrentSources/);
+});
+
+test('discovery can be narrowed without changing what is configured', () => {
+  // The restriction is per-call, not a settings change: the same Prowlarr that
+  // is skipped here still serves live requests, and nobody has to re-enter a
+  // URL to get it back.
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'streams.js'), 'utf8');
+  assert.match(source, /const permitted = \(name\) => !allowed \|\| allowed\.has\(name\)/);
+  for (const name of ['companion', 'prowlarr', 'bitmagnet']) {
+    assert.ok(source.includes("permitted('" + name + "')"), name + ' must honour the restriction');
+  }
+});
+
+test('the live path is not narrowed', () => {
+  // Prowlarr is slow but it is also the source that has the American league
+  // releases. One event at a time, with someone waiting, is exactly the volume
+  // it should be used at.
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'streams.js'), 'utf8');
+  const live = source.slice(source.indexOf("runOrSkip('torbox'"));
+  const call = live.slice(0, live.indexOf('\n'));
+  assert.ok(!/onlySources/.test(call), 'the live torbox pipeline must use every enabled source');
+});
+
+test('an index build with no Bitmagnet says so instead of falling back', () => {
+  // Silently reverting to Prowlarr would reintroduce the exact problem this
+  // exists to prevent.
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'streams.js'), 'utf8');
+  assert.match(source, /index build needs Bitmagnet/);
+  assert.match(source, /so its indexers are not disabled for over-use/);
+  assert.match(source, /AVAILABILITY_WARM_ALL_TORRENT_SOURCES/,
+    'and there has to be a way back for anyone who wants the old behaviour');
+});

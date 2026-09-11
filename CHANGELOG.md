@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased — building the index is Bitmagnet-only
+
+Reported as: the index build is getting Prowlarr's indexers disabled for
+over-use.
+
+It runs over every upcoming event of every enabled promotion, unattended, so
+its cost is measured in whole catalogues rather than single requests. Prowlarr
+answers by fanning each query out to remote trackers, and at that volume the
+trackers do what they always do — the indexers get disabled, which takes
+Prowlarr out of the **live** path too, the one a person is actually waiting on.
+The background job was starving the foreground one.
+
+Bitmagnet has no such ceiling: a local Postgres index with no remote party to
+annoy, and 65ms against Prowlarr's 20,086ms on the same fixture. It is the only
+source that can sensibly be asked this many times, so it is now the only one the
+index build asks.
+
+Prowlarr is untouched for live requests, where the volume is one event at a time
+and somebody is waiting. The restriction is per-call rather than a settings
+change, so nothing has to be re-entered to get it back. If Bitmagnet is not
+configured, the build says so and skips rather than quietly falling back to the
+source this exists to protect; `AVAILABILITY_WARM_ALL_TORRENT_SOURCES=1` restores
+the old fan-out.
+
+461 tests passing.
+
 ## Unreleased — query order decides whether a slow provider finds anything
 
 Measured against the live Prowlarr/usenet stack. Same terms, same fixture, same
