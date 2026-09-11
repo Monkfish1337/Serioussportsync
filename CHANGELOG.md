@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased — a row now names every source that found it
+
+Reported as: the Bitmagnet rows don't match the name and claim Bitmagnet rather
+than Prowlarr.
+
+Three separate things, and only one was a defect.
+
+**The label was accurate.** `lib/sources/bitmagnet.js` hard-codes
+`indexer: 'Bitmagnet'`; Prowlarr results carry the real per-indexer name, so
+"RuTracker.org" is what a Prowlarr row says. Bitmagnet is a DHT crawler and
+rutracker torrents are public, so it genuinely has them — finding the same
+content is not the same as being the same source.
+
+**The title was the torrent's own name**, as the index reports it — not the
+rutracker listing's title. A single-file torrent is usually named after its
+file, which is why the row reads `Houston Texans at Carolina Panthers 28.08.2026
+Ad Free.mkv` rather than the slash-delimited listing.
+
+**The defect:** deduplication by info hash kept the first source's attribution
+and discarded the rest. A torrent returned by *both* Prowlarr and Bitmagnet was
+labelled with whichever list came first in the fan-out, and the row then
+asserted a single origin that was only half true — which is exactly the question
+these labels exist to answer. Every source that returned a hash is now named,
+`Bitmagnet, RuTracker.org`. That also makes the single-source case mean
+something: a row saying only Bitmagnet now tells you Prowlarr did not return it.
+
+466 tests passing.
+
 ## Unreleased — rutracker's catalogue was never being asked for
 
 rutracker has by far the deepest NFL coverage — every week of 2025-26 and

@@ -1,34 +1,28 @@
-Ask for rutracker's titles, and stop asking for codes nobody uses
+Name every source that found a torrent, not just the first
 
-rutracker has by far the deepest NFL coverage -- every week of 2025-26 and
-2026-27, playoffs included -- and not one query SSS emitted could return any
-of it. Its titles are slash-delimited with a DMY date:
+Reported as: the Bitmagnet rows don't match the name and claim Bitmagnet
+rather than Prowlarr. Three separate things, and only one was a defect.
 
-  NFL 2026-2027 / Preseason / Week 03 / 28.08.2026 /
-    Houston Texans @ Carolina Panthers [Американский футбол, WEB-DL HD/1080p...]
+The label was accurate. lib/sources/bitmagnet.js hard-codes
+indexer: 'Bitmagnet'; Prowlarr results carry the real per-indexer name, so a
+Prowlarr row says "RuTracker.org". Bitmagnet is a DHT crawler and rutracker
+torrents are public, so it genuinely has them -- finding the same content is
+not the same as being the same source.
 
-The matcher already accepted that string, Cyrillic and all. The queries were
-the problem, in a familiar way: every dated one carried dotted ISO, so on an
-ANDing index none could match a title dated 28.08.2026. The same failure as
-the nickname releases, one date format along.
+The title was the torrent's own name as the index reports it, not the
+rutracker listing's title. A single-file torrent is usually named after its
+file, hence "Houston Texans at Carolina Panthers 28.08.2026 Ad Free.mkv"
+rather than the slash-delimited listing.
 
-Nickname pairs now carry four date tokens -- the stored day and the day before
-it, each in dotted ISO and in DMY. DMY for the day before comes first of the
-two, because rutracker names by the American local date, which is the day the
-UTC timestamp has already rolled past. Both catalogues are reachable inside
-the first six queries, which is what a bounded provider list can send.
+The defect: deduplication by info hash kept the first source's attribution and
+threw the rest away. A torrent returned by BOTH Prowlarr and Bitmagnet was
+labelled with whichever list came first in the fan-out, so the row asserted a
+single origin that was only half true -- which is the exact question these
+labels were added to answer. Every source that returned a hash is now named:
+"Bitmagnet, RuTracker.org". That also gives the single-source case meaning --
+a row saying only Bitmagnet now tells you Prowlarr did not return it.
 
-Also: three-letter code pairs now require the curated preset they were
-measured on. The form belongs to EPL 2160p releases; emitted from ESPN's
-abbreviations it is noise. A college football fixture opened with "DUQ AFA",
-"DUQ-AFA", "DUQ-AFA 20260905" -- three of its first queries, all empty, on
-every event of every ESPN promotion without a preset.
-
-Confirmed from the latest log: the availability build now reports "torrent
-discovery: restricted to bitmagnet" and completed 379 events with no Prowlarr
-call and no errors.
-
-463 tests passing.
+466 tests passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU
