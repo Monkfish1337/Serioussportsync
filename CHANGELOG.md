@@ -1,5 +1,41 @@
 # Changelog
 
+## Unreleased — the cut-offs are adjustable from the Server page
+
+Asked for after four rounds of tuning these numbers by redeploy: somewhere to
+fine-tune the cost of time against results without editing environment
+variables and rebuilding.
+
+**Server → Discovery timing** now carries five numbers:
+
+| Field | Default | What it decides |
+|---|---|---|
+| Stream request budget | 9500ms | The whole request. Pipelines still running when it expires are abandoned. |
+| Discovery budget | 5000ms | Searching only, held at least 1s below the request budget so filtering and the TorBox cache check still fit. |
+| Prowlarr queries per request | 6 | How many are offered; the budget decides how many finish. |
+| Prowlarr per-query timeout | 15000ms | One HTTP search. |
+| Index build budget | 25000ms | The background build, which nobody waits on. |
+
+These are the most consequential numbers in the stream path and they were the
+hardest ones to try. Prowlarr answers in roughly two seconds per query, so the
+5000ms discovery budget is the difference between two queries and six — and
+that, this evening, decided whether the query that reaches rutracker was ever
+sent at all.
+
+Saved values win over environment variables, which still win over the defaults,
+so an existing deployment keeps whatever it had and a cleared field means "use
+this deployment's configured value" rather than zero. Out-of-range entries are
+clamped rather than refused. The request budget can be pushed past Nuvio's
+~10s client deadline if an operator wants to — the form says plainly that doing
+so turns a partial answer into no answer.
+
+The Prowlarr query cap previously borrowed the promotion's `uuMaxQueries`, which
+was the nearest existing number rather than the right one: how many queries fit
+is a property of how slow this deployment's Prowlarr is, not of the promotion
+being searched.
+
+474 tests passing.
+
 ## Unreleased — the rutracker query was being generated and never sent
 
 Reported bluntly and correctly: rutracker results still are not being captured.

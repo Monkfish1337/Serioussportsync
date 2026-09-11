@@ -67,3 +67,89 @@ test('an overridden event says so on the chip', () => {
   });
   assert.match(html, /Overridden/);
 });
+
+// ---------------------------------------------------------------------------
+// Discovery timing, made adjustable.
+//
+// Asked for after four rounds of tuning these numbers by redeploy: "build in
+// the server gui adjustable cut offs, so i and others can fine tune the cost
+// of time vs results easily." They are the most consequential numbers in the
+// stream path — Prowlarr answers in about 2s per query, so a 5000ms discovery
+// budget is the difference between two queries and six, and that decided
+// whether the query reaching rutracker was ever sent.
+
+test('the timing defaults are the values that were hard-coded', () => {
+  const settings = require('../lib/settings');
+  assert.equal(settings.DISCOVERY_TIMING_DEFAULTS.pipelineBudgetMs, 9500);
+  assert.equal(settings.DISCOVERY_TIMING_DEFAULTS.discoveryBudgetMs, 5000);
+  assert.equal(settings.DISCOVERY_TIMING_DEFAULTS.prowlarrMaxQueries, 6);
+  assert.equal(settings.DISCOVERY_TIMING_DEFAULTS.prowlarrQueryTimeoutMs, 15000);
+  assert.equal(settings.DISCOVERY_TIMING_DEFAULTS.indexBuildBudgetMs, 25000);
+});
+
+test('discovery is held below the request budget, not refused', () => {
+  // A discovery budget at or above the request budget starves relevance
+  // filtering, dedupe and the TorBox cache check — everything that happens
+  // after searching. Clamping lets the typed number take effect as far as it
+  // safely can instead of rejecting the save.
+  const settings = require('../lib/settings');
+  const before = settings.getDiscoveryTiming();
+  try {
+    settings.setDiscoveryTiming({ pipelineBudgetMs: 8000, discoveryBudgetMs: 20000 });
+    const out = settings.getDiscoveryTiming();
+    assert.equal(out.pipelineBudgetMs, 8000);
+    assert.equal(out.discoveryBudgetMs, 7000, 'held 1s below the request budget');
+  } finally {
+    settings.setDiscoveryTiming(before);
+  }
+});
+
+test('out-of-range values are clamped to something workable', () => {
+  const settings = require('../lib/settings');
+  const before = settings.getDiscoveryTiming();
+  try {
+    settings.setDiscoveryTiming({ prowlarrMaxQueries: 900, prowlarrQueryTimeoutMs: 1 });
+    const out = settings.getDiscoveryTiming();
+    assert.equal(out.prowlarrMaxQueries, 60);
+    assert.equal(out.prowlarrQueryTimeoutMs, 1000);
+  } finally {
+    settings.setDiscoveryTiming(before);
+  }
+});
+
+test('a blank field falls back rather than meaning zero', () => {
+  // Clearing a box has to mean "use this deployment's configured value", or
+  // saving the form with one empty field would set a budget of nothing.
+  const settings = require('../lib/settings');
+  const before = settings.getDiscoveryTiming();
+  try {
+    settings.setDiscoveryTiming({ pipelineBudgetMs: '', discoveryBudgetMs: '' });
+    const out = settings.getDiscoveryTiming();
+    assert.equal(out.pipelineBudgetMs, settings.DISCOVERY_TIMING_DEFAULTS.pipelineBudgetMs);
+    assert.ok(out.discoveryBudgetMs > 0);
+  } finally {
+    settings.setDiscoveryTiming(before);
+  }
+});
+
+test('the stream path reads the setting instead of the constant', () => {
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'streams.js'), 'utf8');
+  assert.match(source, /const timing = settings\.getDiscoveryTiming\(\)/);
+  assert.match(source, /Number\(params\.budgetMs\) \|\| timing\.pipelineBudgetMs/);
+  assert.match(source, /settings\.getDiscoveryTiming\(\)\.prowlarrMaxQueries/);
+  assert.match(source, /settings\.getDiscoveryTiming\(\)\.indexBuildBudgetMs/);
+  assert.ok(!/STREAM_PIPELINE_TIMEOUT_MS \|\| '9500'/.test(source),
+    'the hard-coded default moved into settings');
+});
+
+test('the Server page offers every one of them', () => {
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'addon.js'), 'utf8');
+  assert.match(source, /title: 'Discovery timing'/);
+  for (const field of ['pipelineBudgetMs', 'discoveryBudgetMs', 'prowlarrMaxQueries',
+    'prowlarrQueryTimeoutMs', 'indexBuildBudgetMs']) {
+    assert.ok(source.includes('name="' + field + '"'), field + ' needs an input');
+    assert.ok(source.includes(field + ': b.' + field), field + ' must reach the save');
+  }
+});

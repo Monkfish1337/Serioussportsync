@@ -115,12 +115,17 @@ test('prowlarr returns what it collected when the budget runs out', async () => 
     'the loop must stop early, not run all eight past the deadline');
 });
 
-test('the query cap is the promotion\'s own provider budget', () => {
-  // uuMaxQueries is what every other rate-limited provider already uses, so a
-  // promotion that needs more queries raises one number rather than two.
+test('the query cap is an operator setting, not a constant', () => {
+  // It began as the promotion's uuMaxQueries, which was the nearest existing
+  // number rather than the right one: the cap is a property of how slow THIS
+  // deployment's Prowlarr is, not of the promotion being searched. It is now
+  // adjustable from Server -> Discovery timing, alongside the budget that
+  // decides how many of those queries actually finish.
   const source = require('fs').readFileSync(
     require('path').join(__dirname, '..', 'lib', 'streams.js'), 'utf8');
-  assert.match(source, /promo && promo\.uuMaxQueries\) \|\| 6/);
+  assert.match(source, /settings\.getDiscoveryTiming\(\)\.prowlarrMaxQueries/);
+  assert.equal(require('../lib/settings').DISCOVERY_TIMING_DEFAULTS.prowlarrMaxQueries, 6,
+    'the default must match what was shipped before it was adjustable');
 });
 
 // ---------------------------------------------------------------------------

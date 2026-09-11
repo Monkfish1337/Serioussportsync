@@ -1625,6 +1625,16 @@ function createApp() {
         apiKey: String(b.prowlarrApiKey || ''),
         enabled: toggle(b.prowlarrEnabled),
       });
+      // Discovery timing. Blank fields fall through to the environment and
+      // then the defaults, so clearing one is how an operator says "use
+      // whatever this deployment was configured with" rather than zero.
+      settings.setDiscoveryTiming({
+        pipelineBudgetMs: b.pipelineBudgetMs,
+        discoveryBudgetMs: b.discoveryBudgetMs,
+        prowlarrMaxQueries: b.prowlarrMaxQueries,
+        prowlarrQueryTimeoutMs: b.prowlarrQueryTimeoutMs,
+        indexBuildBudgetMs: b.indexBuildBudgetMs,
+      });
       // 0.95.0: direct Bitmagnet. URL only — no database credentials.
       settings.setBitmagnet({
         url: security.cleanHttpUrl(b.bitmagnetUrl, { label: 'Bitmagnet URL' }),
@@ -2266,6 +2276,7 @@ function renderAdminPage(currentUser, opts) {
   const _comp = settings.getCompanion();
   const _prowlarr = settings.getProwlarr();
   const _bitmagnet = settings.getBitmagnet();
+  const _timing = settings.getDiscoveryTiming();
   const _sportVideo = settings.getSportVideo();
   const _tmdb = settings.getTmdb ? settings.getTmdb() : { apiKey: '' };
   // 0.38.1: football-data.org API key field on /admin Sources so admins can
@@ -2349,6 +2360,41 @@ function renderAdminPage(currentUser, opts) {
           + '<input class="form-control text-mono" type="url" name="prowlarrUrl" value="' + escapeHtml(_prowlarr.url) + '" placeholder="http://prowlarr:9696" autocomplete="off">'
           + '</div>'
           + secretField('Prowlarr API key', 'prowlarrApiKey', _prowlarr.apiKey, 'Settings → General → Security'),
+          })
+
+    // Discovery timing.
+    //
+    // These were constants and environment variables, which made the most
+    // consequential trade-off in the stream path the hardest one to try:
+    // tuning it meant a redeploy and knowing the variable names. Prowlarr
+    // answers in roughly two seconds per query, so a five-second discovery
+    // budget is the difference between two queries and six — and that decided
+    // whether the query which reaches rutracker was ever sent.
+    +       pipelineSection({
+          title: 'Discovery timing',
+          enabled: true,
+          open: false,
+          summary: 'How long a stream request waits before giving up on a source. Higher numbers find more and make the client wait longer; lower ones answer fast from whatever arrived. Leave a field blank to fall back to the environment variable, and then to the shipped default.',
+          body: ''
+          + '<div class="row g-3 mb-3">'
+          + '<div class="col-md-6"><label class="form-label">Stream request budget (ms)</label>'
+          + '<input class="form-control text-mono" type="number" name="pipelineBudgetMs" value="' + escapeHtml(String(_timing.pipelineBudgetMs)) + '" min="2000" max="120000" autocomplete="off">'
+          + '<div class="form-hint">The whole request. Every pipeline still running when this expires is abandoned and the user gets what had arrived. Default 9500. <strong>Nuvio gives up at about 10s</strong>, and the response still has to merge and serialise after the slowest pipeline returns — past 10000 here the user gets nothing at all rather than a partial answer.</div></div>'
+          + '<div class="col-md-6"><label class="form-label">Discovery budget (ms)</label>'
+          + '<input class="form-control text-mono" type="number" name="discoveryBudgetMs" value="' + escapeHtml(String(_timing.discoveryBudgetMs)) + '" min="1000" max="120000" autocomplete="off">'
+          + '<div class="form-hint">Searching only, inside the budget above. Relevance filtering, dedupe and the TorBox cache check happen after it, so this is held at least 1s below the request budget. Default 5000.</div></div>'
+          + '</div>'
+          + '<div class="row g-3 mb-3">'
+          + '<div class="col-md-6"><label class="form-label">Prowlarr queries per request</label>'
+          + '<input class="form-control text-mono" type="number" name="prowlarrMaxQueries" value="' + escapeHtml(String(_timing.prowlarrMaxQueries)) + '" min="1" max="60" autocomplete="off">'
+          + '<div class="form-hint">Prowlarr searches sequentially and fans each query out to remote trackers — measured at about 2s each against Bitmagnet\'s 65ms. This is the number offered; the discovery budget decides how many it finishes. Default 6.</div></div>'
+          + '<div class="col-md-6"><label class="form-label">Prowlarr per-query timeout (ms)</label>'
+          + '<input class="form-control text-mono" type="number" name="prowlarrQueryTimeoutMs" value="' + escapeHtml(String(_timing.prowlarrQueryTimeoutMs)) + '" min="1000" max="120000" autocomplete="off">'
+          + '<div class="form-hint">One HTTP search. A slow indexer inside Prowlarr can hold a query open for all of it. Default 15000.</div></div>'
+          + '</div>'
+          + '<div class="mb-1"><label class="form-label">Index build budget (ms)</label>'
+          + '<input class="form-control text-mono" type="number" name="indexBuildBudgetMs" value="' + escapeHtml(String(_timing.indexBuildBudgetMs)) + '" min="1000" max="600000" autocomplete="off">'
+          + '<div class="form-hint">The background build, which nobody is waiting on, so it can afford to be generous. Default 25000.</div></div>',
           })
 
     // Sport-Video's settings used to live entirely on their own page, so this

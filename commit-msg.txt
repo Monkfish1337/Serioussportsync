@@ -1,32 +1,35 @@
-Send the rutracker query, don't just generate it
+Make the discovery cut-offs adjustable from the Server page
 
-Reported bluntly and correctly: rutracker results still are not captured. The
-previous commit's claim that both catalogues were "reachable inside the first
-six queries" was the wrong measurement.
+Asked for after four rounds of tuning these numbers by redeploy: somewhere to
+fine-tune the cost of time against results without editing environment
+variables and rebuilding.
 
-Six is not the number that matters. Prowlarr -- the only configured source
-that reaches rutracker -- is given six queries and completes about TWO before
-its deadline, so index 0 and 1 are in practice everything it asks. With the
-date formats grouped by type, both of those were dotted ISO and the DMY form
-sat at index 4. Bitmagnet sends all sixty, found the content, and the row was
-labelled Bitmagnet; Prowlarr was never handed the one query that can match a
-rutracker title. The query was generated and then never sent.
+Server -> Discovery timing now carries five numbers:
 
-The four date tokens now alternate format instead of grouping, and every
-prefix-free form goes out before any prefixed one -- a prefixed date is
-measurably weaker than the bare one ("NFL 2026.08.28 Cardinals Packers" -> 0,
-"Cardinals Packers 2026.08.28" -> 1), so it must not displace a format that
-has not been tried at all. For Texans at Panthers:
+  Stream request budget        9500ms   the whole request
+  Discovery budget             5000ms   searching only, held 1s below the above
+  Prowlarr queries per request      6   offered; the budget decides how many finish
+  Prowlarr per-query timeout  15000ms   one HTTP search
+  Index build budget          25000ms   the background build, nobody waiting
 
-  0  Panthers Texans 2026.08.29     dotted ISO, stored day
-  1  Panthers Texans 28.08.2026     DMY, day before   -> rutracker
-  2  Panthers Texans 2026.08.28     dotted ISO        -> the usenet release
-  3  Panthers Texans 29.08.2026     DMY, stored day
+These are the most consequential numbers in the stream path and they were the
+hardest to try. Prowlarr answers in roughly two seconds per query, so the
+5000ms discovery budget is the difference between two queries and six -- and
+that decided whether the query reaching rutracker was ever sent.
 
-The test pins index <= 1 now rather than < 6. The margin that looked
-comfortable was the entire bug.
+Saved values win over environment variables, which still win over the
+defaults, so an existing deployment keeps what it had and a cleared field
+means "use this deployment's configured value" rather than zero. Out-of-range
+entries are clamped rather than refused. The request budget can be pushed past
+Nuvio's ~10s client deadline deliberately; the form says plainly that doing so
+turns a partial answer into no answer.
 
-468 tests passing.
+The Prowlarr query cap previously borrowed the promotion's uuMaxQueries, which
+was the nearest existing number rather than the right one: how many queries
+fit is a property of how slow this deployment's Prowlarr is, not of the
+promotion being searched.
+
+474 tests passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

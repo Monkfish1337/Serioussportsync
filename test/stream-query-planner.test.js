@@ -88,9 +88,11 @@ test('the live budget stays inside the client\'s patience', () => {
   // seconds, and the response still has to merge, dedupe and serialise after
   // the slowest pipeline returns. A 10000ms budget answers at ~10.1s and turns
   // partial results into no results.
-  const match = source.match(/STREAM_PIPELINE_TIMEOUT_MS \|\| '(\d+)'/);
-  assert.ok(match, 'the live budget must be readable from the source');
-  const live = Number(match[1]);
+  // The number moved into settings when the cut-offs became adjustable from
+  // the Server page, so the DEFAULT is what this constraint applies to. An
+  // operator may raise it past the client deadline deliberately; the form says
+  // what that costs.
+  const live = require('../lib/settings').DISCOVERY_TIMING_DEFAULTS.pipelineBudgetMs;
   assert.ok(live >= 9000, 'a slow indexer fan-out needs more than 8s: ' + live);
   assert.ok(live < 10000, 'past the client deadline the user gets nothing at all: ' + live);
 
