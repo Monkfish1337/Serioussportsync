@@ -139,6 +139,32 @@ into the TorBox row, so "TorBox: nothing found" never revealed whether
 Bitmagnet — the primary discovery source now — had even been consulted. A
 switched-off source and an empty index read identically.
 
+## Promotions and Collections: things that did not line up
+
+**The Promotions table.** Reported as a text alignment issue, and it was one. A
+table cell inherits `vertical-align: middle` from its table, so every row's
+one-line cells — the kind badge, the poster shape, the catalog count — floated
+to the vertical centre of rows whose other cells ran to two or three lines.
+Nothing shared a baseline, and a badge was worse still: an inline-block sits its
+bottom margin edge on the text baseline, so it hung visibly below the name
+beside it. The new Events column made it worse by adding a third line.
+
+Fixed by top-aligning the table — which needed saying twice, because dropping
+Tabler's `.table-vcenter` leaves the inherited `middle` in place. The rule the
+markup now asks for is defined alongside it.
+
+**The Collections folder cards.** `ratio` sizes a box from its aspect ratio
+using a padding-top pseudo-element; `h-100` forced `height: 100%` onto the same
+element. Inside `row g-0` the column is a stretched flex item, so the two rules
+disagreed about the height and the artwork stretched or collapsed depending on
+how much text the card carried beside it — which is why the body text never sat
+level with the top of the image.
+
+Also on those cards: the included-promotion names lived inside the `<summary>`,
+where a long comma list wraps under the disclosure marker and indents every line
+but the first. The count stays in the summary; the names moved to a line of
+their own beneath it.
+
 ## The Promotions table can tell you a promotion is broken
 
 AEW sat in that list with zero upcoming events and nothing on the page said so.

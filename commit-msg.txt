@@ -1,33 +1,33 @@
-Stop "Check it works" picking a fixture designed to fail
+Fix the alignment on Promotions and Collections
 
-The feature whose entire job is telling a new user whether their setup works.
-Pressed on a fully working install it chose "ONE Friday Fights 169 & The Inner
-Circle 29" -- a seven-day-old card from about the least-covered promotion in
-the catalog -- found nothing, and reported No streams. The copy underneath then
-spent a paragraph explaining that the red result might not mean what it says,
-which is a design admitting its own answer is unreliable.
+## The Promotions table
 
-The cause was the selection: newest settled fixture wins, and recency is
-uncorrelated with whether a release exists.
+A table cell inherits vertical-align: middle from its table, so every row's
+one-line cells -- the kind badge, the poster shape, the catalog count -- floated
+to the vertical centre of rows whose other cells ran to two or three lines.
+Nothing shared a baseline. A badge was worse still: an inline-block sits its
+bottom margin edge on the text baseline, so it hung visibly below the name
+beside it. The Events column added in the previous commit made it worse by
+adding a third line to most rows.
 
-There is no reliable way to predict which fixture has one, so this stops
-trying. It takes the newest settled fixture from each of three different
-promotions and checks them in turn, stopping at the first that returns
-something. One hit proves the pipeline end to end; three misses across three
-promotions is real evidence, which one miss never was. Later attempts get a
-shorter deadline so three full-length misses cannot sit on the page for a
-minute and a half.
+Top-aligned now, which needed saying twice: dropping Tabler's .table-vcenter
+leaves the inherited middle in place, so .table.align-top is defined in the
+compat layer rather than assumed to exist. It did not -- Tabler itself has not
+been loaded since 0.90.0; those class names are reimplemented in lib/ui.
 
-A failure lists every fixture tried and what each returned, and says the result
-points at the configuration -- because across three promotions it does. The
-hedge goes with the reason for it.
+## The Collections folder cards
 
-Also: the result now says which torrent sources were asked. Every torrent
-source is folded into the TorBox row, so "TorBox: nothing found" never revealed
-whether Bitmagnet -- the primary discovery source now -- had even been
-consulted. A switched-off source and an empty index read identically.
+`ratio` sizes a box from its aspect ratio with a padding-top pseudo-element;
+`h-100` forced height:100% onto the same element. Inside `row g-0` the column is
+a stretched flex item, so the two rules disagreed about the height and the
+artwork stretched or collapsed depending on how much text the card carried
+beside it. That is why the body text never sat level with the top of the image.
 
-407 unit tests pass.
+Also there: the included-promotion names lived inside the <summary>, where a
+long comma list wraps under the disclosure marker and indents every line but
+the first. The count stays in the summary, the names moved beneath it.
+
+410 unit tests pass.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

@@ -181,3 +181,26 @@ test('catalogs in no folder are named, not just counted', () => {
   assert.match(markup, /1 catalog in no folder/);
   assert.match(markup, /NFL/);
 });
+
+// The standalone admin Collections page, which the Configure step links to and
+// which still renders every folder as a card.
+test('the folder artwork box is sized by one rule, not two that fight', () => {
+  // `ratio` sizes a box from its aspect ratio using a padding-top pseudo
+  // element; `h-100` forced height:100% on the same element. Inside `row g-0`
+  // the column is a stretched flex item, so the two rules disagreed about the
+  // height and the artwork stretched or collapsed depending on how much text
+  // the card carried beside it.
+  const adminCollectionsPage = require('../lib/admin-nuvio-collections');
+  const html = adminCollectionsPage.renderBody({});
+  assert.ok(!/ratio ratio-16x9 h-100/.test(html), 'ratio and h-100 must not both size the box');
+  assert.match(html, /ratio ratio-16x9/);
+});
+
+test('a long promotion list does not wrap inside the disclosure summary', () => {
+  // A <summary> indents every line after the first under the marker, so a long
+  // comma list rendered as a ragged block. The count stays in the summary; the
+  // names moved to a line of their own beneath it.
+  const adminCollectionsPage = require('../lib/admin-nuvio-collections');
+  const html = adminCollectionsPage.renderBody({});
+  assert.match(html, /Included promotions \(\d+\)<\/summary>/);
+});

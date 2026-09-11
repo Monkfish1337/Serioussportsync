@@ -103,3 +103,21 @@ test('the table carries an Events column', () => {
   // With no events at all, every row must say so rather than showing a zero.
   assert.match(html, /No events/);
 });
+
+test('the table opts out of middle alignment, and the rule it opts into exists', () => {
+  // A table cell inherits vertical-align: middle from the table, so dropping
+  // Tabler's .table-vcenter changes nothing on its own — the replacement has to
+  // be defined. Rows here are a primary line over a secondary one, and middle
+  // alignment floated the one-line cells (the kind badge, the poster shape, the
+  // catalog count) to the centre of a three-line row while the multi-line cells
+  // started at the top. The Events column made it worse by adding a third line.
+  const html = adminPromotions.renderBody({ events: [] });
+  const table = (html.match(/<table[^>]*>/) || [''])[0];
+  assert.match(table, /align-top/);
+  assert.ok(!/table-vcenter/.test(table));
+
+  const { compatCss } = require('../lib/ui/compat');
+  const css = typeof compatCss === 'function' ? compatCss() : compatCss;
+  assert.match(String(css), /\.table\.align-top td[^}]*vertical-align: top/,
+    'the class the markup asks for must actually be styled');
+});
