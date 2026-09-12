@@ -1,5 +1,54 @@
 # Changelog
 
+## Unreleased — week-numbered NFL releases, and AEW's Upcoming row for real
+
+Two things, both of them a gate satisfied by the wrong thing.
+
+**AEW still had nothing upcoming.** The previous fix was right about the
+mechanism and wrong about the test. Its gate skipped a named lookup for any
+card already present in the fetched set — but these cards are *annual*, and the
+season walk covers every season in the event window, which starts 2025-01-01.
+Measured against the live free key: the AEW 2025 walk returns 101 events
+including All Out 2025-09-20, WrestleDream 2025-10-19, Revolution, Dynasty,
+Double or Nothing, Forbidden Door and All In. Ten of the fourteen names looked
+covered, every lookup was skipped, and the 2026 cards were never asked for.
+
+The question is not "is this card known?" but "is this card known *ahead*?" Only
+an event dated today or later can cover a name now. Verified end to end against
+the live API: AEW returns All Out 2026-09-27, WrestleDream 2026-10-17, Full Gear
+2026-11-15 and Dynasty 2027-02-07, where it previously returned none.
+
+The gate has now been wrong twice and was only reachable over the network, so it
+is extracted as `namesNeedingLookup` and tested directly, with both historical
+failures pinned as cases.
+
+That run also exposed a second defect: seasons are walked oldest-first against a
+single shared deadline, so 2025 walked to round 127 and stopped "out of time
+budget" while 2026 — the season anyone is actually asking about — got one round.
+Each season now gets an equal share of whatever time is left, and a season that
+finishes early hands its share on.
+
+**Week-numbered NFL releases were unreachable.** `NFL.2025-2026.W04.Packers-
+Cowboys.1080p.ACC.2CH.MKV-CG` carries a season span, a week number and a
+nickname pair — and no date anywhere. Every query SSS generated keyed on a date,
+and the matcher required one, so this catalogue was not badly ranked, it was
+invisible. rutracker numbers its weeks the same way.
+
+ESPN carries the week on each event, so it is captured (regular season only —
+preseason and postseason restart their numbering, and a W04 from either points
+at the wrong fixture), stored, and queried. Three things had to change together:
+the queries now include `NFL <span> W04 <pair>`, placed *behind* the dated forms
+because that ordering is measured and this one is not; the team guard now treats
+a week label before a club name as a schedule position rather than as another
+club, which is what was rejecting these as `no-away-team-alias`; and
+`requireDateInTitle` accepts a matching week plus a matching season instead, on
+the grounds that the rule's real purpose is identifying *which* fixture, and a
+date is only the usual way of doing it. Deliberately strict: the event must
+carry a week, the number must be that week, and the season must still match, so
+last season's W04 is rejected exactly as last season's date would be.
+
+513 unit tests, plus both standalone verification scripts, passing.
+
 ## Unreleased — Champions League stops throwing away forty queries
 
 `championsLeague.torrentSearchTitles` built three focused scene queries and

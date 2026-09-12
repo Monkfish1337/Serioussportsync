@@ -1,17 +1,39 @@
-Champions League: keep the full query list behind the focused three
+AEW's upcoming cards, and NFL's week-numbered releases
 
-championsLeague.torrentSearchTitles built three focused scene queries and
-then sliced the rest of the list away. Same bug class as MLB: the torrent
-sources only ever saw three full-name queries carrying a league prefix AND
-a date - the weakest measured shape - so no short pair and no DMY form
-reached Bitmagnet or rutracker.
+Two gates, each satisfied by the wrong thing.
 
-The three focused forms are correct and still lead. Behind them now sits
-the full generated list, deduplicated. 3 queries -> 46.
+AEW still had nothing upcoming. The previous gate skipped a named lookup
+for any card already in the fetched set, but these cards are annual and
+the season walk covers the whole event window, which starts 2025-01-01.
+Measured live: the AEW 2025 walk returns 101 events including All Out
+2025-09-20, WrestleDream 2025-10-19, Revolution, Dynasty, Double or
+Nothing, Forbidden Door and All In. Ten of fourteen names looked covered,
+nothing was looked up, and the 2026 cards were never asked for.
 
-Two tests pinned the old length === 3 and were rewritten.
+The question is "is this card known AHEAD", not "is it known". Verified
+end to end: AEW now returns All Out 2026-09-27, WrestleDream 2026-10-17,
+Full Gear 2026-11-15 and Dynasty 2027-02-07.
 
-503 unit tests plus both standalone verification scripts passing.
+The gate has been wrong twice and was only reachable over the network, so
+it is extracted as namesNeedingLookup and tested directly with both past
+failures pinned.
+
+That run also showed seasons racing for one shared deadline: 2025 walked
+to round 127 and stopped out of budget while 2026 got one round. Each
+season now takes an equal share of the time left.
+
+Week-numbered NFL releases were unreachable. NFL.2025-2026.W04.Packers-
+Cowboys has a span, a week and a nickname pair and no date at all, so
+every query missed it and the matcher rejected it. ESPN carries the week
+per event (regular season only - preseason and postseason restart their
+numbering), so it is captured, stored and queried. The week forms sit
+behind the dated ones, which are the measured ones. The team guard now
+reads a week label before a club name as a schedule position, and
+requireDateInTitle accepts a matching week plus a matching season - the
+rule's purpose is identifying which fixture, and a date is only the usual
+way. Wrong week, wrong season and wrong fixture all still reject.
+
+513 unit tests plus both standalone verification scripts passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

@@ -535,3 +535,119 @@ test("'regular' is never sent, because it is not a poster shape", () => {
     require('path').join(__dirname, '..', 'lib', 'transform.js'), 'utf8');
   assert.ok(!/posterShape: ev\.posterShape \|\| 'regular'/.test(source));
 });
+
+// ===== Week-numbered releases =====
+//
+// NFL.2025-2026.W04.Packers-Cowboys.1080p.ACC.2CH.MKV-CG
+//
+// Season span, week number, hyphenated nickname pair, and no date anywhere.
+// Every query SSS generated keyed on a date and the matcher required one, so
+// this catalogue was not badly ranked — it was unreachable. rutracker numbers
+// its weeks the same way, which makes this a second route in there too.
+
+test('ESPN week numbers reach the event, for the regular season only', () => {
+  const espn = require('../lib/sources/espn');
+  assert.equal(espn.weekOf({ week: { number: 4 }, season: { year: 2026, type: 2 } }), 4);
+  assert.equal(espn.seasonSpanOf({ season: { year: 2026, type: 2 } }), '2026-2027',
+    'the scene writes the span; ESPN reports the starting year');
+  // Preseason and postseason restart their week numbering from 1, so a W04
+  // taken from either would point at the wrong fixture.
+  assert.equal(espn.weekOf({ week: { number: 4 }, season: { year: 2026, type: 1 } }), null);
+  assert.equal(espn.weekOf({ week: { number: 4 }, season: { year: 2026, type: 3 } }), null);
+  assert.equal(espn.weekOf({ season: { year: 2026, type: 2 } }), null);
+  assert.equal(espn.weekOf({}), null);
+  assert.equal(espn.seasonSpanOf({}), null);
+});
+
+test('the week survives normalization into the stored event', () => {
+  const transform = require('../lib/transform');
+  const nfl = promotions.all.find((p) => p.id === 'nfl');
+  const raw = {
+    sourceId: '401', name: 'Green Bay Packers at Dallas Cowboys', date: '2026-09-27',
+    week: 4, seasonSpan: '2026-2027',
+  };
+  const ev = transform.fromWiki(raw, nfl);
+  assert.equal(ev.week, 4);
+  assert.equal(ev.seasonSpan, '2026-2027');
+  // Absent rather than zero, so a query builder can test for presence.
+  const undated = transform.fromWiki({ sourceId: '402', name: 'A at B', date: '2026-09-27' }, nfl);
+  assert.ok(!('week' in undated));
+});
+
+test('NFL asks for its week-numbered releases, behind the dated ones', () => {
+  const nfl = promotions.all.find((p) => p.id === 'nfl');
+  const event = {
+    name: 'Green Bay Packers at Dallas Cowboys', date: '2026-09-27',
+    week: 4, seasonSpan: '2026-2027',
+    teamNames: {
+      home: ['Dallas Cowboys', 'Dallas', 'Cowboys', 'DAL'],
+      away: ['Green Bay Packers', 'Green Bay', 'Packers', 'GB'],
+    },
+  };
+  const queries = nfl.searchTitles(event);
+  const weekQueries = queries.filter((q) => /\bW0?4\b/.test(q));
+  assert.ok(weekQueries.length >= 2, 'padded and unpadded: ' + weekQueries.join(' | '));
+  assert.ok(weekQueries.some((q) => /^NFL 2026-2027 W04 /.test(q)),
+    'the observed release shape: ' + weekQueries.join(' | '));
+
+  // Behind the dated forms, which are the measured ones. A bounded provider
+  // reaches about two queries, and those two must stay the ones known to work.
+  const firstWeek = queries.findIndex((q) => /\bW0?4\b/.test(q));
+  assert.ok(firstWeek >= 4,
+    'week forms must not displace the measured dated forms: index ' + firstWeek);
+
+  // An event with no week number generates none of them at all.
+  const dateOnly = Object.assign({}, event);
+  delete dateOnly.week; delete dateOnly.seasonSpan;
+  assert.equal(nfl.searchTitles(dateOnly).filter((q) => /\bW0?4\b/.test(q)).length, 0);
+});
+
+test('a week number identifies a fixture the way a date does', () => {
+  const nfl = promotions.all.find((p) => p.id === 'nfl');
+  const event = {
+    name: 'Green Bay Packers at Dallas Cowboys', date: '2026-09-27',
+    week: 4, seasonSpan: '2026-2027',
+    teamNames: {
+      home: ['Dallas Cowboys', 'Dallas', 'Cowboys', 'DAL'],
+      away: ['Green Bay Packers', 'Green Bay', 'Packers', 'GB'],
+    },
+  };
+  const ok = (title) => assert.equal(nfl.isRelevantStreamTitle(title, event).ok, true, title);
+  const no = (title) => assert.equal(nfl.isRelevantStreamTitle(title, event).ok, false, title);
+
+  ok('NFL.2026-2027.W04.Packers-Cowboys.1080p.ACC.2CH.MKV-CG');
+  ok('NFL.2026-2027.W4.Packers-Cowboys.1080p');
+  ok('NFL.Week.4.Packers.vs.Cowboys.1080p');
+  ok('NFL.26-27.W04.Packers-Cowboys.1080p');
+  ok('NFL.2026.09.27.Packers.vs.Cowboys.1080p.WEB.h264');
+
+  // requireDateInTitle is relaxed, not removed. Each of these would be
+  // accepted by a rule that merely noticed "a week number is present".
+  no('NFL.2026-2027.W05.Packers-Cowboys.1080p');
+  no('NFL.2024-2025.W04.Packers-Cowboys.1080p');
+  no('NFL.2026-2027.W04.Steelers-Ravens.1080p');
+
+  const dateOnly = Object.assign({}, event);
+  delete dateOnly.week; delete dateOnly.seasonSpan;
+  assert.equal(
+    nfl.isRelevantStreamTitle('NFL.2026-2027.W04.Packers-Cowboys.1080p', dateOnly).ok, false,
+    'an event with no week number cannot take this route');
+});
+
+test('a week label before a club name is a schedule position, not another club', () => {
+  // The guard this relaxes exists to stop "Inter Milan" matching an AC Milan
+  // fixture, and it rejected every week-numbered release as no-away-team-alias:
+  // the word before the away side is W04. The home side already passed, because
+  // the word before IT is the opponent.
+  const nfl = promotions.all.find((p) => p.id === 'nfl');
+  const event = {
+    name: 'Green Bay Packers at Dallas Cowboys', date: '2026-09-27', week: 4,
+    teamNames: {
+      home: ['Dallas Cowboys', 'Dallas', 'Cowboys', 'DAL'],
+      away: ['Green Bay Packers', 'Green Bay', 'Packers', 'GB'],
+    },
+  };
+  assert.notEqual(
+    nfl.isRelevantStreamTitle('NFL.2026-2027.W04.Packers-Cowboys.1080p', event).reason,
+    'no-away-team-alias');
+});
