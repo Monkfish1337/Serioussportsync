@@ -66,7 +66,15 @@ test('preserves a pre-existing custom ucl promotion over the new shipped default
     assert.equal(preserved.isCustom, true);
     assert.deepEqual(preserved.source, { type: 'football-data', competitionId: 'CL' });
     const event = { name: 'Celje vs Slovan Bratislava', date: '2026-08-26' };
-    assert.equal(preserved.torrentSearchTitles(event).length, 3);
+    // The shipped UCL torrent ordering survives on a custom promotion: the
+    // three measured-correct focused forms lead, and the rest of the list is
+    // kept behind them rather than sliced away.
+    const torrentQueries = preserved.torrentSearchTitles(event);
+    assert.match(torrentQueries[0], /^UEFA Champions League 2026\.08\.26/);
+    assert.match(torrentQueries[1], /^Champions League\b/);
+    assert.match(torrentQueries[2], /^UCL\b/);
+    assert.ok(torrentQueries.length > 3,
+      'the rest of the list must survive: got ' + torrentQueries.length);
     assert.match(preserved.searchTitles(event)[0], /^UEFA Champions League 2026\.08\.26/);
     assert.equal(preserved.isRelevantStreamTitle(
       'UEFA.Champions.League.2026.08.26.Celje.vs.Slovan.Bratislava.720p.WEB.h264-ULTRA',

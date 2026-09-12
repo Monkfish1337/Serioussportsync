@@ -89,17 +89,10 @@ test('MLB ships with its official schedule and keeps its observed RS queries', (
     'MLB Network Daily Show 25.07.2026 Toronto Blue Jays Boston Red Sox', event).ok, false);
 });
 
-test('Champions League gives TorBox three focused scene queries', () => {
-  const item = promotion('ucl');
-  const event = { name: 'Celje vs Slovan Bratislava', date: '2026-08-26' };
-  const queries = item.torrentSearchTitles(event);
-  assert.equal(queries.length, 3);
-  assert.match(queries[0], /^UEFA Champions League 2026\.08\.26/);
-  assert.ok(queries.some((query) => /^Champions League\b/.test(query)));
-  assert.ok(queries.some((query) => /^UCL\b/.test(query)));
-  assert.equal(item.isRelevantStreamTitle(
-    'UEFA.Champions.League.2026.08.26.Celje.vs.Slovan.Bratislava.720p.WEB.h264-ULTRA', event).ok, true);
-});
+// The old 'Champions League gives TorBox three focused scene queries' test
+// lived here. It pinned `queries.length === 3` — the slice that was the bug.
+// It is superseded by 'Champions League leads with its three focused queries
+// and keeps the rest' below, which asserts the same three lead.
 
 // Man United was removed in 0.89.1 — the Configure-page wizard creates a club
 // promotion from a pick now, and keeping a hand-built duplicate of one club
@@ -112,4 +105,35 @@ test('existing WWE, AEW and Match of the Day rules remain locked', () => {
     'AEW.All.In.London.2026.1080p.WEB.H264', { name: 'All In London', date: '2026-08-31' }).ok, true);
   assert.ok(promotion('motd').searchTitles(
     { name: 'Match of the Day 02 09 2026', date: '2026-09-02' }).length > 0);
+});
+
+test('Champions League leads with its three focused queries and keeps the rest', () => {
+  // The three are right and were measured: UCL releases genuinely are named
+  // "UEFA.Champions.League.<date>.<matchup>", the same fixture also appears
+  // under "Champions League" and "UCL", and `Vs` is the scene capitalisation.
+  //
+  // What was wrong was the slice(0, 3) behind them. It threw the other forty
+  // away, so the torrent sources saw only three full-name queries each
+  // carrying a league prefix AND a date — the shape measured to be weakest
+  // everywhere else. The identical slice on MLB was why MLB returned nothing
+  // from Bitmagnet or rutracker at all.
+  const item = promotion('ucl');
+  const event = { name: 'Celje vs Slovan Bratislava', date: '2026-08-26' };
+  const queries = item.torrentSearchTitles(event);
+
+  assert.match(queries[0], /^UEFA Champions League 2026\.08\.26/);
+  assert.match(queries[1], /^Champions League\b/);
+  assert.match(queries[2], /^UCL\b/);
+  assert.match(queries[0], / Vs /, 'the scene capitalisation the focused forms exist for');
+
+  assert.ok(queries.length > 3,
+    'the rest of the list must survive, not be discarded: got ' + queries.length);
+  const full = item.searchTitles(event);
+  for (const query of full) {
+    assert.ok(queries.includes(query) || queries.some((q) => q.toLowerCase() === query.toLowerCase()),
+      'every generated query must still reach the torrent path: ' + query);
+  }
+
+  assert.equal(item.isRelevantStreamTitle(
+    'UEFA.Champions.League.2026.08.26.Celje.vs.Slovan.Bratislava.720p.WEB.h264-ULTRA', event).ok, true);
 });

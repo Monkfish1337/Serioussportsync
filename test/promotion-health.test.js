@@ -177,3 +177,54 @@ test('the table fits the card instead of relying on the scrollbar', () => {
   assert.match(css, /td\.promo-actions \{[^}]*white-space: normal/);
   assert.match(css, /td\.promo-actions \{[^}]*width: 250px/);
 });
+
+// ---------------------------------------------------------------------------
+// The review inbox, removed in 1.0.
+
+test('nothing writes to a review inbox any more', () => {
+  // recordInbox wrote excluded and duplicate-looking candidates to a list
+  // capped at 500. Nothing ever read it: updateInbox had zero callers, no page
+  // rendered the items, no export included them. It had been accumulating
+  // records nobody could see since it was written.
+  const contentStore = require('../lib/content-store');
+  assert.equal(typeof contentStore.recordInbox, 'undefined');
+  assert.equal(typeof contentStore.updateInbox, 'undefined');
+  assert.ok(!Object.prototype.hasOwnProperty.call(contentStore.load(), 'inbox'),
+    'and the key is gone from the state shape');
+});
+
+test('the duplicate scan went with it', () => {
+  // Its only consumer was the inbox, and it walked every stored event for
+  // every candidate of every refresh — an O(n) scan per record, writing
+  // something nobody could read.
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'scripts', 'refresh.js'), 'utf8');
+  assert.ok(!/possibleDuplicate/.test(source));
+  assert.ok(!/contentStore\.recordInbox/.test(source));
+});
+
+test('an existing file with an inbox still loads', () => {
+  // Upgrading from a version that wrote one must not throw; the key is simply
+  // not carried forward.
+  const path = require('path');
+  const os = require('os');
+  const fs = require('fs');
+  const file = path.join(os.tmpdir(), 'sss-inbox-drop-' + process.pid + '.json');
+  fs.writeFileSync(file, JSON.stringify({
+    version: 1, manualEvents: [], eventOverrides: {}, disabledEventIds: [],
+    inbox: [{ key: 'abc', status: 'pending', candidate: { name: 'Old' } }],
+  }));
+  const original = require('../config').contentStudioFile;
+  try {
+    require('../config').contentStudioFile = file;
+    delete require.cache[require.resolve('../lib/content-store')];
+    const fresh = require('../lib/content-store');
+    const state = fresh.load();
+    assert.ok(Array.isArray(state.manualEvents));
+    assert.ok(!Object.prototype.hasOwnProperty.call(state, 'inbox'));
+  } finally {
+    require('../config').contentStudioFile = original;
+    delete require.cache[require.resolve('../lib/content-store')];
+    try { fs.unlinkSync(file); } catch (_) { /* best effort */ }
+  }
+});

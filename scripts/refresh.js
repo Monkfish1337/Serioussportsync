@@ -453,19 +453,15 @@ async function runRefresh(options) {
       if (!norm) continue;
       // Promotion-level filter (e.g. drop WWE weekly TV, UFC Contender Series).
       if (typeof p.includeEvent === 'function' && !p.includeEvent(norm, config)) {
-        contentStore.recordInbox(norm, 'promotion-filter', 'The source returned this event but the promotion filter excluded it.');
         skipped++; continue;
       }
       if (!inScope(norm, p)) { skipped++; continue; }
-      const possibleDuplicate = Array.from(byId.values()).find((existingEvent) =>
-        existingEvent && existingEvent.id !== norm.id
-        && existingEvent.promotion === norm.promotion
-        && String(existingEvent.date || '') === String(norm.date || '')
-        && String(existingEvent.name || '').toLowerCase() === String(norm.name || '').toLowerCase()
-      );
-      if (possibleDuplicate) {
-        contentStore.recordInbox(norm, 'possible-duplicate', 'Looks like ' + possibleDuplicate.id + '. Review and merge if needed.');
-      }
+      // The duplicate scan and the promotion-filter note above both used to
+      // write to a review inbox. Nothing ever read it — `updateInbox` had zero
+      // callers and no page listed the items — so the scan was an O(n) walk of
+      // every stored event, per candidate, per refresh, producing records
+      // nobody could see. Removed rather than surfaced: see the note in
+      // lib/content-store.js.
       if (byId.has(norm.id)) updated++;
       else added++;
       byId.set(norm.id, norm);

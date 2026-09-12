@@ -1,39 +1,17 @@
-Walk the first run, and fix the three things it found
+Champions League: keep the full query list behind the focused three
 
-The top item on the 1.0 list was the one path nobody had ever walked: a brand
-new account through all five Configure steps. A clean instance booted against
-an empty data directory, an admin account created through /setup, every step
-read as a new operator reads it, the save round-tripped, the manifest fetched
-and a catalog requested as an installed client. Three defects, all on paths
-only a new install takes, which is why none had been seen.
+championsLeague.torrentSearchTitles built three focused scene queries and
+then sliced the rest of the list away. Same bug class as MLB: the torrent
+sources only ever saw three full-name queries carrying a league prefix AND
+a date - the weakest measured shape - so no short pair and no DMY form
+reached Bitmagnet or rutracker.
 
-The setup page told the first user they would not be an admin. It said the
-account "will be auto-promoted to admin if it matches the ADMIN_USER env var
-(currently (unset))". Every operator who has not set that variable -- the
-default -- was told on the first screen of the product that their account
-would not be an administrator. It always is: POST /setup passes role: 'admin'
-and createUser takes `role === 'admin' || matchesAdminEnv`. ADMIN_USER only
-prefills the field and promotes a LATER user of that name.
+The three focused forms are correct and still lead. Behind them now sits
+the full generated list, deduplicated. 3 queries -> 46.
 
-The team picker pointed at a page that does not exist. With no football-data
-key -- every new operator -- the Premier League chooser says where to add one:
-"Admin -> Sources". There is no Admin nav item and there has never been a
-Sources page; the sidebar says Server.
+Two tests pinned the old length === 3 and were rewritten.
 
-A new install looked broken while it filled. Measured: a clean instance was
-still on the first of 29 promotions several minutes after boot, because the
-refresh is sequential and the TheSportsDB adapter waits between requests. The
-Install step handed over a manifest that produces empty rows and said nothing,
-and "Check it works" then reported it had no fixture to try -- a working
-install presenting exactly as a broken one. The step says so now while the
-catalogue is empty, and says the manifest is fine to install meanwhile.
-
-Confirmed working on a clean install: /setup -> account -> Configure renders
-all five steps, save round-trips (only the selected catalogs come back
-served), the personal manifest returns the right two catalogs, and the team
-pickers for NFL, NBA and MLB populate.
-
-500 unit tests, plus both standalone verification scripts, passing.
+503 unit tests plus both standalone verification scripts passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

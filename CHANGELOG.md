@@ -1,5 +1,44 @@
 # Changelog
 
+## Unreleased — Champions League stops throwing away forty queries
+
+`championsLeague.torrentSearchTitles` built three focused scene queries and
+then `slice(0, 3)`'d the rest of the list away. The same shape as the MLB bug
+fixed earlier: the torrent sources saw only three full-name queries, each
+carrying a league prefix *and* a date — the form measured to be the weakest
+everywhere else — so no short pair and no DMY form ever reached Bitmagnet or
+rutracker.
+
+The three focused forms were right and stay first. UCL releases genuinely are
+named `UEFA.Champions.League.<date>.<matchup>`, the same fixture also appears
+under `Champions League` and `UCL`, and `Vs` is the scene capitalisation. What
+changes is what sits behind them: the full generated list, deduplicated, rather
+than nothing. 3 queries became 46, with the measured three still leading.
+
+Two tests pinned the old `length === 3` and were rewritten rather than
+weakened — a slice that discarded forty usable queries was never the
+specification.
+
+## Unreleased — the review inbox is gone
+
+It recorded two things: candidates the promotion filter had excluded, and
+candidates that looked like duplicates of an event already stored, capped at
+500 items.
+
+Nothing ever read them. `updateInbox` had zero callers, no page rendered the
+list, no export included it. It had been accumulating records nobody could see
+or act on since it was written — and the duplicate half was not free: it walked
+every stored event for every candidate of every refresh, an O(n) scan per
+record, to produce a note nobody would read.
+
+Deleted rather than surfaced, deliberately. A reviewer queue is only worth
+having if someone reviews it, and a promotion filter that excludes an event is
+usually doing its job. An existing `content-studio.json` with an `inbox` key
+still loads; the key is read and dropped, so the next save of that store writes
+it out.
+
+503 unit tests, plus both standalone verification scripts, passing.
+
 ## Unreleased — the first-run walkthrough, at last
 
 The top item on the 1.0 list was the one path nobody had ever walked: a brand
