@@ -120,3 +120,69 @@ test('every chooser names a provider the code can actually reach', () => {
     }
   }
 });
+
+// ===== "2 selected" with nothing highlighted =====
+//
+// Reported as two bugs and it is one: the wizard said how many teams were
+// selected but drew none of them as picked, and un-ticking a team did not
+// remove its catalog.
+//
+// /account/teams/:key.json never sent `selected`, which the client reads to set
+// aria-pressed. Every tile rendered aria-pressed="false" — so the CSS highlight
+// never applied, AND the click handler, which reads that same attribute to
+// choose between create and remove, always chose create. Clicking a selected
+// team re-created it. The catalog stayed exactly where it was.
+
+test('selectedTeamIds reports the teams that currently have a served catalog', () => {
+  const teams = [{ id: '12' }, { id: '25' }, { id: '30' }];
+  const specs = [
+    { id: 'nfl-dal', teamFilter: { id: '12' }, enabled: true },
+    { id: 'nfl-gb', teamFilter: { id: '25' }, enabled: false },
+  ];
+  assert.deepEqual(teamPicker.selectedTeamIds('nfl', specs, teams), ['12'],
+    'enabled only — a kept-but-off team must draw as unpicked, or clicking it '
+    + 'to get it back would be read as a request to remove it');
+});
+
+test('a football club is matched by teamId, a US team by teamFilter', () => {
+  // The two chooser shapes store the team differently, and the rule has to know
+  // both or one whole half of the wizard never highlights.
+  assert.equal(teamPicker.matchesTeam({ id: 'epl-mun', teamId: '66' }, 'epl', '66'), true);
+  assert.equal(teamPicker.matchesTeam({ id: 'nfl-dal', teamFilter: { id: '12' } }, 'nfl', '12'), true);
+});
+
+test('team ids are only unique within their provider', () => {
+  // ESPN numbers NFL, NBA and MLB teams separately, so team 12 exists three
+  // times. Without the id prefix in the test, picking one would highlight three.
+  const spec = { id: 'nfl-dal', teamFilter: { id: '12' }, enabled: true };
+  assert.equal(teamPicker.matchesTeam(spec, 'nfl', '12'), true);
+  assert.equal(teamPicker.matchesTeam(spec, 'nba', '12'), false);
+  assert.equal(teamPicker.matchesTeam(spec, 'mlb', '12'), false);
+  assert.deepEqual(teamPicker.selectedTeamIds('nba', [spec], [{ id: '12' }]), []);
+});
+
+test('nothing selected, nothing matched, and bad input are all empty', () => {
+  assert.deepEqual(teamPicker.selectedTeamIds('nfl', [], [{ id: '12' }]), []);
+  assert.deepEqual(teamPicker.selectedTeamIds('nfl', null, null), []);
+  assert.equal(teamPicker.matchesTeam(null, 'nfl', '12'), false);
+  assert.equal(teamPicker.matchesTeam({ id: 'nfl-dal', teamFilter: { id: '12' } }, 'nfl', ''), false,
+    'an empty team id must not match a spec that happens to have no filter id');
+});
+
+test('the endpoint sends selected, and the picker draws and toggles from it', () => {
+  const fs = require('fs'); const path = require('path');
+  const addonSource = fs.readFileSync(path.join(__dirname, '..', 'addon.js'), 'utf8');
+  assert.match(addonSource, /out\.selected = teamPicker\.selectedTeamIds\(/,
+    'the field the client has always read must actually be sent');
+  // The remove route shares the rule rather than keeping its own copy, so the
+  // highlight and the removal cannot disagree about what "this team" means.
+  assert.match(addonSource, /teamPicker\.matchesTeam\(item, key, teamId\)/);
+
+  const page = fs.readFileSync(path.join(__dirname, '..', 'lib', 'configure-page.js'), 'utf8');
+  assert.match(page, /data\.selected/);
+  assert.match(page, /aria-pressed/);
+  assert.match(page, /team-tick/, 'a tinted border alone was too quiet to read at a glance');
+
+  const css = fs.readFileSync(path.join(__dirname, '..', 'lib', 'ui', 'css.js'), 'utf8');
+  assert.match(css, /\.team\[aria-pressed="true"\] \.team-tick/);
+});

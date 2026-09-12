@@ -1,5 +1,53 @@
 # Changelog
 
+## Unreleased — the wizard tells the truth
+
+Four reports, and three of them turned out to be one sentence: something on
+screen was not showing what it claimed to be showing.
+
+**"Pick your club" said "2 selected" and highlighted nothing, and un-ticking a
+team left its catalog in place.** One cause. `/account/teams/:key.json` never
+sent the `selected` field the picker has always read, so every tile rendered
+`aria-pressed="false"`. The CSS highlight keys off that attribute, so nothing lit
+up — and so does the click handler, which uses it to choose between create and
+remove. Clicking an already-selected team POSTed to the create route and
+re-created it. The catalog stayed exactly where it was, which is what was
+reported.
+
+The endpoint now reports the selection, computed with the same rule the remove
+route uses — shared as `teamPicker.matchesTeam` rather than copied, because the
+two disagreeing is what this was. Enabled catalogs only, deliberately: a
+deselected team keeps its promotion and its stored fixtures, so it has to draw
+as unpicked or clicking it to get it back would read as a request to remove it.
+Selected tiles now also carry a tick; a tinted border alone was too quiet to
+scan across thirty of them.
+
+**"Check it works" reported a broken install on a working one.** Reproduced
+live: three attempts, all empty, on UFC Fight Night 287, ONE Fight Night 47 and
+*Italian Grand Prix Practice 3* — all three dated 2026-09-05. Taking the newest
+event per promotion and then sorting the lot by recency selects for a single
+day, so one thin day took every attempt with it; and a Friday practice session
+is close to the least-uploaded thing in the catalogue. The existing note in the
+code says picking the least-covered card was the bug. The previous fix picked
+one anyway, three times over.
+
+Candidates are now ranked by whether a release is likely to *exist* —
+`checkWorthiness`, which lets a promotion say that a Grand Prix race is worth
+checking and Practice 3 is not — and spread across different days, with recency
+only breaking ties. Four attempts instead of three.
+
+**AEW's preview said "3 events · 29 removed" and listed cards it fetches
+perfectly well.** Nothing was removed; a preview writes nothing. But the number
+was not a prediction either. A preview asks the list endpoints only, skipping
+the named-card lookups and the per-round walk — which is where most of AEW's
+events come from — so it compared a deliberately truncated fetch against the
+full store and called the difference deletions. A preview now reports those as
+"Not seen by this preview", says why, and shows no removed count at all when the
+fetch was incomplete. A source with no skippable path still reports removals
+exactly as before.
+
+526 unit tests, plus both standalone verification scripts, passing.
+
 ## Unreleased — week-numbered NFL releases, and AEW's Upcoming row for real
 
 Two things, both of them a gate satisfied by the wrong thing.

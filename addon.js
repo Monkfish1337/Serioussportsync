@@ -388,11 +388,9 @@ function createApp() {
     const body = req.body || {};
     const key = String(body.chooser || '').trim();
     const teamId = String(body.teamId || '').trim();
-    const spec = customPromotions.list().find((item) => {
-      const filter = item.teamFilter || {};
-      const sameTeam = String(filter.id || '') === teamId || String(item.teamId || '') === teamId;
-      return sameTeam && String(item.id || '').indexOf(key + '-') === 0;
-    });
+    // The same rule the picker uses to draw a team as selected — shared so the
+    // two cannot disagree about what "this team" means.
+    const spec = customPromotions.list().find((item) => teamPicker.matchesTeam(item, key, teamId));
     if (!spec) return fail(404, 'No catalog for that team');
     try {
       customPromotions.update(spec.id, Object.assign({}, spec, { enabled: false }));
@@ -449,7 +447,35 @@ function createApp() {
     // different promotions and checks them in turn, stopping at the first hit.
     // One hit proves the pipeline end to end. Three misses across three
     // promotions is real evidence; one miss never was.
-    const MAX_ATTEMPTS = 3;
+    // 0.95.1 — and it was STILL picking by recency alone.
+    //
+    // Reported as "check it works is broken", and reproduced on a working
+    // install: three attempts, all returning nothing, on
+    //
+    //   UFC Fight Night 287 Hooker vs Parnasse   2026-09-05
+    //   ONE Fight Night 47                       2026-09-05
+    //   Italian Grand Prix Practice 3            2026-09-05
+    //
+    // Two things are wrong there. Every candidate is from the SAME DAY — the
+    // newest settled one — because taking the newest per promotion and then
+    // sorting the lot by recency selects for a single date, and a date with
+    // thin coverage takes all three attempts down with it. And the third is a
+    // Friday practice session, which is close to the least-released item in the
+    // entire catalogue; the note above says picking the least-covered card was
+    // the bug, and the fix still picked one.
+    //
+    // So: rank candidates by how likely a release is to EXIST, and spread them
+    // over different days. `checkWorthiness` on the promotion lets a promotion
+    // say which of its own events are worth checking — a Grand Prix race is,
+    // Practice 3 is not — and defaults to neutral for promotions that do not
+    // care. Recency only breaks ties.
+    const MAX_ATTEMPTS = 4;
+    const DAY_SPREAD_MS = 2 * DAY;
+    const worthOf = (promotion, event) => {
+      if (typeof promotion.checkWorthiness !== 'function') return 0;
+      const value = Number(promotion.checkWorthiness(event));
+      return Number.isFinite(value) ? value : 0;
+    };
     const newestPerPromotion = new Map();
     for (const event of store.getEvents()) {
       const prefix = String(event.id || '').split(':')[0];
@@ -463,14 +489,31 @@ function createApp() {
       const when = Date.parse(event.date + 'T00:00:00Z');
       if (!Number.isFinite(when)) continue;
       if (when > settledBefore || when < oldestUseful) continue;
+      const worth = worthOf(promotion, event);
+      // An event the promotion says is not worth checking is not a candidate at
+      // all. Better to check three promotions than to spend an attempt on a
+      // practice session and report its miss as a finding.
+      if (worth < 0) continue;
       const held = newestPerPromotion.get(promotion.id);
-      if (!held || when > held.when) {
-        newestPerPromotion.set(promotion.id, { event, when, promotion });
+      if (!held || worth > held.worth || (worth === held.worth && when > held.when)) {
+        newestPerPromotion.set(promotion.id, { event, when, promotion, worth });
       }
     }
-    const candidates = Array.from(newestPerPromotion.values())
-      .sort((a, b) => b.when - a.when)
-      .slice(0, MAX_ATTEMPTS);
+    const ranked = Array.from(newestPerPromotion.values())
+      .sort((a, b) => (b.worth - a.worth) || (b.when - a.when));
+    // Spread over days: a thin day must not be able to take every attempt with
+    // it. Fall back to the ranked order if there are not enough distinct days.
+    const candidates = [];
+    const usedDays = [];
+    for (const pass of [true, false]) {
+      for (const candidate of ranked) {
+        if (candidates.length >= MAX_ATTEMPTS) break;
+        if (candidates.includes(candidate)) continue;
+        if (pass && usedDays.some((day) => Math.abs(day - candidate.when) < DAY_SPREAD_MS)) continue;
+        candidates.push(candidate);
+        usedDays.push(candidate.when);
+      }
+    }
     const chosen = candidates[0] || null;
     if (!chosen) {
       return res.send(JSON.stringify({
@@ -604,7 +647,20 @@ function createApp() {
   app.get('/account/teams/:key.json', requireLogin, async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    const out = await teamPicker.teamsFor(req.params.key, { log: () => {} });
+    const key = String(req.params.key || '');
+    const out = await teamPicker.teamsFor(key, { log: () => {} });
+    // Which of these teams the user already has.
+    //
+    // The client has always read `data.selected` to decide whether to draw a
+    // team as picked, and this endpoint never sent the field. Two reported
+    // bugs, one cause: every team rendered aria-pressed="false", so nothing was
+    // highlighted even while the count chip said "2 selected"; and the click
+    // handler reads that same attribute to choose between create and remove, so
+    // un-ticking a team POSTed to /account/teams and re-created it instead of
+    // removing it. The catalog stayed, which is exactly what was reported.
+    if (out && out.ok) {
+      out.selected = teamPicker.selectedTeamIds(key, customPromotions.list(), out.teams);
+    }
     res.status(out.ok ? 200 : 422).send(JSON.stringify(out));
   });
 

@@ -1,39 +1,42 @@
-AEW's upcoming cards, and NFL's week-numbered releases
+Make the wizard show what it claims to be showing
 
-Two gates, each satisfied by the wrong thing.
+Four reports, three of them one cause.
 
-AEW still had nothing upcoming. The previous gate skipped a named lookup
-for any card already in the fetched set, but these cards are annual and
-the season walk covers the whole event window, which starts 2025-01-01.
-Measured live: the AEW 2025 walk returns 101 events including All Out
-2025-09-20, WrestleDream 2025-10-19, Revolution, Dynasty, Double or
-Nothing, Forbidden Door and All In. Ten of fourteen names looked covered,
-nothing was looked up, and the 2026 cards were never asked for.
+Pick your club said "2 selected" and highlighted nothing, and un-ticking
+a team left its catalog. /account/teams/:key.json never sent the
+`selected` field the picker has always read, so every tile rendered
+aria-pressed="false". The CSS highlight keys off that attribute, and so
+does the click handler that chooses between create and remove - so
+clicking a selected team re-created it and the catalog stayed.
 
-The question is "is this card known AHEAD", not "is it known". Verified
-end to end: AEW now returns All Out 2026-09-27, WrestleDream 2026-10-17,
-Full Gear 2026-11-15 and Dynasty 2027-02-07.
+The endpoint now reports the selection using the same rule the remove
+route uses, shared as teamPicker.matchesTeam rather than copied, since
+the two disagreeing is what this was. Enabled catalogs only: a deselected
+team keeps its promotion and fixtures, so it must draw as unpicked or
+clicking it to restore it would read as a removal. Selected tiles gain a
+tick; a tinted border alone was too quiet across thirty tiles.
 
-The gate has been wrong twice and was only reachable over the network, so
-it is extracted as namesNeedingLookup and tested directly with both past
-failures pinned.
+Check it works reported a broken install on a working one. Reproduced
+live: three empty attempts on UFC Fight Night 287, ONE Fight Night 47 and
+Italian Grand Prix Practice 3, all dated 2026-09-05. Newest-per-promotion
+then sorted by recency selects one single day, so a thin day takes every
+attempt with it, and a Friday practice session is close to the least
+uploaded thing in the catalogue. Candidates are now ranked by whether a
+release is likely to exist (checkWorthiness, which a promotion implements
+for its own session types) and spread over different days, with recency
+only breaking ties. Four attempts instead of three.
 
-That run also showed seasons racing for one shared deadline: 2025 walked
-to round 127 and stopped out of budget while 2026 got one round. Each
-season now takes an equal share of the time left.
+AEW's preview said "3 events, 29 removed" and listed cards a real refresh
+fetches without trouble. Nothing was removed - a preview writes nothing -
+but it was not a prediction either: a preview asks the list endpoints
+only, skipping the named lookups and the per-round walk, which is where
+most of AEW's events come from. It compared a truncated fetch against the
+full store and called the difference deletions. Those are now reported as
+"Not seen by this preview", with the reason, and no removed count is
+shown when the fetch was incomplete. A source with no skippable path
+reports removals exactly as before.
 
-Week-numbered NFL releases were unreachable. NFL.2025-2026.W04.Packers-
-Cowboys has a span, a week and a nickname pair and no date at all, so
-every query missed it and the matcher rejected it. ESPN carries the week
-per event (regular season only - preseason and postseason restart their
-numbering), so it is captured, stored and queried. The week forms sit
-behind the dated ones, which are the measured ones. The team guard now
-reads a week label before a club name as a schedule position, and
-requireDateInTitle accepts a matching week plus a matching season - the
-rule's purpose is identifying which fixture, and a date is only the usual
-way. Wrong week, wrong season and wrong fixture all still reject.
-
-513 unit tests plus both standalone verification scripts passing.
+526 unit tests plus both standalone verification scripts passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU
