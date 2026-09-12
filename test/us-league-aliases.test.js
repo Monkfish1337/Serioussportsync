@@ -480,3 +480,58 @@ test('the artwork keys are the ones the factory reads', () => {
   const body = spec.slice(0, spec.indexOf('});'));
   assert.ok(!/defaults: \{/.test(body), 'a defaults block here would do nothing');
 });
+
+// ---------------------------------------------------------------------------
+// Tile shape. Reported as a cropping issue on the Nuvio home rows for NFL,
+// MLB, NBA, Premier League and Champions League — every promotion whose
+// artwork is a team badge.
+
+test('badge-art leagues declare a square tile', () => {
+  // ESPN, the MLB schedule and football-data supply a team logo and nothing
+  // else, and a logo is square. Declared as landscape, the client scaled it to
+  // fill a 16:9 tile and cropped the top and bottom off every crest.
+  for (const id of ['nfl', 'nba', 'wnba', 'ncaaf', 'mlb', 'ucl', 'epl', 'laliga',
+    'seriea', 'ligue1', 'bundesliga', 'eredivisie', 'efl-championship', 'brasileirao']) {
+    const promotion = promotions.all.find((p) => p.id === id);
+    if (!promotion) continue;
+    assert.equal(promotion.posterShape, 'square', id + ' shows a team badge');
+  }
+});
+
+test('promotions with real widescreen artwork keep landscape', () => {
+  // UFC, WWE, AEW, ONE, F1, MotoGP and Match of the Day have photography or
+  // branded banners to put in a 16:9 tile. Nothing about them was broken.
+  for (const id of ['ufc', 'wwe', 'aew', 'one', 'f1', 'motogp', 'motd']) {
+    const promotion = promotions.all.find((p) => p.id === id);
+    if (!promotion) continue;
+    assert.equal(promotion.posterShape, 'landscape', id + ' has widescreen art');
+  }
+  const boxing = promotions.all.find((p) => p.id === 'boxing');
+  if (boxing) assert.equal(boxing.posterShape, 'poster');
+});
+
+test('the shape a client is told follows the promotion, not the stored event', () => {
+  // posterShape is stamped at ingest, so an event stored before its
+  // promotion's shape changed keeps the old value until the next full refresh.
+  // Reading it from the promotion means a shape change takes effect on the
+  // next catalogue read instead.
+  const transform = require('../lib/transform');
+  const stale = {
+    id: 'mlb:123', promotion: 'mlb', name: 'Cleveland Guardians vs Baltimore Orioles',
+    posterShape: 'landscape',
+  };
+  assert.equal(transform.toCatalogMeta(stale).posterShape, 'square');
+  assert.equal(transform.toDetailMeta(stale).posterShape, 'square');
+});
+
+test("'regular' is never sent, because it is not a poster shape", () => {
+  // The Stremio spec has square, poster and landscape. A client given
+  // 'regular' falls back to its own default, which is how square badges ended
+  // up in 16:9 tiles in the first place.
+  const transform = require('../lib/transform');
+  const unknown = { id: 'nothing:1', name: 'Unknown', posterShape: 'regular' };
+  assert.equal(transform.toCatalogMeta(unknown).posterShape, 'landscape');
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'transform.js'), 'utf8');
+  assert.ok(!/posterShape: ev\.posterShape \|\| 'regular'/.test(source));
+});

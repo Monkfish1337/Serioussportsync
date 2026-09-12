@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased — square badges were being cropped into widescreen tiles
+
+Reported on the Nuvio home rows for NFL, MLB, NBA, Premier League and Champions
+League — which is precisely the set of promotions whose artwork is a team badge.
+
+ESPN, the MLB schedule and football-data supply a team logo and nothing else,
+and a logo is square. Declared as `landscape`, the client scaled it to fill a
+16:9 tile and cropped the top and bottom off every crest. The promotions that
+keep landscape — UFC, WWE, AEW, ONE, F1, MotoGP, Match of the Day — have real
+widescreen artwork to put in it, which is why none of them were affected.
+
+Those fourteen league promotions now declare `square`.
+
+**And `'regular'` was never a poster shape.** The Stremio spec has `square`,
+`poster` and `landscape`; every catalogue and detail response was sending
+`'regular'` whenever an event had no stored shape, leaving the client to fall
+back to its own default. That is the mechanism by which a square badge ended up
+in a 16:9 tile in the first place.
+
+The shape now resolves from the **promotion** rather than the value stamped on
+the event at ingest. A stored event keeps its old shape until the next full
+refresh, so reading the live definition means this change takes effect on the
+next catalogue read instead — no refresh needed for the tiles, only for the MLB
+images added in the previous commit.
+
+490 tests passing.
+
 ## Unreleased — MLB had no artwork at all
 
 Reported as missing images, and it was missing at both levels.

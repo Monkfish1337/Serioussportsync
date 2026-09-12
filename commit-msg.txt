@@ -1,31 +1,28 @@
-Give MLB artwork, at both levels
+Draw team badges as square tiles instead of cropping them
 
-Reported as missing images. It was missing twice over.
+Reported on the Nuvio home rows for NFL, MLB, NBA, Premier League and
+Champions League -- precisely the set of promotions whose artwork is a team
+badge.
 
-Per-event: lib/sources/mlb.js set poster, thumb, fanart and banner to null
-outright, so every MLB event rendered with nothing behind it while the
-ESPN-backed promotions showed team logos. The schedule feed already carries
-team ids and MLB serves logos from a public CDN keyed by exactly that id, so
-the fix costs no extra request and no API key -- away team's logo becomes the
-poster, home team's the thumb, the same shape ESPN supplies.
+ESPN, the MLB schedule and football-data supply a team logo and nothing else,
+and a logo is square. Declared as landscape, the client scaled it to fill a
+16:9 tile and cropped the top and bottom off every crest. The promotions that
+keep landscape -- UFC, WWE, AEW, ONE, F1, MotoGP, Match of the Day -- have
+real widescreen artwork to put in it, which is why none of them were affected.
+Fourteen league promotions now declare 'square'.
 
-The PNG spots endpoint rather than /team-logos/<id>.svg: both return 200, but
-a client that will not render SVG would show nothing, which is the bug being
-fixed. A team id that is missing or not numeric yields no URL rather than a
-broken one, for the same reason. Checked against a real day of the schedule:
-15 games, 0 without a poster.
+And 'regular' was never a poster shape. The Stremio spec has square, poster
+and landscape; every catalogue and detail response sent 'regular' whenever an
+event had no stored shape, leaving the client to fall back to its own default.
+That is the mechanism by which a square badge ended up in a 16:9 tile.
 
-Catalog-level: MLB shipped with no poster, fanart or logo while every
-TSDB-backed promotion had all three, so its tile and meta backdrop were empty.
-Filled from TheSportsDB's MLB league record, each URL checked to return 200
-with an image content type first.
+The shape resolves from the PROMOTION now rather than the value stamped on the
+event at ingest. A stored event keeps its old shape until the next full
+refresh, so reading the live definition means this takes effect on the next
+catalogue read instead -- no refresh needed for the tiles, only for the MLB
+images from the previous commit.
 
-One trap worth recording: createGenericPromotion builds `defaults` from
-spec.poster / .fanart / .logo. A `defaults: {...}` block written into the spec
-is silently ignored -- it looks set in the source and renders nothing. The
-first attempt here did exactly that; there is now a test against it.
-
-486 tests passing.
+490 tests passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU
