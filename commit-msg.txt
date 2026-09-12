@@ -1,35 +1,30 @@
-Add a Big 3 folder and gather the discovered catalogs as Unmatched
+Fix the two CI checks the new collection folders broke
 
-Two new default collection folders, with artwork to match the existing set.
+Both workflow runs for the Big 3 / Unmatched commit failed, and neither
+failure was in the unit suite -- they were in
+scripts/test-nuvio-collections.js, which CI runs and `npm run test:unit` does
+not. Two separate assumptions.
 
-Big 3 -- NFL, NBA and MLB had no folder at all, so three of the busiest
-promotions sat loose among the ungrouped catalogs.
+A letters-only asset name. Folder artwork was asserted against
+/^...\/collection-[a-z-]+\.png$/ and the new file is collection-big-3.png. The
+digit was the whole failure. That pattern was incidental to the four original
+names rather than a rule about asset filenames; it now allows digits.
 
-Unmatched -- the seven discovered-* catalogs exist for events pulled out of
-release listings that matched no promotion. Loose on the home screen they read
-as seven more leagues with full schedules, which is the opposite of what they
-are. Gathered into one folder they read as what they are.
+A fixture quietly exercising the defaults-upgrade path. The "omits folders
+with no enabled catalogs" case built a personalised selection of three
+catalogs at catalogDefaultsVersion: 1. The current version is 2, and the
+upgrade path switches on every catalog added since -- which for that fixture
+means mlb-upcoming and mlb-recent. So the moment MLB had a folder, that folder
+correctly appeared and the assertion read as a failure. The subject there is
+which folders get omitted for a given selection, not the upgrade path, so the
+fixture states the current version now and says what it means.
 
-Artwork: scripts/make-collection-art.py draws both tiles at 1672x941, the same
-canvas as the four existing ones, to the same construction -- matte-black
-subjects, orange rim light, a glowing hexagon behind, bloom, floor reflection,
-vignette. Drawn rather than photographed, but built to sit in that row without
-looking like a different product. Both are offered in the artwork picker on
-the Configure step and the admin Collections page, so any folder can use them.
+Worth recording what was NOT wrong: the two PNGs committed cleanly. They are
+larger on GitHub than on disk (283,346 vs 277,576 bytes) because a provenance
+chunk is added in transit, and every PNG chunk CRC verifies on the committed
+copy -- so that size difference is not the corruption it looks like.
 
-Reaching an install that already saved: a saved collections file replaces the
-defaults outright -- that is what makes the editor work -- so a new default
-folder would otherwise appear for nobody, since everyone has saved at least
-once. Collections version 2 adds missing default folders by id, once, then
-stamps the version. Folders the operator already has are untouched, renames
-survive, and a folder they delete afterwards stays deleted rather than
-returning on every load.
-
-Two tests changed rather than were added: one pinned the four-folder layout as
-the shipped default, and one used NFL as its example of an ungrouped catalog.
-Both were describing the old arrangement correctly.
-
-496 tests passing.
+496 unit tests, plus both standalone verification scripts, passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased — fix the two CI checks the new collection folders broke
+
+Both workflow runs for the Big 3 / Unmatched commit failed, and neither failure
+was in the unit suite — they were in `scripts/test-nuvio-collections.js`, which
+CI runs and `npm run test:unit` does not. Two separate assumptions:
+
+**A letters-only asset name.** Folder artwork was asserted against
+`/^…\/collection-[a-z-]+\.png$/`, and the new file is `collection-big-3.png`.
+The digit was the whole failure. That pattern was incidental to the four
+original names rather than a rule about asset filenames, so it now allows
+digits.
+
+**A fixture that was quietly exercising the defaults-upgrade path.** The
+"omits folders with no enabled catalogs" case built a personalised selection of
+three catalogs at `catalogDefaultsVersion: 1`. The current version is 2, and the
+upgrade path switches on every catalog added since — which for that fixture
+means `mlb-upcoming` and `mlb-recent`. So the moment MLB had a folder, the
+folder correctly appeared and the assertion read as a failure. The subject there
+is which folders get omitted for a given selection, not the upgrade path, so the
+fixture now states the current version and says what it means.
+
+Worth noting what was **not** wrong: the two PNGs committed cleanly. They are
+larger on GitHub than on disk (283,346 vs 277,576 bytes) because a provenance
+chunk is added in transit, and every PNG chunk CRC verifies on the committed
+copy — so that difference is not the corruption it looks like.
+
+496 unit tests, plus both standalone verification scripts, passing.
+
 ## Unreleased — a Big 3 folder, and the discovered catalogs gathered as Unmatched
 
 Two new default collection folders, and the artwork to go with them.

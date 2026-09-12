@@ -2,6 +2,7 @@
 
 const assert = require('assert');
 const config = require('../config');
+const { CURRENT_DEFAULTS_VERSION } = require('../lib/catalog-selection');
 const { buildManifest } = require('../lib/manifest');
 const {
   buildNuvioCollections,
@@ -39,7 +40,11 @@ for (const folder of all[0].folders) {
   assert.ok(folder.sources.length > 0, folder.title + ' contains catalogs');
   assert.match(
     folder.coverImageUrl,
-    /^https:\/\/sss\.example\/assets\/collection-[a-z-]+\.png$/,
+    // Digits allowed: the Big 3 folder's asset is collection-big-3.png. The
+    // letters-only pattern was incidental to the four original names, not a
+    // rule about asset filenames, and it failed CI for a file that is
+    // perfectly valid.
+    /^https:\/\/sss\.example\/assets\/collection-[a-z0-9-]+\.png$/,
     folder.title + ' uses dedicated collection artwork',
   );
   assert.strictEqual(
@@ -61,7 +66,13 @@ for (const folder of all[0].folders) {
 
 const personalised = build({
   catalogs: ['aew-recent', 'wwe-upcoming', 'f1-race'],
-  catalogDefaultsVersion: 1,
+  // Current, deliberately. At version 1 the defaults-upgrade path switches on
+  // every catalog added since, which for this fixture meant mlb-upcoming and
+  // mlb-recent — so once MLB had a folder, that folder correctly appeared and
+  // the assertion below read as a failure. The subject here is which folders
+  // are omitted for a given selection, not the upgrade path, and the fixture
+  // should say exactly what it means.
+  catalogDefaultsVersion: CURRENT_DEFAULTS_VERSION,
   promotionOrder: ['aew', 'wwe', 'f1'],
   catalogOrder: ['aew-recent', 'wwe-upcoming', 'f1-race'],
 });
