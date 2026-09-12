@@ -25,8 +25,10 @@ const PROMOTIONS = [
   { id: 'boxing', name: 'Boxing', catalogs: [{ id: 'boxing-events' }] },
   { id: 'wwe', name: 'WWE', catalogs: [{ id: 'wwe-events' }] },
   // Deliberately in no default folder, so the "not grouped" notice has
-  // something to report.
-  { id: 'nfl', name: 'NFL', catalogs: [{ id: 'nfl-events' }] },
+  // something to report. It used to be NFL; NFL joined the Big 3 folder in
+  // collections version 2, so this needs a promotion that is genuinely
+  // ungrouped — a custom one, which is the realistic case anyway.
+  { id: 'darts', name: 'Darts', catalogs: [{ id: 'darts-events' }] },
 ];
 
 // The step's own markup, without the page shell or the client script — both of
@@ -179,7 +181,7 @@ test('a folder holding a promotion that no longer exists says so', () => {
 test('catalogs in no folder are named, not just counted', () => {
   const markup = stepMarkup(renderStep(true));
   assert.match(markup, /1 catalog in no folder/);
-  assert.match(markup, /NFL/);
+  assert.match(markup, /Darts/);
 });
 
 // The standalone admin Collections page, which the Configure step links to and

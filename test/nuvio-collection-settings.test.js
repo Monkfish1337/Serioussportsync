@@ -23,9 +23,13 @@ test.after(() => {
   fs.rmSync(testDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test('keeps the existing four-folder Nuvio layout as the upgrade default', () => {
+test('ships the default Nuvio layout', () => {
+  // Four folders until collections version 2, which added Big 3 (NFL, NBA and
+  // MLB had no folder at all) and Unmatched (the seven discovered-* catalogs,
+  // which read as seven more full leagues while they sat loose).
   const state = settings.load();
-  assert.deepEqual(state.folders.map((folder) => folder.title), ['Combat Sports', 'Wrestling', 'Football', 'Motorsport']);
+  assert.deepEqual(state.folders.map((folder) => folder.title),
+    ['Combat Sports', 'Wrestling', 'Football', 'Motorsport', 'Big 3', 'Unmatched']);
   assert.equal(state.collection.id, collections.COLLECTION_ID);
 });
 
@@ -126,4 +130,91 @@ test('a promotion can be removed from a folder, including the last one', () => {
   assert.throws(() => settings.upsertFolder(null, Object.assign({}, base, {
     title: 'Empty on creation', promotions: [],
   }), ids), /at least one promotion/);
+});
+
+// ---------------------------------------------------------------------------
+// Big 3 and Unmatched, added in collections version 2.
+
+test('the American big three have a folder', () => {
+  const settings = require('../lib/nuvio-collection-settings');
+  const folder = settings.defaults().folders.find((f) => f.title === 'Big 3');
+  assert.ok(folder, 'NFL, NBA and MLB sat loose among the ungrouped catalogs');
+  assert.deepEqual(folder.promotions, ['nfl', 'nba', 'mlb']);
+  assert.equal(folder.artwork, '/assets/collection-big-3.png');
+});
+
+test('the discovered catalogs are gathered as Unmatched', () => {
+  // They exist for events pulled out of release listings that matched no
+  // promotion. Loose on the home screen they read as seven more leagues with
+  // full schedules, which is the opposite of what they are.
+  const settings = require('../lib/nuvio-collection-settings');
+  const folder = settings.defaults().folders.find((f) => f.title === 'Unmatched');
+  assert.ok(folder);
+  assert.equal(folder.promotions.length, 7);
+  for (const id of folder.promotions) assert.match(id, /^discovered-/);
+  assert.equal(folder.artwork, '/assets/collection-unmatched.png');
+});
+
+test('both images are bundled at the size the other tiles use', () => {
+  // A folder pointing at a missing asset renders an empty tile, and the tiles
+  // sit in one row, so an odd size shows immediately.
+  const fs = require('fs');
+  const path = require('path');
+  const pub = path.join(__dirname, '..', 'public');
+  for (const name of ['collection-big-3.png', 'collection-unmatched.png']) {
+    const file = path.join(pub, name);
+    assert.ok(fs.existsSync(file), name + ' must be bundled');
+    const head = fs.readFileSync(file).subarray(0, 24);
+    assert.equal(head.readUInt32BE(16), 1672, name + ' width');
+    assert.equal(head.readUInt32BE(20), 941, name + ' height');
+  }
+});
+
+test('a new default folder reaches an install that already saved', () => {
+  // A saved file replaces the defaults outright — that is what makes the
+  // editor work — so without this a new default folder would appear for nobody,
+  // since everyone has saved at least once.
+  const settings = require('../lib/nuvio-collection-settings');
+  const before = settings.defaults();
+  const v1 = {
+    version: 1,
+    collection: before.collection,
+    folders: before.folders.slice(0, 4).map((f) => Object.assign({}, f)),
+  };
+  v1.folders[0].title = 'My Combat Sports';
+  const after = settings.normalize(v1);
+  assert.equal(after.version, 2);
+  assert.ok(after.folders.some((f) => f.title === 'Big 3'));
+  assert.ok(after.folders.some((f) => f.title === 'Unmatched'));
+  assert.ok(after.folders.some((f) => f.title === 'My Combat Sports'),
+    'an edited folder must survive untouched');
+});
+
+test('a folder the operator deleted stays deleted', () => {
+  // The migration is gated on the stored version, so once it has run the
+  // folder is the operator's to remove. Re-adding it on every load would make
+  // deleting it impossible.
+  const settings = require('../lib/nuvio-collection-settings');
+  const current = settings.defaults();
+  const withoutBig3 = {
+    version: 2,
+    collection: current.collection,
+    folders: current.folders.filter((f) => f.title !== 'Big 3'),
+  };
+  const after = settings.normalize(withoutBig3);
+  assert.ok(!after.folders.some((f) => f.title === 'Big 3'));
+});
+
+test('the bundled images are offered in both artwork pickers', () => {
+  // A folder whose artwork is not in the list renders as "Custom image URL",
+  // and an operator cannot pick the new images for a folder of their own.
+  const fs = require('fs');
+  const path = require('path');
+  for (const file of ['admin-nuvio-collections.js', 'configure-page.js']) {
+    const source = fs.readFileSync(path.join(__dirname, '..', 'lib', file), 'utf8');
+    const list = source.slice(source.indexOf('ARTWORK_CHOICES'));
+    const block = list.slice(0, list.indexOf('];'));
+    assert.ok(block.includes('/assets/collection-big-3.png'), file + ' needs Big 3');
+    assert.ok(block.includes('/assets/collection-unmatched.png'), file + ' needs Unmatched');
+  }
 });

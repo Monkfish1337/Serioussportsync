@@ -1,28 +1,35 @@
-Draw team badges as square tiles instead of cropping them
+Add a Big 3 folder and gather the discovered catalogs as Unmatched
 
-Reported on the Nuvio home rows for NFL, MLB, NBA, Premier League and
-Champions League -- precisely the set of promotions whose artwork is a team
-badge.
+Two new default collection folders, with artwork to match the existing set.
 
-ESPN, the MLB schedule and football-data supply a team logo and nothing else,
-and a logo is square. Declared as landscape, the client scaled it to fill a
-16:9 tile and cropped the top and bottom off every crest. The promotions that
-keep landscape -- UFC, WWE, AEW, ONE, F1, MotoGP, Match of the Day -- have
-real widescreen artwork to put in it, which is why none of them were affected.
-Fourteen league promotions now declare 'square'.
+Big 3 -- NFL, NBA and MLB had no folder at all, so three of the busiest
+promotions sat loose among the ungrouped catalogs.
 
-And 'regular' was never a poster shape. The Stremio spec has square, poster
-and landscape; every catalogue and detail response sent 'regular' whenever an
-event had no stored shape, leaving the client to fall back to its own default.
-That is the mechanism by which a square badge ended up in a 16:9 tile.
+Unmatched -- the seven discovered-* catalogs exist for events pulled out of
+release listings that matched no promotion. Loose on the home screen they read
+as seven more leagues with full schedules, which is the opposite of what they
+are. Gathered into one folder they read as what they are.
 
-The shape resolves from the PROMOTION now rather than the value stamped on the
-event at ingest. A stored event keeps its old shape until the next full
-refresh, so reading the live definition means this takes effect on the next
-catalogue read instead -- no refresh needed for the tiles, only for the MLB
-images from the previous commit.
+Artwork: scripts/make-collection-art.py draws both tiles at 1672x941, the same
+canvas as the four existing ones, to the same construction -- matte-black
+subjects, orange rim light, a glowing hexagon behind, bloom, floor reflection,
+vignette. Drawn rather than photographed, but built to sit in that row without
+looking like a different product. Both are offered in the artwork picker on
+the Configure step and the admin Collections page, so any folder can use them.
 
-490 tests passing.
+Reaching an install that already saved: a saved collections file replaces the
+defaults outright -- that is what makes the editor work -- so a new default
+folder would otherwise appear for nobody, since everyone has saved at least
+once. Collections version 2 adds missing default folders by id, once, then
+stamps the version. Folders the operator already has are untouched, renames
+survive, and a folder they delete afterwards stays deleted rather than
+returning on every load.
+
+Two tests changed rather than were added: one pinned the four-folder layout as
+the shipped default, and one used NFL as its example of an ungrouped catalog.
+Both were describing the old arrangement correctly.
+
+496 tests passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

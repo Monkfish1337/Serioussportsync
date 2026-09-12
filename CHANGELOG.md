@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased — a Big 3 folder, and the discovered catalogs gathered as Unmatched
+
+Two new default collection folders, and the artwork to go with them.
+
+**Big 3** — NFL, NBA and MLB had no folder at all, so three of the busiest
+promotions sat loose among the ungrouped catalogs.
+
+**Unmatched** — the seven `discovered-*` catalogs exist for events pulled out of
+release listings that matched no promotion. Loose on the home screen they read
+as seven more leagues with full schedules, which is the opposite of what they
+are. Gathered into one folder they read as what they are: the unmatched pile.
+
+**Artwork.** `scripts/make-collection-art.py` draws both tiles at 1672×941, the
+same canvas as the four existing ones, and to the same construction: matte-black
+subjects, an orange rim light, a glowing hexagon behind, bloom, floor reflection
+and a vignette. Drawn rather than photographed, but built to sit in that row
+without looking like a different product. Both are offered in the artwork picker
+on the Configure step and the admin Collections page, so they can be used for
+any folder.
+
+**Reaching an install that already saved.** A saved collections file replaces
+the defaults outright — that is what makes the editor work — so a new default
+folder would otherwise appear for nobody, since everyone has saved at least
+once. Collections version 2 adds missing default folders by id, once, then
+stamps the version: folders the operator already has are untouched, renames
+survive, and a folder they delete afterwards stays deleted rather than returning
+on every load.
+
+496 tests passing.
+
 ## Unreleased — square badges were being cropped into widescreen tiles
 
 Reported on the Nuvio home rows for NFL, MLB, NBA, Premier League and Champions
