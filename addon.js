@@ -1293,6 +1293,7 @@ function createApp() {
   app.post('/admin/logs/preferences', requireAdmin, (req, res) => {
     const preferences = settings.setLogPreferences({
       detailedRejections: req.body.detailedRejections === 'on',
+      verboseIndexBuild: req.body.verboseIndexBuild === 'on',
     });
     console.log('[admin] detailed rejection logging '
       + (preferences.detailedRejections ? 'enabled' : 'set to sampled'));

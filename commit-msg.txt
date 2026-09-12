@@ -1,37 +1,30 @@
-MLB was handing the torrent pipeline four of its worst queries
+Stop the index build flushing the log buffer
 
-Reported after NFL started working: MLB still pulls nothing from Bitmagnet or
-rutracker, verified by manual search.
+Asked to check Prowlarr and Bitmagnet in the live logs for an MLB event. The
+logs could not answer, and that is its own bug: /admin/logs held 4000 entries
+spanning THIRTY-SEVEN SECONDS, every one from the availability build, with
+zero entries in the stream category.
 
-MLB was the last promotion carrying a torrentSearchTitles override, and it cut
-the list to FOUR -- the four hand-written full-name forms that also led it:
+The background build logs one line per query per event. At 379 events and 54
+variants that is roughly twenty thousand lines a run against a five-thousand
+line buffer, so a run pushes every stream request out of the window -- the
+diagnostic tool made unusable by the routine job, precisely when a stream
+request was what needed reading.
 
-  MLB 2026 RS 20.08.2026 San Diego Padres @ Los Angeles Dodgers
-  MLB 2026 20.08.2026 San Diego Padres @ Los Angeles Dodgers
-  MLB 2026.08.20 San Diego Padres vs Los Angeles Dodgers
-  MLB San Diego Padres @ Los Angeles Dodgers 20.08.2026
+The build's per-query lines are suppressed by default now; its progress and
+summary lines still log. The distinction is indentation: the sources indent
+their per-query output, the run's own lines are not indented. Logs -> Verbose
+index build turns the detail back on and the panel says what that costs.
 
-Every one carries a league prefix AND a date, the shape measured to be
-weakest, and the slice meant Bitmagnet and Prowlarr saw only these and never a
-single nickname pair. NFL, which has no override at all, worked. The override
-existed to keep a slow fan-out short back when neither source had a budget of
-its own; both do now, so it only removed the good queries before either could
-choose.
+What the logs did show first: MLB's queries are now the right shape --
+"Orioles Red Sox 2026.09.05", "MLB 05.09.2026 Orioles Red Sox", nickname pairs
+in both date formats -- and Bitmagnet returns 0 results for them. Prowlarr does
+not appear at all, because the index build is Bitmagnet-only by design.
+Whether the live path reaches Prowlarr for these fixtures could not be
+determined from a buffer holding no live requests, which is what this change
+fixes.
 
-The observed forms are kept -- they came from real releases -- spliced in
-behind the first block of pair queries rather than in front of it. Appending
-them outright was the first attempt and dropped them entirely, since the
-generated list fills the 60-query cap on its own.
-
-Two-word nicknames. The pair queries accepted single-word forms only, so
-Toronto Blue Jays against Boston Red Sox produced "Boston Toronto <date>" -- a
-pair of cities that cannot match MLB.2026.07.25.Blue.Jays.Vs.Red.Sox. Red Sox,
-Blue Jays, White Sox and Trail Blazers are nicknames like any other; they just
-carry a space. Allowing them then let the canonical "City Nickname" back in at
-the head ("Carolina Panthers Houston Texans ...", the full-name template
-again), so the canonical form is dropped whenever a shorter one exists.
-
-477 tests passing.
+482 tests passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

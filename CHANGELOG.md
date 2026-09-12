@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased — the log buffer was being flushed by the thing filling it
+
+Asked to check Prowlarr and Bitmagnet in the live logs for an MLB event. The
+logs could not answer, and that is its own bug: `/admin/logs` held 4000 entries
+spanning **thirty-seven seconds**, every one from the availability build, with
+zero entries in the `stream` category.
+
+The background build logs one line per query per event. At 379 events and 54
+variants that is roughly twenty thousand lines a run against a five-thousand
+line buffer, so a run pushes every stream request out of the window — the
+diagnostic tool made unusable by the routine job, precisely when a stream
+request was the thing that needed reading.
+
+The build's per-query lines are now suppressed by default; its progress and
+summary lines still log. The distinction is indentation: the sources indent
+their per-query output and the run's own lines are not indented. **Logs →
+Verbose index build** turns the detail back on, and the panel says what that
+costs.
+
+What the logs did show, before this landed: MLB's queries are now the right
+shape — `Orioles Red Sox 2026.09.05`, `MLB 05.09.2026 Orioles Red Sox`,
+nickname pairs in both date formats — and Bitmagnet returns **0 results** for
+them. Prowlarr does not appear at all, because the index build is Bitmagnet-only
+by design. Whether the live path reaches Prowlarr for these fixtures could not
+be determined from a buffer holding no live requests, which is exactly what this
+change fixes.
+
+482 tests passing.
+
 ## Unreleased — MLB was handing the torrent pipeline four bad queries
 
 Reported after NFL started working: MLB still pulls nothing from Bitmagnet or

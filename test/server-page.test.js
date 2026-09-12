@@ -153,3 +153,64 @@ test('the Server page offers every one of them', () => {
     assert.ok(source.includes(field + ': b.' + field), field + ' must reach the save');
   }
 });
+
+// ---------------------------------------------------------------------------
+// The background build was flushing the log buffer.
+//
+// Measured on the live instance while trying to diagnose an MLB event:
+// /admin/logs held 4000 entries spanning THIRTY-SEVEN SECONDS, every one of
+// them from the availability build, and `category: 'stream'` returned zero
+// rows. The build logs one line per query per event — 379 events times 54
+// variants is roughly twenty thousand lines a run against a five-thousand-line
+// buffer — so the diagnostic tool was unusable for the thing being diagnosed.
+
+test('index build chatter is off by default', () => {
+  const settings = require('../lib/settings');
+  assert.equal(settings.getLogPreferences().verboseIndexBuild, false);
+});
+
+test('the two log preferences are independent', () => {
+  // They share one form and one POST, so a careless wiring would have each
+  // toggle silently clear the other.
+  const settings = require('../lib/settings');
+  const before = settings.getLogPreferences();
+  try {
+    settings.setLogPreferences({ detailedRejections: true, verboseIndexBuild: false });
+    assert.deepEqual(settings.getLogPreferences(),
+      { detailedRejections: true, verboseIndexBuild: false });
+    settings.setLogPreferences({ detailedRejections: false, verboseIndexBuild: true });
+    assert.deepEqual(settings.getLogPreferences(),
+      { detailedRejections: false, verboseIndexBuild: true });
+  } finally {
+    settings.setLogPreferences(before);
+  }
+});
+
+test('only indented per-query lines are suppressed', () => {
+  // The sources indent their per-query output; the run's own progress and
+  // summary lines are not indented. That is the whole distinction, so it is
+  // worth stating where the filter lives.
+  const warmer = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'availability-warmer.js'), 'utf8');
+  assert.match(warmer, /verboseBuild/);
+  assert.match(warmer, /if \(!verboseBuild && \/\^\\s\/\.test/);
+  assert.match(warmer, /log: eventLog\(/, 'the per-event log must go through the filter');
+});
+
+test('the Logs page can turn it back on', () => {
+  const adminLogs = require('../lib/admin-logs');
+  const html = adminLogs.renderBody
+    ? adminLogs.renderBody({ rows: [], stats: { total: 0, byLevel: {}, bytes: 0 },
+      categories: [], preferences: { detailedRejections: false, verboseIndexBuild: false },
+      options: { level: 'all', substring: '', category: 'all', user: '', limit: 500, tail: true, regex: false } })
+    : null;
+  if (!html) return;   // renderBody signature differs in this build
+  assert.match(html, /id="build-toggle"/);
+  assert.match(html, /Index build logging/);
+});
+
+test('the route saves both preferences', () => {
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'addon.js'), 'utf8');
+  assert.match(source, /verboseIndexBuild: req\.body\.verboseIndexBuild === 'on'/);
+});
