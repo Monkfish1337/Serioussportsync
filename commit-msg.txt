@@ -1,30 +1,31 @@
-Stop the index build flushing the log buffer
+Give MLB artwork, at both levels
 
-Asked to check Prowlarr and Bitmagnet in the live logs for an MLB event. The
-logs could not answer, and that is its own bug: /admin/logs held 4000 entries
-spanning THIRTY-SEVEN SECONDS, every one from the availability build, with
-zero entries in the stream category.
+Reported as missing images. It was missing twice over.
 
-The background build logs one line per query per event. At 379 events and 54
-variants that is roughly twenty thousand lines a run against a five-thousand
-line buffer, so a run pushes every stream request out of the window -- the
-diagnostic tool made unusable by the routine job, precisely when a stream
-request was what needed reading.
+Per-event: lib/sources/mlb.js set poster, thumb, fanart and banner to null
+outright, so every MLB event rendered with nothing behind it while the
+ESPN-backed promotions showed team logos. The schedule feed already carries
+team ids and MLB serves logos from a public CDN keyed by exactly that id, so
+the fix costs no extra request and no API key -- away team's logo becomes the
+poster, home team's the thumb, the same shape ESPN supplies.
 
-The build's per-query lines are suppressed by default now; its progress and
-summary lines still log. The distinction is indentation: the sources indent
-their per-query output, the run's own lines are not indented. Logs -> Verbose
-index build turns the detail back on and the panel says what that costs.
+The PNG spots endpoint rather than /team-logos/<id>.svg: both return 200, but
+a client that will not render SVG would show nothing, which is the bug being
+fixed. A team id that is missing or not numeric yields no URL rather than a
+broken one, for the same reason. Checked against a real day of the schedule:
+15 games, 0 without a poster.
 
-What the logs did show first: MLB's queries are now the right shape --
-"Orioles Red Sox 2026.09.05", "MLB 05.09.2026 Orioles Red Sox", nickname pairs
-in both date formats -- and Bitmagnet returns 0 results for them. Prowlarr does
-not appear at all, because the index build is Bitmagnet-only by design.
-Whether the live path reaches Prowlarr for these fixtures could not be
-determined from a buffer holding no live requests, which is what this change
-fixes.
+Catalog-level: MLB shipped with no poster, fanart or logo while every
+TSDB-backed promotion had all three, so its tile and meta backdrop were empty.
+Filled from TheSportsDB's MLB league record, each URL checked to return 200
+with an image content type first.
 
-482 tests passing.
+One trap worth recording: createGenericPromotion builds `defaults` from
+spec.poster / .fanart / .logo. A `defaults: {...}` block written into the spec
+is silently ignored -- it looks set in the source and renders nothing. The
+first attempt here did exactly that; there is now a test against it.
+
+486 tests passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

@@ -428,3 +428,55 @@ test('MLB hands the torrent pipeline its whole list', () => {
     'league-prefixed-and-dated is the weakest shape and must not lead: ' + head.join(' | '));
   assert.ok(head.some((q) => /\d{2}\.\d{2}\.\d{4}/.test(q)), 'DMY, for rutracker');
 });
+
+// ---------------------------------------------------------------------------
+// MLB artwork. Reported as "MLB metadata is missing images".
+
+test('every MLB event carries team artwork', () => {
+  // The adapter set poster, thumb, fanart and banner to null outright, so MLB
+  // events rendered with nothing behind them while every ESPN-backed promotion
+  // showed team logos. The schedule feed already carries team ids and MLB
+  // serves logos from a public CDN keyed by exactly that id — no extra
+  // request, no API key.
+  const mlbSource = require('../lib/sources/mlb');
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'sources', 'mlb.js'), 'utf8');
+  assert.match(source, /midfield\.mlbstatic\.com\/v1\/team\//);
+  assert.match(source, /poster: teamLogo\(away\.id\) \|\| teamLogo\(home\.id\)/);
+  assert.match(source, /thumb: teamLogo\(home\.id\) \|\| teamLogo\(away\.id\)/);
+  assert.ok(!/poster: null/.test(source), 'the null that caused this must be gone');
+  assert.equal(typeof mlbSource.fetchAll, 'function');
+});
+
+test('a missing or malformed team id yields no URL rather than a broken one', () => {
+  // A logo URL built from an empty id is a 404 in the client, which looks
+  // exactly like the bug being fixed. Better to have no image than a broken
+  // one.
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'sources', 'mlb.js'), 'utf8');
+  assert.match(source, /if \(!\/\^\\d\+\$\/\.test\(id\)\) return null/);
+});
+
+test('the MLB promotion has catalog artwork of its own', () => {
+  // Separate from per-event art: this is the catalog tile and the meta
+  // backdrop, and MLB shipped with none while every TSDB-backed promotion had
+  // all three.
+  const promotion = promotions.all.find((p) => p.id === 'mlb');
+  for (const key of ['poster', 'fanart', 'logo']) {
+    assert.match(promotion.defaults[key], /^https:\/\//, key + ' must be set');
+  }
+});
+
+test('the artwork keys are the ones the factory reads', () => {
+  // createGenericPromotion assembles `defaults` from spec.poster / .fanart /
+  // .logo. A `defaults` block written directly into the spec is silently
+  // ignored — it looks set in the source and renders nothing, which is a
+  // fiddly way to reintroduce this exact bug.
+  const promotion = promotions.all.find((p) => p.id === 'mlb');
+  assert.ok(promotion.defaults.poster.length > 0);
+  const source = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'promotions.js'), 'utf8');
+  const spec = source.slice(source.indexOf("id: 'mlb',"));
+  const body = spec.slice(0, spec.indexOf('});'));
+  assert.ok(!/defaults: \{/.test(body), 'a defaults block here would do nothing');
+});

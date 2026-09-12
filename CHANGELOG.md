@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased — MLB had no artwork at all
+
+Reported as missing images, and it was missing at both levels.
+
+**Per-event.** `lib/sources/mlb.js` set `poster`, `thumb`, `fanart` and
+`banner` to `null` outright, so every MLB event rendered with nothing behind it
+while the ESPN-backed promotions showed team logos. The schedule feed already
+carries team ids, and MLB serves logos from a public CDN keyed by exactly that
+id, so the fix costs no extra request and no API key: the away team's logo
+becomes the poster and the home team's the thumb, the same shape ESPN supplies.
+
+The PNG `spots` endpoint rather than `/team-logos/<id>.svg` — both return 200,
+but a client that will not render SVG would show nothing, which is the bug being
+fixed. A team id that is missing or not numeric yields no URL rather than a
+broken one, for the same reason. Checked against a real day of the schedule:
+15 games, 0 without a poster.
+
+**Catalog-level.** MLB shipped with no `poster`, `fanart` or `logo` while every
+TSDB-backed promotion had all three, so its tile and meta backdrop were empty.
+Filled from TheSportsDB's MLB league record, each URL checked to return 200 with
+an image content type first.
+
+One trap worth recording: `createGenericPromotion` builds `defaults` from
+`spec.poster` / `.fanart` / `.logo`. A `defaults: {…}` block written into the
+spec is silently ignored — it looks set in the source and renders nothing. The
+first attempt here did exactly that, and there is now a test against it.
+
+486 tests passing.
+
 ## Unreleased — the log buffer was being flushed by the thing filling it
 
 Asked to check Prowlarr and Bitmagnet in the live logs for an MLB event. The
