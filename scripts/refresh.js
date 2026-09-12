@@ -15,6 +15,8 @@ let onefc = null;
 try { onefc = require('../lib/sources/onefc'); } catch (e) { onefc = null; }
 let mlb = null;
 try { mlb = require('../lib/sources/mlb'); } catch (e) { mlb = null; }
+let aew = null;
+try { aew = require('../lib/sources/aew'); } catch (e) { aew = null; }
 let espn = null;
 try { espn = require('../lib/sources/espn'); } catch (e) { espn = null; }
 let releaseIngest = null;
@@ -143,6 +145,12 @@ async function refreshPromotion(promotion, log, opts) {
   } else if (promotion.source.type === 'onefc') {
     if (!onefc) { log('  onefc source unavailable — skipping'); return { ok: true }; }
     raw = await onefc.fetchAll({ log });
+  } else if (promotion.source.type === 'aew') {
+    // AEW publishes its own schedule; TheSportsDB's free key cannot reach the
+    // upcoming cards at all. One request, no key, no date window — the page
+    // lists everything announced, which is about eighteen events.
+    if (!aew) { log('  aew source unavailable — skipping'); return { ok: true }; }
+    raw = await aew.fetchAll({ log });
   } else if (promotion.source.type === 'mlb') {
     if (!mlb) { log('  mlb source unavailable — skipping'); return { ok: true }; }
     const today = new Date(); today.setUTCHours(0, 0, 0, 0);
@@ -319,6 +327,7 @@ function normalizeRecord(raw, promotion) {
   if (promotion.source.type === 'tmdb') return transform.fromTmdb(raw, promotion);
   if (promotion.source.type === 'wikipedia' || promotion.source.type === 'onefc'
       || promotion.source.type === 'mlb' || promotion.source.type === 'espn'
+      || promotion.source.type === 'aew'
       || promotion.source.type === 'wikipedia-list'
       || promotion.source.type === 'sport-video'
       || promotion.source.type === 'json-feed') {

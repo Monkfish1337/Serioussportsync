@@ -1,15 +1,15 @@
 'use strict';
 
-// "Check it works", the feature a new user judges the whole product by.
+// First-run defects — the paths only a brand-new install takes.
 //
-// On a fully working install it chose "ONE Friday Fights 169 & The Inner Circle
-// 29" — a seven-day-old card from about the least-covered promotion in the
-// catalog — found nothing, and reported that. The old copy then spent a
-// paragraph explaining that the red result might not mean what it says, which
-// is a design admitting its own answer is unreliable.
+// This file was written for "Check it works", which was removed in 0.95.1: it
+// had to guess which fixture has a release, recency was the only signal it had,
+// and recency is uncorrelated with availability — so on working installs it
+// picked things like a Friday practice session, found nothing, and told the
+// user their setup was broken. Its four tests went with it.
 //
-// The cause was the selection: newest settled fixture wins, and recency is
-// uncorrelated with whether a release exists.
+// What remains is everything else the first-run walkthrough turned up, which is
+// unrelated to that feature and still worth pinning.
 
 const test = require('node:test');
 const assert = require('node:assert');
@@ -25,42 +25,6 @@ function installStep() {
     collections: collectionSettings.defaults(), choosers: [], teamPromotions: [],
   });
 }
-
-test('a failure names every fixture tried, not just one', () => {
-  // One miss on one fixture was never evidence of anything. Several misses
-  // across several promotions is, and the result has to show its working.
-  const html = installStep();
-  assert.match(html, /fixtures checked/);
-  assert.match(html, /a\.promotion \+ ' — ' \+ a\.name/);
-});
-
-test('the result says which torrent sources were asked', () => {
-  // Every torrent source is folded into the TorBox row, so "TorBox: nothing
-  // found" never said whether Bitmagnet — the primary source now — was even
-  // consulted. A switched-off source and an empty index read identically.
-  const html = installStep();
-  assert.match(html, /Torrent sources asked/);
-  assert.match(html, /none — nothing was searched/);
-});
-
-test('the old "this might not be a configuration problem" hedge is gone', () => {
-  // It was true of a single low-profile fixture and is not true of three
-  // misses across three promotions. Keeping it would excuse a real fault.
-  const html = installStep();
-  assert.ok(!/not always a\s+.?configuration problem/.test(html));
-  assert.match(html, /points at the configuration rather/);
-});
-
-test('a success says how many fixtures it had to try', () => {
-  const html = installStep();
-  assert.match(html, /stopped at the first that returned something/);
-});
-
-// ---------------------------------------------------------------------------
-// First-run walkthrough, 2026-09-12. A clean instance booted against an empty
-// data directory, an admin account created through /setup, and all five
-// Configure steps walked as a new operator. Three defects, all on paths that
-// only a brand-new install takes — which is why none of them had been seen.
 
 test('the setup page does not tell the first user they will not be an admin', () => {
   // It said the account "will be auto-promoted to admin if it matches the

@@ -545,56 +545,23 @@ test('the skin picker applies a known skin and refuses anything else', async () 
 // The step SSS has never had. Until now the first evidence that setup worked
 // was opening Stremio and finding an empty row — and a pipeline returning
 // nothing looked exactly like one that was never configured.
-test('the install check reports per pipeline, and says so when it cannot run', async () => {
-  const user = await makeUser('verifier', 'admin');
-  const login = await get('/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ username: 'verifier', password: 'correct-horse-battery-staple' }).toString(),
-  });
-  const cookie = (login.headers.getSetCookie ? login.headers.getSetCookie() : [])
-    .map((value) => value.split(';')[0]).join('; ');
-  assert.ok(user.id);
-
-  const response = await get('/account/verify', {
-    method: 'POST', headers: { cookie, Accept: 'application/json' },
-  });
-  assert.equal(response.status, 200);
-  const body = await response.json();
-
-  // This test store has no settled fixtures, so the honest answer is that there
-  // is nothing to check — not a pass, and not an error the user has to decode.
-  //
-  // The week-old rule matters: a match that finished last night has nothing
-  // posted for it, so checking against it would report no streams for every
-  // pipeline and look exactly like the broken configuration this step exists
-  // to rule out.
-  assert.equal(body.ok, false);
-  assert.match(body.error, /at least a week ago/i);
-  assert.doesNotMatch(JSON.stringify(body), /token|password|apiKey/i,
-    'the check must not echo credentials back to the page');
-});
-
-// The check reports each pipeline from what handleStream actually produced.
-// Working it out by pattern-matching row labels made a pipeline that answered
-// look like one that found nothing — which is the exact failure the check is
-// supposed to distinguish.
-test('the install check reads provenance from the stream result, not row labels', async () => {
-  const streams = require('../lib/streams');
-  const source = String(streams.handleStream);
-  assert.match(source, /pipelineRows:/,
-    'handleStream must report which pipeline produced what');
-  const addon = fs.readFileSync(path.join(__dirname, '..', 'addon.js'), 'utf8');
-  const verify = addon.slice(addon.indexOf("app.post('/account/verify'"));
-  const body = verify.slice(0, verify.indexOf('\n  });'));
-  assert.match(body, /result\.pipelineRows/);
-  assert.doesNotMatch(body, /row\.name/,
-    'a row\'s display label is presentation, not provenance');
-});
-
-test('the install check refuses an anonymous caller', async () => {
+// "Check it works" and its /account/verify route were removed in 0.95.1.
+//
+// Three tests lived here: that it reported per pipeline, that it read
+// provenance from handleStream rather than from row labels, and that it refused
+// an anonymous caller. All three were true of it, and none of them was the
+// problem. The problem was that it had to guess which fixture has a release —
+// recency was the only signal it had, recency is uncorrelated with
+// availability, and so on working installs it picked a Friday practice session,
+// found nothing, and told the user their setup was broken. A check that cries
+// wolf sends people to debug configuration that was never wrong. Nuvio answers
+// the same question honestly, against something the user actually wants.
+//
+// The route is gone, so nothing is left to test. This note replaces the tests
+// rather than deleting them silently.
+test('the removed install check leaves no route behind', async () => {
   const response = await get('/account/verify', { method: 'POST', redirect: 'manual' });
-  assert.notEqual(response.status, 200, 'verify runs a real search — it needs a session');
+  assert.equal(response.status, 404);
 });
 
 // The Nuvio push signs in from the page, so the policy has to permit exactly

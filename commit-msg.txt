@@ -1,42 +1,40 @@
-Make the wizard show what it claims to be showing
+Give AEW its own source, and remove "Check it works"
 
-Four reports, three of them one cause.
+AEW now reads allelitewrestling.com instead of TheSportsDB. The free key
+cannot reach AEW's upcoming cards at all - eventsnextleague returns one
+event, eventsseason returns fifteen, and AEW runs about three weekly
+tapings a week, so the fifteen are spent before February and every PPV
+falls outside them. Three rounds of workarounds did not change that.
 
-Pick your club said "2 selected" and highlighted nothing, and un-ticking
-a team left its catalog. /account/teams/:key.json never sent the
-`selected` field the picker has always read, so every tile rendered
-aria-pressed="false". The CSS highlight keys off that attribute, and so
-does the click handler that chooses between create and remove - so
-clicking a selected team re-created it and the catalog stayed.
+The site is Wix, which embeds its page data as JSON in a
+<script id="wix-warmup-data"> tag, so this reads a structured collection
+rather than scraping markup. Both pages: /events for what is coming and
+/aewonppv for the replays, since /events alone leaves Recent empty.
 
-The endpoint now reports the selection using the same rule the remove
-route uses, shared as teamPicker.matchesTeam rather than copied, since
-the two disagreeing is what this was. Enabled catalogs only: a deselected
-team keeps its promotion and fixtures, so it must draw as unpicked or
-clicking it to restore it would read as a removal. Selected tiles gain a
-tick; a tinted border alone was too quiet across thirty tiles.
+Verified live through the real refresh path: 6 upcoming, 9 recent. All
+Out 2026-09-26, Grand Slam France, WrestleDream, Fright Night, Full Gear,
+Dynasty - every one with artwork. TheSportsDB had All Out on the 27th and
+Full Gear on the 15th; releases are named by the local date, so the old
+dates were wrong for matching too. TheSportsDB AEW stays selectable.
 
-Check it works reported a broken install on a working one. Reproduced
-live: three empty attempts on UFC Fight Night 287, ONE Fight Night 47 and
-Italian Grand Prix Practice 3, all dated 2026-09-05. Newest-per-promotion
-then sorted by recency selects one single day, so a thin day takes every
-attempt with it, and a Friday practice session is close to the least
-uploaded thing in the catalogue. Candidates are now ranked by whether a
-release is likely to exist (checkWorthiness, which a promotion implements
-for its own session types) and spread over different days, with recency
-only breaking ties. Four attempts instead of three.
+Two things broke on the switch, because the CMS names cards WITH the year
+where TSDB did not. The query builder only added a query when the year was
+missing, so "All Out 2026" produced one string. And the matcher kept words
+of four characters or more and accepted on any single hit - "All Out" has
+no word that long, so it matched every AEW release ever, and once the year
+was in the name the only token left was "2026" and Full Gear matched an
+All Out fixture. Both fixed, both pinned.
 
-AEW's preview said "3 events, 29 removed" and listed cards a real refresh
-fetches without trouble. Nothing was removed - a preview writes nothing -
-but it was not a prediction either: a preview asks the list endpoints
-only, skipping the named lookups and the per-round walk, which is where
-most of AEW's events come from. It compared a truncated fetch against the
-full store and called the difference deletions. Those are now reported as
-"Not seen by this preview", with the reason, and no removed count is
-shown when the fetch was incomplete. A source with no skippable path
-reports removals exactly as before.
+"Check it works" is removed - route, panel, client script, ranking hooks
+and tests. It had to guess which fixture has a release; recency was the
+only signal it had and recency is uncorrelated with availability, so on
+working installs it picked things like a Friday practice session, found
+nothing, and told the user their setup was broken. Two rounds of fixing
+the guess did not fix the guessing. A check that cries wolf sends people
+to debug configuration that was never wrong; Nuvio answers the same
+question honestly, against something the user actually wants to watch.
 
-526 unit tests plus both standalone verification scripts passing.
+528 unit tests plus both standalone verification scripts passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

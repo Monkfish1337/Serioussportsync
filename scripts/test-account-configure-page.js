@@ -82,7 +82,6 @@ function listen(app) {
       'Your teams',
       'Catalogs',
       'Install',
-      'Check it works',
       'stremio://',
     ]) assert.ok(html.includes(expected), 'account page includes ' + expected);
 

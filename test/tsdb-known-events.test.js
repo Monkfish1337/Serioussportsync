@@ -51,19 +51,27 @@ test('a league with no list is simply not affected', () => {
   assert.deepEqual(known.knownEventsFor(undefined), []);
 });
 
-test('the lists are keyed by league, and reach the shipped promotions', () => {
-  // The names cannot live on the source object: a promotion's source comes
-  // from its own fallback, the system metadata-source registry, or a
-  // user-created entry, and only the league id is common to all three. AEW's
-  // resolved source is the registry's, which is why an earlier attempt to put
-  // the names on the promotion literal had no effect at all.
-  for (const id of ['aew']) {
-    const promotion = promotions.all.find((p) => p.id === id);
-    assert.ok(promotion, id + ' must exist');
-    assert.equal(promotion.source.type, 'thesportsdb');
-    assert.ok(known.knownEventsFor(promotion.source.leagueId).length > 0,
-      id + ' must resolve to a name list through its league id');
-  }
+test('the list is still reachable for anyone who selects the TSDB source', () => {
+  // AEW moved to its own source in 0.95.1, so the shipped promotion no longer
+  // goes through TheSportsDB and this list is no longer on its default path.
+  //
+  // It is kept rather than deleted because "TheSportsDB · AEW" is still a
+  // selectable source — an operator with a premium key may prefer it — and a
+  // promotion pointed back at league 4563 needs these names for exactly the
+  // reasons measured above. The keying is what matters: names live here, keyed
+  // by league id, not on the promotion, because a source can come from the
+  // promotion's own fallback, the system registry, or a user-created entry and
+  // only the league id is common to all three.
+  const sources = require('../lib/metadata-sources');
+  const tsdbAew = sources.list().find((item) => item.id === 'tsdb-aew');
+  assert.ok(tsdbAew, 'the TheSportsDB AEW source must still be offered');
+  assert.equal(tsdbAew.source.type, 'thesportsdb');
+  assert.ok(known.knownEventsFor(tsdbAew.source.leagueId).length > 0,
+    'and it must still resolve to a name list through its league id');
+
+  // Meanwhile the shipped promotion is on AEW's own schedule.
+  const promotion = promotions.all.find((p) => p.id === 'aew');
+  assert.deepEqual(promotion.source, { type: 'aew' });
 });
 
 test('the caller cannot mutate the shared list', () => {
