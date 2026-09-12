@@ -209,11 +209,21 @@ function createApp() {
     const prefill = (config.admin && config.admin.user) || '';
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(authPage('Initial setup',
+      // This used to say the account "will be auto-promoted to admin if it
+      // matches the ADMIN_USER env var (currently (unset))" — which told every
+      // operator who had not set that variable, on the first screen of a brand
+      // new install, that their account would NOT be an admin. It always is:
+      // POST /setup passes role: 'admin' and createUser takes
+      // `role === 'admin' || matchesAdminEnv`. ADMIN_USER only prefills the
+      // field here and promotes a LATER user created with that name.
       '<p style="margin:0 0 16px;color:var(--muted);font-size:13px;">'
-      + 'No users exist yet. Create your admin account. The username '
-      + 'will be auto-promoted to <code>admin</code> if it matches the '
-      + '<code>ADMIN_USER</code> env var (currently <code>'
-      + escapeHtml(prefill || '(unset)') + '</code>).</p>'
+      + 'No users exist yet. This first account is the administrator — it can '
+      + 'reach the Server, Promotions and Database pages, and create everyone '
+      + 'else.'
+      + (prefill
+        ? ' The name is prefilled from <code>ADMIN_USER</code>; you can change it.'
+        : '')
+      + '</p>'
       + '<form method="POST" action="/setup">'
       + '<label class="form-label">Username</label>'
       + '<input class="form-control" name="username" value="' + escapeHtml(prefill) + '" required minlength="3" maxlength="32" autofocus>'
@@ -342,6 +352,13 @@ function createApp() {
       })),
       selected: effective || new Set(),
       selectAll: effective === null,
+      // Whether the catalogue has anything in it yet. On a brand-new install
+      // the first refresh runs through 29 promotions sequentially, and the
+      // TheSportsDB adapter waits between requests, so it is minutes before
+      // the first rows have content and considerably longer before all of them
+      // do. Without this the Install step hands over a manifest that produces
+      // empty rows and says nothing about why.
+      eventCount: (store.loadFromDisk().events || []).length,
       hiddenHomeRows: new Set(cfg.homeRowsHidden || []),
       folderOf,
       collections,

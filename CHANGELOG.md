@@ -1,5 +1,43 @@
 # Changelog
 
+## Unreleased — the first-run walkthrough, at last
+
+The top item on the 1.0 list was the one path nobody had ever walked: a brand
+new account through all five Configure steps. Done properly this time — a clean
+instance booted against an empty data directory, an admin account created
+through `/setup`, every step read as a new operator reads it, the save round
+tripped, the manifest fetched and a catalog requested as an installed client.
+Three defects, all on paths only a new install takes, which is exactly why none
+of them had been seen.
+
+**The setup page told the first user they would not be an admin.** It said the
+account "will be auto-promoted to `admin` if it matches the `ADMIN_USER` env var
+(currently `(unset)`)". Every operator who has not set that variable — the
+default — was told on the very first screen of the product that their account
+would not be an administrator. It always is: `POST /setup` passes
+`role: 'admin'` and `createUser` takes `role === 'admin' || matchesAdminEnv`.
+`ADMIN_USER` only prefills the field and promotes a *later* user of that name.
+
+**The team picker pointed at a page that does not exist.** With no
+football-data key — which is every new operator — the Premier League chooser
+says where to add one: "Admin → Sources". There is no Admin nav item and there
+has never been a Sources page; the sidebar says **Server**. Renamed to match.
+
+**A new install looked broken while it filled.** Measured: a clean instance was
+still on the first of 29 promotions several minutes after boot, because the
+refresh is sequential and the TheSportsDB adapter waits between requests. The
+Install step handed over a manifest that produces empty rows and said nothing
+about it, and "Check it works" then reported it had no fixture to try — a
+working install presenting exactly as a broken one. The step now says so while
+the catalogue is empty, and says the manifest is fine to install meanwhile.
+
+Confirmed working on a clean install, for the record: `/setup` → account →
+Configure renders all five steps, save round-trips (only the selected catalogs
+come back served), the personal manifest returns the right two catalogs, and the
+team pickers for NFL, NBA and MLB all populate.
+
+500 unit tests, plus both standalone verification scripts, passing.
+
 ## Unreleased — fix the two CI checks the new collection folders broke
 
 Both workflow runs for the Big 3 / Unmatched commit failed, and neither failure
