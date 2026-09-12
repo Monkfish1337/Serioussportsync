@@ -1,5 +1,40 @@
 # Changelog
 
+## Unreleased — MLB was handing the torrent pipeline four bad queries
+
+Reported after NFL started working: MLB still pulls nothing from Bitmagnet or
+rutracker, verified by manual search.
+
+MLB was the last promotion carrying a `torrentSearchTitles` override, and it cut
+the list to **four** — the four hand-written full-name forms that also led it:
+
+    MLB 2026 RS 20.08.2026 San Diego Padres @ Los Angeles Dodgers
+    MLB 2026 20.08.2026 San Diego Padres @ Los Angeles Dodgers
+    MLB 2026.08.20 San Diego Padres vs Los Angeles Dodgers
+    MLB San Diego Padres @ Los Angeles Dodgers 20.08.2026
+
+Every one carries a league prefix *and* a date, the shape measured to be
+weakest, and the slice meant Bitmagnet and Prowlarr saw only these — never a
+single nickname pair. NFL, which has no override at all, worked. The override
+existed to keep a slow fan-out short back when neither source had a budget of
+its own; both do now, so it only removed the good queries before either could
+choose.
+
+The observed forms are kept — they came from real releases — spliced in behind
+the first block of pair queries rather than in front of it. Appending them
+outright was the first attempt and dropped them entirely, since the generated
+list fills the 60-query cap on its own.
+
+**Two-word nicknames.** The pair queries only accepted single-word forms, so
+Toronto Blue Jays against Boston Red Sox produced `Boston Toronto <date>` — a
+pair of cities that cannot match `MLB.2026.07.25.Blue.Jays.Vs.Red.Sox`. Red Sox,
+Blue Jays, White Sox and Trail Blazers are nicknames like any other; they just
+carry a space. Allowing them then let the canonical "City Nickname" back in at
+the head (`Carolina Panthers Houston Texans …`, the full-name template again),
+so the canonical form is now dropped whenever a shorter one exists.
+
+477 tests passing.
+
 ## Unreleased — the cut-offs are adjustable from the Server page
 
 Asked for after four rounds of tuning these numbers by redeploy: somewhere to

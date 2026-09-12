@@ -1,35 +1,37 @@
-Make the discovery cut-offs adjustable from the Server page
+MLB was handing the torrent pipeline four of its worst queries
 
-Asked for after four rounds of tuning these numbers by redeploy: somewhere to
-fine-tune the cost of time against results without editing environment
-variables and rebuilding.
+Reported after NFL started working: MLB still pulls nothing from Bitmagnet or
+rutracker, verified by manual search.
 
-Server -> Discovery timing now carries five numbers:
+MLB was the last promotion carrying a torrentSearchTitles override, and it cut
+the list to FOUR -- the four hand-written full-name forms that also led it:
 
-  Stream request budget        9500ms   the whole request
-  Discovery budget             5000ms   searching only, held 1s below the above
-  Prowlarr queries per request      6   offered; the budget decides how many finish
-  Prowlarr per-query timeout  15000ms   one HTTP search
-  Index build budget          25000ms   the background build, nobody waiting
+  MLB 2026 RS 20.08.2026 San Diego Padres @ Los Angeles Dodgers
+  MLB 2026 20.08.2026 San Diego Padres @ Los Angeles Dodgers
+  MLB 2026.08.20 San Diego Padres vs Los Angeles Dodgers
+  MLB San Diego Padres @ Los Angeles Dodgers 20.08.2026
 
-These are the most consequential numbers in the stream path and they were the
-hardest to try. Prowlarr answers in roughly two seconds per query, so the
-5000ms discovery budget is the difference between two queries and six -- and
-that decided whether the query reaching rutracker was ever sent.
+Every one carries a league prefix AND a date, the shape measured to be
+weakest, and the slice meant Bitmagnet and Prowlarr saw only these and never a
+single nickname pair. NFL, which has no override at all, worked. The override
+existed to keep a slow fan-out short back when neither source had a budget of
+its own; both do now, so it only removed the good queries before either could
+choose.
 
-Saved values win over environment variables, which still win over the
-defaults, so an existing deployment keeps what it had and a cleared field
-means "use this deployment's configured value" rather than zero. Out-of-range
-entries are clamped rather than refused. The request budget can be pushed past
-Nuvio's ~10s client deadline deliberately; the form says plainly that doing so
-turns a partial answer into no answer.
+The observed forms are kept -- they came from real releases -- spliced in
+behind the first block of pair queries rather than in front of it. Appending
+them outright was the first attempt and dropped them entirely, since the
+generated list fills the 60-query cap on its own.
 
-The Prowlarr query cap previously borrowed the promotion's uuMaxQueries, which
-was the nearest existing number rather than the right one: how many queries
-fit is a property of how slow this deployment's Prowlarr is, not of the
-promotion being searched.
+Two-word nicknames. The pair queries accepted single-word forms only, so
+Toronto Blue Jays against Boston Red Sox produced "Boston Toronto <date>" -- a
+pair of cities that cannot match MLB.2026.07.25.Blue.Jays.Vs.Red.Sox. Red Sox,
+Blue Jays, White Sox and Trail Blazers are nicknames like any other; they just
+carry a space. Allowing them then let the canonical "City Nickname" back in at
+the head ("Carolina Panthers Houston Texans ...", the full-name template
+again), so the canonical form is dropped whenever a shorter one exists.
 
-474 tests passing.
+477 tests passing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01R7HrrZJTkA33HeY5YGpMPU

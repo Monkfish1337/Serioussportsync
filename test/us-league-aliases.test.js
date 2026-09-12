@@ -388,3 +388,43 @@ test('an untried date format outranks a weaker form of a tried one', () => {
   assert.ok(prefixFreeDated.length >= 4,
     'all four date tokens go out bare before any of them goes out prefixed');
 });
+
+test('a two-word nickname is usable as a pair term', () => {
+  // Single-word-only looked right until a team whose nickname is two words
+  // came up. Toronto Blue Jays against Boston Red Sox produced
+  // "Boston Toronto <date>" — a pair of cities, which cannot match
+  // MLB.2026.07.25.Blue.Jays.Vs.Red.Sox at all. Red Sox, Blue Jays, White Sox
+  // and Trail Blazers are nicknames like any other; they just carry a space.
+  const event = { promotion: 'mlb', name: 'Toronto Blue Jays vs Boston Red Sox', date: '2026-07-25' };
+  const queries = mlb.searchTitles(event);
+  assert.ok(andMatches(queries,
+    'MLB.2026.07.25.Blue.Jays.Vs.Red.Sox.1080p.WEB.h264-SPORTSNET').length > 0);
+  assert.match(queries[0], /Red Sox|Blue Jays/, 'the nickname pair must lead');
+});
+
+test('the canonical name does not displace the short form', () => {
+  // Allowing two-word forms let "Carolina Panthers" back in at the head, so an
+  // NFL pair became "Carolina Panthers Houston Texans <date>" — the full-name
+  // template again, unable to match a nickname-only release. The templates
+  // already cover the long form; this block exists for the short one.
+  const event = {
+    promotion: 'nfl', name: 'Houston Texans at Carolina Panthers', date: '2026-08-29',
+  };
+  const queries = nfl.searchTitles(event);
+  assert.match(queries[0], /^Panthers Texans /, 'got: ' + queries[0]);
+});
+
+test('MLB hands the torrent pipeline its whole list', () => {
+  // MLB was the last promotion with a torrentSearchTitles override, and it cut
+  // the list to four — the four hand-written full-name queries that led it.
+  // Bitmagnet and Prowlarr therefore never saw a single pair query, which is
+  // why MLB returned nothing from either while NFL, with no override, worked.
+  assert.equal(typeof mlb.torrentSearchTitles, 'undefined');
+  const event = { promotion: 'mlb', name: 'San Diego Padres at Los Angeles Dodgers', date: '2026-08-20' };
+  const queries = mlb.searchTitles(event);
+  assert.ok(queries.length > 40, 'the full list, not a slice of four');
+  const head = queries.slice(0, 4);
+  assert.ok(head.every((q) => !/^MLB\b/.test(q)),
+    'league-prefixed-and-dated is the weakest shape and must not lead: ' + head.join(' | '));
+  assert.ok(head.some((q) => /\d{2}\.\d{2}\.\d{4}/.test(q)), 'DMY, for rutracker');
+});

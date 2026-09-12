@@ -50,15 +50,41 @@ test('boxing uses both fighter names from the observed release family', () => {
     'Errol Spence Jr. vs. Tim Tszyu 26.07.2026 Boxing 1080p', event).ok, true);
 });
 
-test('MLB ships with its official schedule and observed RS date matchup queries', () => {
+test('MLB ships with its official schedule and keeps its observed RS queries', () => {
+  // This used to assert that the torrent pipeline got exactly four queries,
+  // led by the hand-written "MLB <year> RS <dmy> <home> @ <away>" form. That
+  // was the bug, not the specification: all four are full-name queries
+  // carrying a league prefix AND a date — the shape measured to be weakest —
+  // and the four-query slice meant the torrent pipeline saw only those and
+  // never a nickname pair. MLB returned nothing from Bitmagnet or rutracker
+  // while NFL, which has no override at all, worked.
+  //
+  // The observed forms are kept, because they were taken from real releases.
+  // They just no longer stand in front of the queries generated from
+  // measurement, and no longer cut the list to four.
   const item = promotion('mlb');
   const event = { name: 'Toronto Blue Jays vs Boston Red Sox', date: '2026-07-25' };
-  const queries = item.torrentSearchTitles(event);
-  assert.equal(queries[0], 'MLB 2026 RS 25.07.2026 Toronto Blue Jays @ Boston Red Sox');
-  assert.equal(queries.length, 4);
+  assert.equal(typeof item.torrentSearchTitles, 'undefined',
+    'the torrent path takes the full list and applies its own budget');
+
+  const queries = item.searchTitles(event);
+  assert.ok(queries.includes('MLB 2026 RS 25.07.2026 Toronto Blue Jays @ Boston Red Sox'),
+    'the observed RS form must survive');
+  assert.ok(queries.length > 4, 'and it must no longer be one of only four');
+
+  // The head of the list is what a bounded provider actually sends.
+  const bareDated = queries.slice(0, 4);
+  assert.ok(bareDated.every((query) => !/^MLB\b/.test(query)),
+    'the weakest shape must not lead: ' + bareDated.join(' | '));
+  assert.ok(bareDated.some((query) => /\d{4}\.\d{2}\.\d{2}/.test(query)), 'dotted ISO');
+  assert.ok(bareDated.some((query) => /\d{2}\.\d{2}\.\d{4}/.test(query)), 'DMY, for rutracker');
+
   assert.deepEqual(item.source, { type: 'mlb' });
   assert.equal(item.isRelevantStreamTitle(
     'MLB 2026 RS 25.07.2026 Toronto Blue Jays @ Boston Red Sox WEB-DL 720p', event).ok, true);
+  assert.equal(item.isRelevantStreamTitle(
+    'MLB.2026.07.25.Blue.Jays.Vs.Red.Sox.1080p.WEB.h264-SPORTSNET', event).ok, true,
+    'nickname-only, the form the presets were added for');
   assert.equal(item.isRelevantStreamTitle(
     'MLB Network Daily Show 25.07.2026 Toronto Blue Jays Boston Red Sox', event).ok, false);
 });
