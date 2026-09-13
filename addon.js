@@ -1495,6 +1495,7 @@ function createApp() {
         discoveryBudgetMs: b.discoveryBudgetMs,
         prowlarrMaxQueries: b.prowlarrMaxQueries,
         prowlarrQueryTimeoutMs: b.prowlarrQueryTimeoutMs,
+        prowlarrLiveBudgetMs: b.prowlarrLiveBudgetMs,
         indexBuildBudgetMs: b.indexBuildBudgetMs,
         easynewsMaxQueries: b.easynewsMaxQueries,
         easynewsQueryTimeoutMs: b.easynewsQueryTimeoutMs,
@@ -2255,7 +2256,8 @@ function renderAdminPage(currentUser, opts) {
           + '<div class="form-hint">Prowlarr searches sequentially and fans each query out to remote trackers — measured at about 2s each against Bitmagnet\'s 65ms. This is the number offered; the discovery budget decides how many it finishes. Default 6.</div></div>'
           + '<div class="col-md-6"><label class="form-label">Prowlarr per-query timeout (ms)</label>'
           + '<input class="form-control text-mono" type="number" name="prowlarrQueryTimeoutMs" value="' + escapeHtml(String(_timing.prowlarrQueryTimeoutMs)) + '" min="1000" max="120000" autocomplete="off">'
-          + '<div class="form-hint">One HTTP search. A slow indexer inside Prowlarr can hold a query open for all of it. Default 15000.</div></div>'
+          + '<label class="form-label mt-3">Prowlarr live search window (ms)</label><input class="form-control" type="number" name="prowlarrLiveBudgetMs" value="' + escapeHtml(String(_timing.prowlarrLiveBudgetMs)) + '" min="1000" max="120000"><small>MLB, NFL and NBA searches keep collecting within this window after the first response. Scheduled preparation stays Bitmagnet-only.</small>'
+          + '<div class="form-hint">One HTTP search for other promotions. MLB, NFL and NBA use the separate live search window as their query deadline. A slow indexer can hold a query open for all of it. Default 15000.</div></div>'
           + '</div>'
           + '<div class="row g-3 mb-3"><div class="col-md-4"><label class="form-label">Easynews queries per request</label>'
           + '<input class="form-control" type="number" name="easynewsMaxQueries" value="' + escapeHtml(String(_timing.easynewsMaxQueries)) + '" min="1" max="6"></div>'

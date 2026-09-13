@@ -24,6 +24,31 @@ async function main() {
   assert.equal(normal.results.length, 2);
   assert.equal(normal.partial, false);
   assert.ok(proxyTimeout > 10000 && proxyTimeout < 49000, 'Hydration uses the configured timeout bounded by discovery, not a fixed ten seconds');
+  const titlesOnly = await prowlarr.multiSearch(['fixture'], {
+    detailed: true, titlesOnly: true, deadlineMs: 1000,
+    fetchImpl: async url => { assert.ok(url.includes('/api/v1/search?')); return new Response(JSON.stringify(raw)); },
+  });
+  assert.equal(titlesOnly.results.length, 2, 'Research retains titles without hashes');
+  const slowHash = await prowlarr.multiSearch(['fixture'], {
+    detailed: true, deadlineMs: 1000,
+    fetchImpl: async () => { await new Promise(resolve => setTimeout(resolve, 720)); return new Response(JSON.stringify([raw[0]])); },
+  });
+  assert.equal(slowHash.results.length, 1, 'Search may use more than seventy percent of the window');
+  let downloads = 0, active = 0, peak = 0, queryCount = 0;
+  await prowlarr.multiSearch(['first', 'second'], {
+    detailed: true, deadlineMs: 5000,
+    fetchImpl: async url => {
+      if (url.includes('/api/v1/search?')) {
+        const start = queryCount++ * 20;
+        return new Response(JSON.stringify(Array.from({length: 20}, (_, i) => ({title: 'release ' + (start+i), downloadUrl: '/download/' + (start+i), seeders: 1}))));
+      }
+      downloads++; active++; peak = Math.max(peak, active);
+      await new Promise(resolve => setTimeout(resolve, 5)); active--;
+      return new Response('', {status: 302, headers: {location: 'magnet:?xt=urn:btih:' + 'e'.repeat(40)}});
+    },
+  });
+  assert.equal(downloads, 25, 'Hydration cap applies across every query');
+  assert.ok(peak <= 4, 'Hash downloads stay bounded while searching overlaps');
   let searches = 0;
   const started = Date.now();
   const stalled = await prowlarr.multiSearch(['first', 'stalled', 'never-started'], {

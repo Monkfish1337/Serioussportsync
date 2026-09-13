@@ -60,7 +60,7 @@ test('Matching Lab uses shipped UCL queries and exposes direct-source timing and
         assert.deepEqual(queries, promo.torrentSearchTitles(event));
         return {ok: true, results: [{title, infoHash: 'a'.repeat(40)}]};
       },
-      prowlarrSearch: async queries => {assert.ok(queries.length <= 6); return {ok: true, partial: true, results: [{title, infoHash: 'b'.repeat(40)}]};},
+      prowlarrSearch: async (queries, opts) => {assert.equal(opts.titlesOnly, true); assert.equal(opts.deadlineMs, settings.getDiscoveryTiming().prowlarrLiveBudgetMs); assert.ok(queries.length <= 6); return {ok: true, partial: true, results: [{title, infoHash: 'b'.repeat(40)}]};},
     });
     assert.equal(result.counts.matched, 1);
     assert.deepEqual(result.groups.matched[0].providers, ['Bitmagnet', 'Prowlarr torrents']);
@@ -69,4 +69,44 @@ test('Matching Lab uses shipped UCL queries and exposes direct-source timing and
     assert.match(result.report, /Queries by source:/);
     assert.doesNotMatch(result.report, /infoHash|apiKey|example.invalid/);
   } finally {restore();}
+});
+
+test('priority live search outlives response wait, shares requests and retains only matching releases', async () => {
+  const restore = configure();
+  const originalTiming = settings.getDiscoveryTiming;
+  settings.getDiscoveryTiming = () => ({prowlarrLiveBudgetMs: 50000, prowlarrMaxQueries: 6, prowlarrQueryTimeoutMs: 15000});
+  const index = availability.createAvailabilityIndex({file: ':memory:', secret: process.env.SESSION_SECRET});
+  availability.getDefault = () => index;
+  const good = {title: 'MLB.Mets.Yankees', infoHash: 'c'.repeat(40)};
+  let calls = 0;
+  prowlarr.multiSearch = async (queries, opts) => {
+    calls++; assert.equal(opts.deadlineMs, 50000); assert.equal(opts.timeoutMs, 50000);
+    await new Promise(resolve => setTimeout(resolve, 80));
+    return {ok: true, results: [good, {title: 'unrelated', infoHash: 'd'.repeat(40)}]};
+  };
+  torbox.checkCachedBatch = async hashes => new Set(hashes);
+  const input = {event: {id: 'mlb:late', name: 'Mets vs Yankees', date: '2026-09-11'},
+    promo: {id: 'mlb', isRelevantStreamTitle: title => ({ok: title.includes('Mets')})},
+    titles: ['Mets Yankees'], torboxKey: 'fixture', discoveryBudgetMs: 20, liveProwlarr: true,
+    log: () => {}, urlCtx: {origin: 'http://sss.invalid', userId: 'one', apiToken: 'fixture', showWarmRows: false}};
+  try {
+    await Promise.allSettled([streams.pipelineTorrentTorbox(input), streams.pipelineTorrentTorbox(input)]);
+    assert.equal(calls, 1);
+    await new Promise(resolve => setTimeout(resolve, 120));
+    const rows = await streams.pipelineTorrentTorbox({...input, fastResponse: true});
+    assert.equal(rows.length, 1); assert.match(rows[0].title, /Mets/);
+    await new Promise(resolve => setTimeout(resolve, 120));
+  } finally {settings.getDiscoveryTiming = originalTiming; restore(); index.close();}
+});
+
+test('Matching Lab puts past fixtures first and sends real event IDs', () => {
+  const store = require('../lib/store'); const oldEvents = store.getEvents;
+  store.getEvents = () => [{id: 'mlb:past', name: 'Past fixture', date: '2026-01-01'},
+    {id: 'mlb:future', name: 'Future fixture', date: '2099-01-01'}];
+  try {
+    const html = admin.renderMatchingLab('mlb');
+    assert.ok(html.indexOf('Past fixture') < html.indexOf('Future fixture'));
+    assert.match(html, /option value="mlb:past"/);
+    assert.match(html, /provider.count/);
+  } finally {store.getEvents = oldEvents;}
 });
