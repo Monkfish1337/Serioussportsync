@@ -110,3 +110,28 @@ test('Matching Lab puts past fixtures first and sends real event IDs', () => {
     assert.match(html, /provider.count/);
   } finally {store.getEvents = oldEvents;}
 });
+
+test('Save generates matching rules from confirmed releases and preserves manual rules', () => {
+  const overrides = require('../lib/promotion-overrides');
+  const oldSet = overrides.set, oldReload = promotions.reload;
+  let submitted;
+  overrides.set = (id, name, input) => {submitted = input; return overrides.normalise(id, name, input);};
+  promotions.reload = () => {};
+  try {
+    const html = admin.renderMatchingLab('mlb');
+    assert.match(html, /id="lab-good" name="goodExamples"/);
+    assert.match(html, /id="lab-bad" name="badExamples"/);
+    const saved = admin.saveMatchingOverride('mlb', {goodExamples:
+      'MLB.2026.09.11.New.York.Mets.vs.New.York.Yankees.1080p.WEB.h264-NiGHTNiNJAS',
+      requireDateInTitle: '1', exclusionKeywords: 'highlights'});
+    assert.ok(saved.searchTitleTemplates.length);
+    assert.ok(saved.promotionAliases.length);
+    assert.equal(saved.requireDateInTitle, true);
+    assert.ok(saved.exclusionKeywords.includes('highlights'));
+    admin.saveMatchingOverride('mlb', {goodExamples: 'MLB confirmed release', promotionAliases: 'My MLB',
+      searchTitleTemplates: '{name} custom'});
+    assert.equal(submitted.promotionAliases, 'My MLB');
+    assert.equal(submitted.searchTitleTemplates, '{name} custom');
+    assert.throws(() => admin.saveMatchingOverride('mlb', {}), /at least one matching rule/);
+  } finally {overrides.set = oldSet; promotions.reload = oldReload;}
+});

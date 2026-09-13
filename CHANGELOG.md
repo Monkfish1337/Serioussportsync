@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.96.2 — 2026-09-13
+
+- Matching Lab submits confirmed release and unrelated titles when saving. If matching rules are empty, Save derives rules directly from the confirmed releases instead of rejecting the save. Existing manual rules and date/language choices are preserved.
+- The confirmation area explains that Create rules is an optional preview before saving.
+
 ## 0.96.1 — 2026-09-13
 
 - MLB, NFL and NBA give Prowlarr a separate live-search window (default 50 seconds), independent of the first-response discovery wait. Active duplicate searches are shared. Matching late results and account-scoped TorBox availability are retained for refreshes; scheduled preparation stays Bitmagnet-only.
