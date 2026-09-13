@@ -1739,6 +1739,23 @@ function createApp() {
     }
   });
 
+  app.get('/admin/promotions/:id/aliases', requireAdmin, (req, res) => {
+    const promotion = promotions.all.find(item => item.id === req.params.id);
+    if (!promotion) return res.status(404).send('Promotion not found');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(tablerChrome.tablerPage('Review aliases', require('./lib/admin-query-review').render(promotion, req.query),
+      {user: req.user, currentSection: 'promotions'}));
+  });
+  app.post('/admin/promotions/:id/aliases', requireAdmin, (req, res) => {
+    const promotion = promotions.all.find(item => item.id === req.params.id);
+    if (!promotion) return res.status(404).send('Promotion not found');
+    try {
+      require('./lib/query-review').getDefault().setPolicy(promotion.id, String(req.body.key || ''), String(req.body.action || ''));
+      availabilityStore.getDefault().clearPromotion(promotion.id);
+      res.redirect(303, '/admin/promotions/' + encodeURIComponent(promotion.id) + '/aliases');
+    } catch (error) {res.status(400).send('Query action failed: ' + error.message);}
+  });
+
   app.get('/admin/promotions/:id/research', requireAdmin, (req, res) => {
     const body = adminPromotions.renderMatchingLab(String(req.params.id || ''), {
       flash: req.query.flash || null,

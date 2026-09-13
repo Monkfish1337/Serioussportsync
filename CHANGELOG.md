@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.97.0 — 2026-09-13
+
+- Every promotion has a Review aliases page showing per-source query patterns, successful searches, zero hits, timeouts, errors, unattempted queries, matched and incremental unique results, average duration and unique matches per second.
+- Measurements come from existing Prowlarr, Bitmagnet, Easynews and native Usenet searches. Dates, seasons and NFL weeks are normalized to compare recurring queries. Usenet Ultimate only supplies combined batch results, so its individual query effectiveness is not inferred.
+- Repeated-zero flags require 10 completed zero-hit searches across 5 past fixtures, excluding scheduled preparation. Future fixtures, timeouts and unattempted queries cannot satisfy that threshold. Rare @ and week formats are labelled, with no automatic disabling.
+- Enable, Demote and Disable controls apply to one promotion/source/query pattern and are reversible. Policy changes refresh only the affected promotion's search cache, preserving release matches and account availability. Prowlarr fills freed query slots from the remaining planned variants within the existing cap.
+- A separate SQLite measurement store retains up to 50,000 observations for 90 days. Disabled patterns stay visible and recoverable after evidence expires. Tracking adds no provider searches; scheduled torrent preparation remains Bitmagnet-only.
+
 ## 0.96.2 — 2026-09-13
 
 - Matching Lab submits confirmed release and unrelated titles when saving. If matching rules are empty, Save derives rules directly from the confirmed releases instead of rejecting the save. Existing manual rules and date/language choices are preserved.
