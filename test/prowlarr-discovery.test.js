@@ -93,7 +93,7 @@ test('playback serves local Prowlarr matches without any live indexer search',as
   const candidate={title:'MLB Mets Yankees 1080p',infoHash:'a'.repeat(40),seeders:5};
   let searches=0;
   settings.getProwlarrDiscovery=()=>({enabled:true});settings.getCompanion=()=>({enabled:false});settings.getBitmagnet=()=>({enabled:false});settings.getSportVideo=()=>({enabled:false});
-  settings.getProwlarr=()=>({enabled:true,url:'http://mock',apiKey:'fixture'});
+  settings.getProwlarr=()=>({enabled:true,liveSearchEnabled:false,url:'http://mock',apiKey:'fixture'});
   discovery.getDefault=()=>({candidates:()=>[candidate]});pw.multiSearch=async()=>{searches++;return {ok:true,results:[]};};
   tb.checkCachedBatch=async hashes=>new Set(hashes);availability.getDefault=()=>index;
   try {
@@ -101,6 +101,24 @@ test('playback serves local Prowlarr matches without any live indexer search',as
       urlCtx:{origin:'http://sss.invalid',userId:'user',apiToken:'token',showWarmRows:false}});
     assert.equal(rows.length,1);assert.equal(searches,0);assert.match(rows[0].url,/resolve/);
   } finally {[settings.getProwlarrDiscovery,settings.getCompanion,settings.getBitmagnet,settings.getProwlarr,settings.getSportVideo,discovery.getDefault,pw.multiSearch,tb.checkCachedBatch,availability.getDefault]=originals;index.close();}
+});
+
+test('live search switch blocks direct and companion searches outside queue promotions',async()=>{
+  const settings=require('../lib/settings'),pw=require('../lib/sources/prowlarr'),companion=require('../lib/sources/companion-scraper');
+  const streams=require('../lib/streams')._test;
+  const originals=[settings.getProwlarrDiscovery,settings.getCompanion,settings.getBitmagnet,settings.getProwlarr,settings.getSportVideo,pw.multiSearch,companion.scrape];
+  let searches=0;
+  settings.getProwlarrDiscovery=()=>({enabled:false});
+  settings.getCompanion=()=>({enabled:true,url:'http://mock-companion'});
+  settings.getProwlarr=()=>({enabled:true,liveSearchEnabled:false,url:'http://mock',apiKey:'fixture'});
+  settings.getBitmagnet=()=>({enabled:false});settings.getSportVideo=()=>({enabled:false});
+  pw.multiSearch=companion.scrape=async()=>{searches++;throw new Error('unexpected live request');};
+  try {
+    await streams.discoverTorrentCandidates({promo:{id:'ucl'},event:{id:'ucl:1',name:'Celtic vs LASK',date:'2026-09-11'},titles:['Celtic LASK'],log:()=>{},discoveryBudgetMs:1000,liveProwlarr:true});
+    await require('../lib/admin-promotions').researchAliases({}, {name:'UEFA Champions League',eventName:'Celtic vs LASK',eventDate:'2026-09-11'}, {
+      prowlarrSearch:pw.multiSearch,companionSearch:companion.scrape,intelligenceSearch:companion.scrape});
+    assert.equal(searches,0);
+  } finally {[settings.getProwlarrDiscovery,settings.getCompanion,settings.getBitmagnet,settings.getProwlarr,settings.getSportVideo,pw.multiSearch,companion.scrape]=originals;}
 });
 test('research retains unmatched titles without treating them as playback matches or retaining URLs',async()=>{
   const {deps}=setup({search:async(q,opts)=>{opts.onRawResults([{title:'Unknown baseball release 1080p',downloadUrl:'http://private/?apikey=secret',guid:'private',size:100}]);return {ok:true,partial:false,results:[]};}});

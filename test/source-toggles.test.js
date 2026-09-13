@@ -88,6 +88,19 @@ test('a fresh save with no prior state defaults to enabled', () => {
   assert.equal(settings.getBitmagnet().enabled, true);
 });
 
+test('Prowlarr live search defaults on and can be saved independently of the queue', () => {
+  writeRaw({prowlarrDiscovery: {enabled: true}});
+  assert.equal(settings.getProwlarr().liveSearchEnabled, true);
+  settings.setProwlarr({url: 'http://prowlarr:9696', apiKey: 'k', enabled: true, liveSearchEnabled: '0'});
+  assert.equal(settings.getProwlarr().enabled, true);
+  assert.equal(settings.getProwlarr().liveSearchEnabled, false);
+  assert.equal(settings.getProwlarrDiscovery().enabled, true);
+  settings.setProwlarr({url: 'http://prowlarr:9696', apiKey: 'k'});
+  assert.equal(settings.getProwlarr().liveSearchEnabled, false, 'older forms preserve the switch');
+  settings.setProwlarr({url: 'http://prowlarr:9696', apiKey: 'k', liveSearchEnabled: '1'});
+  assert.equal(settings.getProwlarr().liveSearchEnabled, true);
+});
+
 test('disabling a source changes the discovery cache fingerprint', () => {
   // Without this, disabling a source would keep serving searches cached while
   // it was enabled, and the comparison the toggle exists for is meaningless.

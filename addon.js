@@ -1486,6 +1486,7 @@ function createApp() {
         url: security.cleanHttpUrl(b.prowlarrUrl, { label: 'Prowlarr URL' }),
         apiKey: String(b.prowlarrApiKey || ''),
         enabled: toggle(b.prowlarrEnabled),
+        liveSearchEnabled: b.prowlarrLiveSearchPresent === '1' ? toggle(b.prowlarrLiveSearchEnabled) : undefined,
       });
       // Discovery timing. Blank fields fall through to the environment and
       // then the defaults, so clearing one is how an operator says "use
@@ -2254,6 +2255,9 @@ function renderAdminPage(currentUser, opts) {
           summary: 'MLB, NFL and NBA use a measured background queue and saved releases by default. Other promotions search live. <a href="/admin/prowlarr-discovery">Manage Prowlarr discovery</a>. Results are filtered and checked against each user\'s TorBox account. The URL must be reachable from this container.',
           body: sourceToggle('prowlarrEnabled', 'Direct Prowlarr enabled', _prowlarr.enabled,
           'Unticking keeps the URL and API key but takes Prowlarr out of discovery.')
+          + '<input type="hidden" name="prowlarrLiveSearchPresent" value="1">'
+          + sourceToggle('prowlarrLiveSearchEnabled', 'Prowlarr live search enabled', _prowlarr.liveSearchEnabled,
+          'Untick to use saved Prowlarr releases without live searches during playback or Improve Matching. The measured background queue keeps running. Companion torrent searches are also skipped because they can query Prowlarr. MLB, NFL and NBA already use saved releases while the queue is enabled.')
           + '<div class="mb-3">'
           + '<label class="form-label">Prowlarr URL</label>'
           + '<input class="form-control text-mono" type="url" name="prowlarrUrl" value="' + escapeHtml(_prowlarr.url) + '" placeholder="http://prowlarr:9696" autocomplete="off">'
