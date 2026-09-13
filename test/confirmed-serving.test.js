@@ -26,6 +26,7 @@ test('warming replaces a stale negative observation so Refresh Links rechecks To
   const companion = { url: 'http://scraper:8080', authToken: 'token' };
   const prowlarr = { url: '', apiKey: '' };
   const sourceScope = index.scopeFingerprint('torrent', {
+    discoveryVersion: 2, sources: 'all',
     companionUrl: companion.url, companionToken: companion.authToken,
     prowlarrUrl: prowlarr.url, prowlarrApiKey: prowlarr.apiKey,
   });
@@ -129,6 +130,7 @@ test('serves an account-scoped confirmed TorBox row while reusing full stored di
     title: 'UFC.300.Main.Card.1080p.WEB-DL', infoHash: 'd'.repeat(40), size: 8_000_000_000,
   };
   const sourceScope = index.scopeFingerprint('torrent', {
+    discoveryVersion: 2, sources: 'all',
     companionUrl: companion.url, companionToken: companion.authToken,
     prowlarrUrl: prowlarr.url, prowlarrApiKey: prowlarr.apiKey,
   });
@@ -187,6 +189,7 @@ test('a confirmed row does not hide another matched candidate that just finished
     { title: 'ONE.Friday.Fights.167.720p.WEB.C', infoHash: '3'.repeat(40), size: 7 },
   ];
   const sourceScope = index.scopeFingerprint('torrent', {
+    discoveryVersion: 2, sources: 'all',
     companionUrl: companion.url, companionToken: companion.authToken,
     prowlarrUrl: prowlarr.url, prowlarrApiKey: prowlarr.apiKey,
   });
@@ -249,6 +252,7 @@ test('background mode ignores confirmed rows so discovery can refresh the index'
     title: 'UFC.300.Main.Card.1080p.WEB-DL', infoHash: 'e'.repeat(40), size: 8_000_000_000,
   };
   const sourceScope = index.scopeFingerprint('torrent', {
+    discoveryVersion: 2, sources: 'all',
     companionUrl: '', companionToken: '', prowlarrUrl: '', prowlarrApiKey: '',
   });
   const torboxScope = index.scopeFingerprint('torbox', { apiKey: 'torbox-key' });

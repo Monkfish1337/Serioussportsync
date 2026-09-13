@@ -146,7 +146,7 @@ test('the query cap is an operator setting, not a constant', () => {
 test('a fan-out that lost a source is marked partial', () => {
   const source = require('fs').readFileSync(
     require('path').join(__dirname, '..', 'lib', 'streams.js'), 'utf8');
-  assert.match(source, /const partial = answered\.length > 0 && \(lateSources\.length > 0 \|\| failed\.length > 0\)/,
+  assert.match(source, /const partial = answered\.length > 0 && \(lateSources\.length > 0 \|\| failed\.length > 0\s*\|\| outcomes\.some\(\(outcome\) => outcome && outcome\.partial\)\)/,
     'answered-but-incomplete is a distinct state from answered and from failed');
   assert.match(source, /partial,/, 'and it has to travel with the result');
 });

@@ -55,7 +55,7 @@ test('detailed Prowlarr search reports all-failed instead of a cacheable empty r
     const empty = await prowlarr.multiSearch(['UFC 1'], {
       detailed: true, log: () => {}, fetchImpl: async () => response('[]'),
     });
-    assert.deepEqual(empty, { ok: true, error: null, results: [] });
+    assert.deepEqual(empty, { ok: true, partial: false, error: null, results: [] });
   } finally {
     settings.getProwlarr = original;
   }

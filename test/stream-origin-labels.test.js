@@ -13,7 +13,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'lib', 'streams.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '..', 'lib', 'streams.js'), 'utf8').replace(/\r\n/g, '\n');
 
 // The labeller is a pure function of the candidate; lift it out rather than
 // booting the whole stream pipeline to exercise four string cases.
@@ -75,7 +75,7 @@ test('both TorBox rows carry the origin', () => {
 
 test('a torrent found by two sources names both', () => {
   const source = require('fs').readFileSync(
-    require('path').join(__dirname, '..', 'lib', 'streams.js'), 'utf8');
+    require('path').join(__dirname, '..', 'lib', 'streams.js'), 'utf8').replace(/\r\n/g, '\n');
   assert.match(source, /const sourcesByHash = new Map\(\)/);
   assert.match(source, /candidate\.indexer = found\.join\(', '\)/);
   assert.match(source, /noteSource\(hash, candidate\)/,
@@ -95,6 +95,6 @@ test('one source still reads as one source', () => {
   // The point of merging is that "Bitmagnet" alone now MEANS Prowlarr did not
   // return it, rather than meaning Bitmagnet happened to be first in the list.
   const source = require('fs').readFileSync(
-    require('path').join(__dirname, '..', 'lib', 'streams.js'), 'utf8');
+    require('path').join(__dirname, '..', 'lib', 'streams.js'), 'utf8').replace(/\r\n/g, '\n');
   assert.match(source, /if \(found && found\.length\) candidate\.indexer = found\.join/);
 });
