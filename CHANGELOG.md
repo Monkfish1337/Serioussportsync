@@ -1,6 +1,18 @@
 # Changelog
 
-## Unreleased — the wizard tells the truth
+## 0.96.0 — 2026-09-13
+
+- Partial Bitmagnet, Prowlarr and Easynews answers remain usable without being cached as complete searches. Matched live torrents are retained independently and can become account-scoped confirmed TorBox results.
+- Availability preparation remains Bitmagnet-only; its cache no longer suppresses full live searches. Prowlarr hash retrieval respects the configured timeout and shared discovery deadline.
+- Bounded MLB/NBA/NFL Prowlarr queries now include full names and `@` matchups, with a reserved NFL week query when the event provides its season and week. UCL keeps its specialist ordering.
+- Confirmed playable torrents stay selected ahead of higher-resolution, larger uncached discoveries. Confirmed Easynews and native Usenet candidates are merged with new discovery rather than hiding alternatives.
+- Server discovery timing now exposes Easynews query count and timeout, plus an optional fast-response wait. Zero keeps thorough searches. Fast responses retain completed results while bounded live work continues learning candidates for the next refresh.
+- Empty searches for events within the last three days expire after five minutes, rather than thirty.
+- Matching Lab includes direct Bitmagnet and torrent Prowlarr, saved promotion rules, specialist query planning, per-source queries, duration and partial status. Untick the live-plan option to research draft matching rules.
+
+Existing saved request/Prowlarr timeouts are preserved. Easynews defaults to six queries and a five-second per-query timeout. First searches refresh older discovery cache scopes; stored data is not wiped.
+
+### Earlier main changes included in 0.96.0 — the wizard tells the truth
 
 Four reports, and three of them turned out to be one sentence: something on
 screen was not showing what it claimed to be showing.

@@ -86,7 +86,7 @@ test('the race resolves rather than rejecting, so results survive', async () => 
 test('prowlarr is given a bounded query list, not every variant', () => {
   const source = require('fs').readFileSync(
     require('path').join(__dirname, '..', 'lib', 'streams.js'), 'utf8');
-  assert.match(source, /const prowlarrTitles = titles\.slice\(0,/,
+  assert.match(source, /const prowlarrTitles = require\('\.\/discovery-plan'\)\.selectTorrentQueries\(/,
     'a sequential 20s-per-query source cannot be handed 60 variants');
   assert.match(source, /prowlarr\.multiSearch\(prowlarrTitles/);
   // Bitmagnet answered the same fixture in 65ms and keeps the full list.

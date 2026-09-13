@@ -1496,6 +1496,9 @@ function createApp() {
         prowlarrMaxQueries: b.prowlarrMaxQueries,
         prowlarrQueryTimeoutMs: b.prowlarrQueryTimeoutMs,
         indexBuildBudgetMs: b.indexBuildBudgetMs,
+        easynewsMaxQueries: b.easynewsMaxQueries,
+        easynewsQueryTimeoutMs: b.easynewsQueryTimeoutMs,
+        fastResponseGraceMs: b.fastResponseGraceMs,
       });
       // 0.95.0: direct Bitmagnet. URL only — no database credentials.
       settings.setBitmagnet({
@@ -2254,6 +2257,13 @@ function renderAdminPage(currentUser, opts) {
           + '<input class="form-control text-mono" type="number" name="prowlarrQueryTimeoutMs" value="' + escapeHtml(String(_timing.prowlarrQueryTimeoutMs)) + '" min="1000" max="120000" autocomplete="off">'
           + '<div class="form-hint">One HTTP search. A slow indexer inside Prowlarr can hold a query open for all of it. Default 15000.</div></div>'
           + '</div>'
+          + '<div class="row g-3 mb-3"><div class="col-md-4"><label class="form-label">Easynews queries per request</label>'
+          + '<input class="form-control" type="number" name="easynewsMaxQueries" value="' + escapeHtml(String(_timing.easynewsMaxQueries)) + '" min="1" max="6"></div>'
+          + '<div class="col-md-4"><label class="form-label">Easynews per-query timeout (ms)</label>'
+          + '<input class="form-control" type="number" name="easynewsQueryTimeoutMs" value="' + escapeHtml(String(_timing.easynewsQueryTimeoutMs)) + '" min="500" max="120000"></div>'
+          + '<div class="col-md-4"><label class="form-label">Fast response wait (ms)</label>'
+          + '<input class="form-control" type="number" name="fastResponseGraceMs" value="' + escapeHtml(String(_timing.fastResponseGraceMs)) + '" min="0" max="120000">'
+          + '<div class="form-hint">0 keeps thorough searches. For a faster response, try 8000: return completed results after this wait, while remaining searches learn results for the next refresh. If no results have arrived, keep waiting within the request budget.</div></div></div>'
           + '<div class="mb-1"><label class="form-label">Index build budget (ms)</label>'
           + '<input class="form-control text-mono" type="number" name="indexBuildBudgetMs" value="' + escapeHtml(String(_timing.indexBuildBudgetMs)) + '" min="1000" max="600000" autocomplete="off">'
           + '<div class="form-hint">The background build, which nobody is waiting on, so it can afford to be generous. Default 25000.</div></div>',

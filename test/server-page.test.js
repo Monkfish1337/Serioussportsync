@@ -148,7 +148,8 @@ test('the Server page offers every one of them', () => {
     require('path').join(__dirname, '..', 'addon.js'), 'utf8');
   assert.match(source, /title: 'Discovery timing'/);
   for (const field of ['pipelineBudgetMs', 'discoveryBudgetMs', 'prowlarrMaxQueries',
-    'prowlarrQueryTimeoutMs', 'indexBuildBudgetMs']) {
+    'prowlarrQueryTimeoutMs', 'indexBuildBudgetMs', 'easynewsMaxQueries',
+    'easynewsQueryTimeoutMs', 'fastResponseGraceMs']) {
     assert.ok(source.includes('name="' + field + '"'), field + ' needs an input');
     assert.ok(source.includes(field + ': b.' + field), field + ' must reach the save');
   }
