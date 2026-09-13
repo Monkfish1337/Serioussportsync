@@ -109,6 +109,7 @@ function scheduleBackgroundWork(currentCount) {
     log: (message) => console.log('[availability] ' + message),
   });
   sportVideo.startScheduler();
+  require('./lib/prowlarr-discovery').start();
 
 }
 
@@ -125,6 +126,7 @@ function shutdown(signal) {
   console.log(`[serioussportsync] ${signal} received, shutting down`);
   availabilityScheduler.stop();
   sportVideo.stopScheduler();
+  require('./lib/prowlarr-discovery').stop();
   server.close(() => {
     try { if (availabilityIndex) availabilityIndex.close(); } catch (_) { /* already closed */ }
     process.exit(0);

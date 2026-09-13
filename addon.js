@@ -1739,6 +1739,22 @@ function createApp() {
     }
   });
 
+  app.get('/admin/prowlarr-discovery', requireAdmin, (req,res) => {
+    res.set('Cache-Control','no-store');
+    res.send(tablerChrome.tablerPage('Prowlarr discovery',require('./lib/admin-prowlarr-discovery').render(),
+      {user:req.user,currentSection:'server'}));
+  });
+  app.post('/admin/prowlarr-discovery', requireAdmin, (req,res) => {
+    settings.setProwlarrDiscovery({enabled:req.body.enabled==='1',intervalSeconds:Number(req.body.intervalSeconds),
+      dailyRequests:Number(req.body.dailyRequests),lookbackDays:Number(req.body.lookbackDays),timeoutSeconds:Number(req.body.timeoutSeconds)});
+    res.redirect(303,'/admin/prowlarr-discovery');
+  });
+  app.post('/admin/prowlarr-discovery/queue', requireAdmin, (req,res) => {
+    const event = store.getEvent(String(req.body.eventId || ''));
+    if (!event) return res.status(404).send('Event not found');
+    try {require('./lib/prowlarr-discovery').getDefault().enqueue(event); res.redirect(303,'/admin/prowlarr-discovery');}
+    catch (error) {res.status(400).send(error.message);}
+  });
   app.get('/admin/promotions/:id/aliases', requireAdmin, (req, res) => {
     const promotion = promotions.all.find(item => item.id === req.params.id);
     if (!promotion) return res.status(404).send('Promotion not found');
@@ -2235,7 +2251,7 @@ function renderAdminPage(currentUser, opts) {
           title: 'Direct Prowlarr',
           enabled: _prowlarr.enabled && !!(_prowlarr.url && _prowlarr.apiKey),
           open: !(_prowlarr.url && _prowlarr.apiKey),
-          summary: 'Query Prowlarr directly when a user opens an event. Discovery is request-only and limited to that event. Results are filtered and checked against each user\'s TorBox account; raw torrent rows are never returned. The URL must be reachable from this container — for a separate Dockge stack use a shared Docker network or the server address, since <code>localhost</code> means this container.',
+          summary: 'MLB, NFL and NBA use a measured background queue and saved releases by default. Other promotions search live. <a href="/admin/prowlarr-discovery">Manage Prowlarr discovery</a>. Results are filtered and checked against each user\'s TorBox account. The URL must be reachable from this container.',
           body: sourceToggle('prowlarrEnabled', 'Direct Prowlarr enabled', _prowlarr.enabled,
           'Unticking keeps the URL and API key but takes Prowlarr out of discovery.')
           + '<div class="mb-3">'

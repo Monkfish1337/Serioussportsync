@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.98.0 — 2026-09-13
+
+- MLB, NFL and NBA use a persistent, measured Prowlarr queue instead of live torrent fan-out during playback. Fast sources and locally matched releases serve requests.
+- Searches target one healthy indexer at a time, with adjustable spacing, daily budgets, generous timeouts and failure cooldowns. Identical queries share cooldowns across fixtures; broad responses match multiple games locally.
+- Missing past games are prioritised; future and ongoing games are excluded. Budgets, fixture retries and metadata recovery caches survive restarts. The ordinary bulk warmer remains Bitmagnet-only.
+- Review Aliases receives actual queued search evidence per indexer, applying both general and individual indexer policies. Internal indexer failures cannot become successful zero-hit evidence.
+- Improve Matching uses saved Prowlarr suggestions, including titles without recoverable hashes, without making live searches. Those suggestions are kept separate from confirmed playback matches.
+- Manage queue settings, budgets, retry history and missing-game priority from Server → Direct Prowlarr → Manage Prowlarr discovery. See the v0.98.0 release notes for defaults and limits.
+
 ## 0.97.0 — 2026-09-13
 
 - Every promotion has a Review aliases page showing per-source query patterns, successful searches, zero hits, timeouts, errors, unattempted queries, matched and incremental unique results, average duration and unique matches per second.

@@ -1,4 +1,6 @@
 'use strict';
+// Verify the retained opt-out/live mode independently of the default queue.
+process.env.PROWLARR_DISCOVERY_ENABLED = '0';
 process.env.SESSION_SECRET ||= 'discovery-live-coverage-secret-0000000000000000000000';
 const test = require('node:test');
 const assert = require('node:assert/strict');

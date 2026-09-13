@@ -1,4 +1,5 @@
 'use strict';
+process.env.PROWLARR_DISCOVERY_ENABLED = '0';
 process.env.SESSION_SECRET ||= 'partial-live-confirmed-test-secret-00000000000000000000';
 const test = require('node:test');
 const assert = require('node:assert/strict');
