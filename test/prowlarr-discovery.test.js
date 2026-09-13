@@ -35,9 +35,38 @@ test('one indexer search matches multiple fixtures and suppresses repeat searche
     assert.equal((await queue.run()).matched,2);
     assert.equal(queue.candidates(fixtures[0]).length,1); assert.equal(queue.candidates(fixtures[1]).length,1);
     assert.equal(queue.status().indexers[0].requests,1);
+    assert.equal(queue.status().indexers[0].successes,1);
+    assert.equal(queue.status().matchedEvents.length,2);
+    assert.equal(queue.status().matchedEvents[0].name,fixtures[0].name);
     queue.enqueue(fixtures[0]); advance(120000);
     assert.equal((await queue.run()).skipped,'no-due-games'); assert.equal(calls,1);
   } finally {queue.close();}
+});
+
+test('success counts survive restart and count partial matched searches once',async()=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'sss-prowlarr-success-')),file=path.join(dir,'queue.sqlite');
+  const {deps}=setup({search:async()=>({ok:true,partial:true,results:[1,2].map(i=>({title:'MLB Mets vs Yankees 1080p',infoHash:String(i).repeat(40),seeders:5,indexer:'RuTracker'}))})});
+  let queue=discovery.createQueue(file,deps);
+  try {
+    await queue.run();queue.close();queue=discovery.createQueue(file,deps);
+    assert.equal(queue.status().indexers[0].successes,1);
+    assert.equal(queue.status().matchedEvents.length,1);
+    assert.equal(queue.status().matchedEvents[0].releases,2);
+    assert.deepEqual(queue.status().matchedEvents[0].indexers,['RuTracker']);
+  } finally {queue.close();fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+test('discovery page shows event names, successes and matched events without test playback controls',()=>{
+  const store=require('../lib/store'),page=require('../lib/admin-prowlarr-discovery');
+  const originals=[discovery.getDefault,store.getEvents];
+  discovery.getDefault=()=>({status:()=>({options:{enabled:true,lookbackDays:7},matches:2,indexers:[{id:30,name:'RuTracker',requests:4,day:'2026-09-13',successes:1,failures:0}],
+    jobs:[{event:'mlb:1',indexer:30,status:'matched'}],matchedEvents:[{event:'mlb:1',name:'Mets <vs> Yankees',date:'2026-09-11',indexers:['RuTracker'],releases:2}]})});
+  store.getEvents=()=>[{...fixtures[0],name:'Mets <vs> Yankees'}];
+  try {
+    const html=page.render();assert.match(html,/Successes/);assert.match(html,/Successfully matched events/);
+    assert.match(html,/Mets &lt;vs&gt; Yankees/);assert.doesNotMatch(html,/<td>mlb:1<\/td>/);
+    assert.doesNotMatch(html,/Test playback|\/stream\//);
+  } finally {[discovery.getDefault,store.getEvents]=originals;}
 });
 test('spacing, failure cooldown and fixture retries survive restart and repeated queue clicks',async()=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'sss-prowlarr-queue-')),file=path.join(dir,'queue.sqlite');
