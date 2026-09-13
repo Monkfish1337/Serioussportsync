@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.98.1 — 2026-09-13
+
+- Stop Prowlarr searches immediately when their discovery deadline expires, avoiding a timer-boundary race that could start one extra query and misclassify an unattempted query as a timeout.
+
 ## 0.98.0 — 2026-09-13
 
 - MLB, NFL and NBA use a persistent, measured Prowlarr queue instead of live torrent fan-out during playback. Fast sources and locally matched releases serve requests.
