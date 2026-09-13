@@ -30,6 +30,15 @@ const nfl = promotions.all.find((p) => p.id === 'nfl');
 const nba = promotions.all.find((p) => p.id === 'nba');
 const mlb = promotions.all.find((p) => p.id === 'mlb');
 
+test('MLB releases match only their official fixture day across consecutive series games', () => {
+  const title='MLB.2026.09.12.Chicago.Cubs.vs.Pittsburgh.Pirates.1080p.WEB-DL';
+  for (const date of ['2026-09-11','2026-09-12','2026-09-13']) {
+    const event={id:'mlb:824630',name:'Pittsburgh Pirates vs Chicago Cubs',date};
+    assert.equal(mlb.isRelevantStreamTitle(title,event).ok,date==='2026-09-12',date);
+  }
+  assert.equal(mlb.isRelevantStreamTitle('MLB.12.09.2026.Cubs.vs.Pirates.1080p',{name:'Pittsburgh Pirates vs Chicago Cubs',date:'2026-09-12'}).ok,true);
+});
+
 // Queries reach an ANDing index — Bitmagnet ANDs every term — so a query can
 // only return a release that contains all of its words.
 function andMatches(queries, releaseTitle) {
