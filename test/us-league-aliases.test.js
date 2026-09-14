@@ -626,7 +626,7 @@ test('a week number identifies a fixture the way a date does', () => {
 
   ok('NFL.2026-2027.W04.Packers-Cowboys.1080p.ACC.2CH.MKV-CG');
   ok('NFL.2026-2027.W4.Packers-Cowboys.1080p');
-  ok('NFL.Week.4.Packers.vs.Cowboys.1080p');
+  no('NFL.Week.4.Packers.vs.Cowboys.1080p');
   ok('NFL.26-27.W04.Packers-Cowboys.1080p');
   ok('NFL.2026.09.27.Packers.vs.Cowboys.1080p.WEB.h264');
 
@@ -634,6 +634,9 @@ test('a week number identifies a fixture the way a date does', () => {
   // accepted by a rule that merely noticed "a week number is present".
   no('NFL.2026-2027.W05.Packers-Cowboys.1080p');
   no('NFL.2024-2025.W04.Packers-Cowboys.1080p');
+  no('NFL.2025-2026.W04.Packers-Cowboys.1080p');
+  no('NFL_2025-2026_W04_Packers-Cowboys_1080p');
+  ok('NFL_2026-2027_W04_Packers-Cowboys_1080p');
   no('NFL.2026-2027.W04.Steelers-Ravens.1080p');
 
   const dateOnly = Object.assign({}, event);
