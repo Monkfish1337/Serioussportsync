@@ -136,6 +136,20 @@ Back up:
 
 Find the exact volume name and mount point without guessing:
 
+The admin **Backup** link also downloads the data directory while SSS runs.
+SSS copies ordinary files into a private staging directory on the data volume, creates standalone
+online snapshots of every SQLite database (including Prowlarr queue state), checks
+database integrity, and verifies the completed archive before downloading it.
+Failed preparation returns an error rather than a partial archive. A disconnected
+request cancels preparation. Temporary files are removed after download.
+This needs free space on the data volume for both the snapshots and compressed
+archive, rather than the container's limited `/tmp`. The `.backup-staging`
+directory is excluded from backups. If a container is forcibly terminated during
+a backup, remove abandoned `sss-backup-*` directories there once no backup is running.
+Databases are individually consistent; this is not one transaction across all
+stores. Files configured outside the data directory and the deployment `.env`
+must be backed up separately. Preserve the same `SESSION_SECRET`.
+
 ```bash
 docker inspect serioussportsync --format '{{range .Mounts}}{{println .Name .Source "->" .Destination}}{{end}}'
 ```
@@ -156,6 +170,19 @@ docker compose start
 To rebuild, restore `.env` with the same `SESSION_SECRET`, restore the data to a
 volume mounted at `/app/data`, and run `docker compose up -d`. A restored data
 volume with a different secret may leave encrypted provider settings unusable.
+
+For a recovery rehearsal, use a separate Compose project and fresh volume, with
+a different container name and host port. Extract the backup into that volume
+and ensure its files belong to the image's `app` user before starting it. Verify
+admin login, user roles, access requests, provider settings, metadata and saved
+discovery releases there. For rollback, restore the pre-upgrade backup into a
+fresh isolated volume and start the earlier image; do not point it at databases
+already migrated by a newer image.
+
+Developers can run `npm run test:recovery` for the disposable fixture drill.
+It does not use production accounts or data. The publish workflow also runs it
+inside the release candidate before uploading the image. See
+[v1 release validation](V1_READINESS.md) for the remaining operator checks.
 
 ## Common problems
 

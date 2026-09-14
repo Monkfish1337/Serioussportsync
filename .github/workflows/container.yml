@@ -59,6 +59,7 @@ jobs:
           npm run test:unit
           npm run test:nuvio
           npm run test:account
+          npm run test:recovery
 
       - uses: docker/setup-buildx-action@v3
 
@@ -98,6 +99,7 @@ jobs:
           printf 'services:\n  serioussportsync:\n    image: sss-release-candidate:ci\n    pull_policy: never\n' > compose.ci.yml
           docker compose -f docker-compose.yml -f compose.ci.yml up -d --wait --wait-timeout 120
           curl --fail --show-error --retry 5 --retry-delay 2 http://127.0.0.1:7000/health
+          docker compose -f docker-compose.yml -f compose.ci.yml exec -T serioussportsync node scripts/test-recovery.js
 
       - name: Publish tested image
         env:

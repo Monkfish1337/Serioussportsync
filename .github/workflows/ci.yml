@@ -113,6 +113,9 @@ jobs:
       - name: Authenticated account configuration tests
         run: npm run test:account
 
+      - name: Application backup and recovery drill
+        run: npm run test:recovery
+
       - name: Playback provider unit tests
         run: npm run test:unit
 

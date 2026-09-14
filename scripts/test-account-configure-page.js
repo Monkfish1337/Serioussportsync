@@ -109,6 +109,12 @@ function listen(app) {
     assert.strictEqual((await fetch(base+'/admin/discovery',{headers:{Cookie:regularCookie}})).status,403);
     assert.strictEqual((await fetch(base+'/assets/discovery-controls.js')).status,200);
     assert.strictEqual((await fetch(base+'/assets/table-sort.js')).status,200);
+    assert.strictEqual((await fetch(base+'/admin/backup',{headers:{Cookie:regularCookie}})).status,403);
+    const backupDownload=await fetch(base+'/admin/backup',{headers:{Cookie:cookie}});
+    assert.strictEqual(backupDownload.status,200);
+    assert.ok(backupDownload.headers.get('content-disposition').includes('serioussportsync-backup-'));
+    const archiveBytes=Buffer.from(await backupDownload.arrayBuffer());
+    assert.equal(archiveBytes[0],0x1f);assert.equal(archiveBytes[1],0x8b);
     await post('/admin/prowlarr-discovery',{enabled:'1',intervalSeconds:'120',dailyRequests:'100',lookbackDays:'7',timeoutSeconds:'120',promotions:['ucl','mlb']},cookie);
     assert.deepEqual(require('../lib/settings').getProwlarrDiscovery().promotions,['ucl','mlb']);
     const selectedQueue=await (await fetch(base+'/admin/discovery?tab=prowlarr',{headers:{Cookie:cookie}})).text();

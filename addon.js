@@ -1522,32 +1522,31 @@ function createApp() {
   // Backup endpoint (0.24.0). Streams a timestamped tar.gz of the data/
   // directory to the admin as a download. Includes events.json, users.json,
   // settings, all denylists, positive cache, and other runtime state —
-  // everything that lives in the named Docker volume. Pipe-streams via the
-  // container's bundled tar binary so we don't bloat the npm tree.
-  app.get('/admin/backup', requireAdmin, (req, res) => {
-    const { spawn } = require('child_process');
-    // Fold the WAL into the main database so a copied archive is immediately
-    // self-contained even when no later write has triggered a checkpoint.
-    try { availabilityStore.getDefault().checkpoint(); }
-    catch (error) { console.error('[availability] backup checkpoint failed:', error.message); }
-    const dataDir = path.dirname(config.dataFile); // ./data → /app/data
-    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const filename = 'serioussportsync-backup-' + ts + '.tar.gz';
-    res.setHeader('Content-Type', 'application/gzip');
-    res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
-    res.setHeader('Cache-Control', 'no-store');
-    const proc = spawn('tar', ['-czf', '-', '-C', dataDir, '.']);
-    proc.stdout.pipe(res);
-    proc.stderr.on('data', (d) => console.error('[backup] tar stderr: ' + d.toString().trim()));
-    proc.on('error', (err) => {
-      console.error('[backup] spawn error:', err.message);
-      if (!res.headersSent) res.status(500).end('Backup failed: ' + err.message);
-    });
-    proc.on('exit', (code) => {
-      if (code !== 0) console.error('[backup] tar exited with code ' + code);
-    });
+  // everything that lives in the named Docker volume. Build and validate an
+  // archive of standalone SQLite snapshots before starting the download.
+  let backupRunning=false;
+  app.get('/admin/backup', requireAdmin, async (req,res) => {
+    res.setHeader('Cache-Control','no-store');
+    if(backupRunning) return res.status(429).send('A backup is already being prepared. Try again shortly.');
+    backupRunning=true;
+    const controller=new AbortController();
+    const cancel=()=>controller.abort();res.once('close',cancel);
+    let backup;
+    try {
+      backup=await require('./lib/data-backup').createArchive(path.dirname(config.dataFile),{signal:controller.signal});
+      if(res.destroyed) {await backup.cleanup();res.removeListener('close',cancel);return;}
+      const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+      res.download(backup.archive,'serioussportsync-backup-'+ts+'.tar.gz',error=>{
+        backup.cleanup().catch(error=>console.error('[backup] cleanup failed:',error.message));
+        res.removeListener('close',cancel);
+        if(error && !res.headersSent && !res.destroyed) res.status(500).end('Backup download failed.');
+      });
+    } catch(error) {
+      console.error('[backup] preparation failed:',error.message);
+      if(!res.destroyed && !res.headersSent) res.status(503).send('Backup could not be prepared. Check server logs.');
+      res.removeListener('close',cancel);
+    } finally {backupRunning=false;}
   });
-
   // Save server-wide metadata and torrent discovery sources.
   app.post('/admin/sources', requireAdmin, (req, res) => {
     const b = req.body || {};

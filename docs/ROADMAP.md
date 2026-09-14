@@ -1,5 +1,25 @@
 # SeriousSportSync roadmap
 
+## Road to v1
+
+Implementation is complete for the v1 readiness work: account-store recovery
+errors, atomic first-admin setup, access-request approval, admin-only DIY Usenet,
+measured Prowlarr discovery, source-specific promotion selection, usable-release
+coverage reporting, sortable tables, collection controls and upgrade migrations.
+Online backups now snapshot SQLite WAL data safely, validate archives, cancel
+disconnected preparation and use the data volume for staging. Application restore,
+restart and optional earlier-source rollback have a repeatable automated drill.
+The exact release image must pass the same recovery drill before publication.
+
+The release validation and outstanding operator evidence are tracked in
+[v1 release validation](V1_READINESS.md). Creating the v1 tag requires the recorded
+container restore and representative playback outcomes. A fixed seven-day waiting
+period is not required.
+
+Smart Play, additional provider-priority controls and replacing the metadata
+dispatcher with a common adapter registry are follow-up work after v1, rather
+than release blockers.
+
 ## P1 security hardening
 
 Progress: complete in v0.64.0. Authentication/session revocation, cross-site
