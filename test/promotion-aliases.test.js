@@ -7,6 +7,23 @@ const { createGenericPromotion } = require('../lib/promotions');
 const adminPromotions = require('../lib/admin-promotions');
 const customPromotions = require('../lib/custom-promotions');
 
+test('football season and matchday releases require both teams, competition and exact season/round',()=>{
+  const promotion=createGenericPromotion({id:'epl-test',name:'Premier League',source:'football-data',competitionId:'PL',
+    teamAliasPreset:'epl',promotionAliases:['Premier League','EPL'],relevanceKeywords:['premier league','epl'],requireDateInTitle:true});
+  const event={name:'Man United vs Man City',date:'2026-09-13',season:'2026',round:'4',competitionCode:'PL'};
+  const title='Premier_League_2026_2027_04_day_Manchester_United_Manchester_City_HD_nadezhdin04';
+  assert.equal(promotion.isRelevantStreamTitle(title,event).ok,true);
+  assert.equal(promotion.isRelevantStreamTitle(title,{...event,season:'2025'}).reason,'wrong-season');
+  assert.equal(promotion.isRelevantStreamTitle(title,{...event,round:'5'}).reason,'wrong-round');
+  assert.equal(promotion.isRelevantStreamTitle(title,{...event,round:null}).reason,'no-date-in-title');
+  assert.equal(promotion.isRelevantStreamTitle(title.replace('Manchester_City','Liverpool'),event).ok,false);
+  assert.equal(promotion.isRelevantStreamTitle(title.replace('Premier_League','FA_Cup'),event).ok,false);
+  assert.equal(promotion.isRelevantStreamTitle(title.replace('2026_2027','2026_2028'),event).reason,'wrong-season');
+  assert.equal(promotion.isRelevantStreamTitle('EPL_2026_27_MD04_Manchester_United_vs_Manchester_City_1080p',event).ok,true);
+  assert.equal(promotion.isRelevantStreamTitle('EPL_2026_2027_R04_Manchester_United_vs_Manchester_City_1080p',event).ok,true);
+  assert.ok(promotion.searchTitles(event).slice(0,12).some(q=>q.includes('Manchester United')&&q.includes('Manchester City')&&q.includes('2026 2027')&&!q.includes(' vs ')));
+});
+
 test('learns the observed full abbreviation and compact date from a date-first show release',()=>{
   const title='20260912_EPL_26.27_R.04_MOTD_Saturday_[rgfootball.net]_1080i.ts';
   const rules=aliases.suggestPromotionSetup('Match of the Day',[title]);
