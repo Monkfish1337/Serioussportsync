@@ -7,6 +7,35 @@ const { createGenericPromotion } = require('../lib/promotions');
 const adminPromotions = require('../lib/admin-promotions');
 const customPromotions = require('../lib/custom-promotions');
 
+test('learns the observed full abbreviation and compact date from a date-first show release',()=>{
+  const title='20260912_EPL_26.27_R.04_MOTD_Saturday_[rgfootball.net]_1080i.ts';
+  const rules=aliases.suggestPromotionSetup('Match of the Day',[title]);
+  assert.deepEqual(rules.aliases,['Match of the Day','MOTD']);
+  assert.equal(rules.searchTitleTemplates[0],'{date_compact} {promotion}');
+  const promotion=createGenericPromotion({id:'show-test',name:'Match of the Day',source:'tsdb',leagueId:'1',
+    promotionAliases:rules.aliases,relevanceKeywords:rules.keywords,searchTitleTemplates:rules.searchTitleTemplates,requireDateInTitle:true});
+  const event={name:'Match of the Day 12 09 2026',date:'2026-09-12'};
+  assert.ok(promotion.searchTitles(event).includes('20260912 MOTD'));
+  assert.equal(promotion.isRelevantStreamTitle(title,event).ok,true);
+  assert.equal(promotion.isRelevantStreamTitle(title,{...event,date:'2026-09-05'}).reason,'wrong-date');
+});
+
+test('shared learning handles date-first compact fixtures and abbreviations retaining connecting words',()=>{
+  const rules=aliases.suggestPromotionSetup('National Football League',['20260912_NFL_Bills_vs_Texans_1080p.mkv']);
+  assert.ok(rules.aliases.includes('NFL'));
+  assert.equal(rules.searchTitleTemplates[0],'{date_compact} {promotion} {name}');
+  assert.deepEqual(aliases.derivePromotionAliases('State of Origin',['20260912_SOO_1080p.mkv']),['State of Origin','SOO']);
+  assert.equal(aliases.deriveSearchTitleTemplates('State of Origin',['2026.09.12_SOO_1080p.mkv'])[0],'{date_spaced} {promotion}');
+  assert.ok(!aliases.derivePromotionAliases('State of Origin',['20260912_SOO_1080p.mkv']).includes('20260912'));
+});
+
+test('existing aliases get compact queries for dated shows without dropping fixture teams',()=>{
+  const promotion=createGenericPromotion({id:'show-test',name:'Match of the Day',source:'tsdb',leagueId:'1',
+    promotionAliases:['MOTD'],searchTitleTemplates:['{name}']});
+  assert.ok(promotion.searchTitles({name:'Match of the Day 12 09 2026',date:'2026-09-12'}).includes('MOTD 20260912'));
+  assert.ok(!promotion.searchTitles({name:'Liverpool vs Arsenal',date:'2026-09-12'}).includes('MOTD 20260912'));
+});
+
 test('derives stable F1 aliases while removing release noise', () => {
   const result = aliases.derivePromotionAliases('Formula 1', [
     'Formula.1.2026.Dutch.Grand.Prix.1080p.WEB-DL.H264-GROUP',
