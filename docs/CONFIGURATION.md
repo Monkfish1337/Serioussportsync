@@ -149,20 +149,25 @@ Improve Matching research still searches configured, enabled Prowlarr directly,
 including promotions using the measured queue. Research requests are bounded
 and title-only, so they do not fetch torrent metadata or start downloads.
 
-The admin sidebar now has a Discovery page with Overview, Events, Prowlarr,
+The admin sidebar now has a Discovery page with Events, Prowlarr,
 Sport-Video and Bitmagnet tabs. Prowlarr has its own promotion selection, defaulting
-to MLB, NFL and NBA; other promotions can opt into the measured queue. The
-Overview selection must also include promotions selected for Prowlarr.
+to MLB, NFL and NBA; other promotions can opt into the measured queue.
+Each source has an independent promotion selection. Events is the default tab.
+The former Overview filter is migrated into each source's effective selection
+without expanding background work; saving a source changes only that source.
 The Bitmagnet tab prepares only Bitmagnet torrent results and their TorBox
 availability. UU and Easynews remain live responders; legacy preparation
 settings and the old all-torrent-sources override cannot enable them here.
-The Overview promotion selection controls
-automatic Prowlarr event work, Sport-Video torrent preparation and warming,
-and automatic availability preparation. Existing source switches, supported
+Sport-Video selection controls automatic torrent preparation and warming;
+Bitmagnet selection controls automatic availability preparation.
+Existing source switches, supported
 promotions, categories, team filters and account catalog selections still apply.
 Before a selection is saved, existing coverage is preserved. Selecting no
 promotions pauses automatic event work without deleting saved results.
 Sport-Video listing collection and manual actions are unaffected.
+Settings and long histories can be expanded as needed. Tables show 15 rows per
+page and can be filtered without hiding matches on later pages. Bitmagnet saves
+and manual preparation return to its source tab.
 
 The Events tab combines saved Prowlarr and Sport-Video evidence by event and
 preserves source names. It does not combine account-specific playable counts.

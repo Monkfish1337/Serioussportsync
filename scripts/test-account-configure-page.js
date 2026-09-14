@@ -100,12 +100,13 @@ function listen(app) {
     const metadataHtml=await (await fetch(base+'/admin/metadata',{headers:{Cookie:cookie}})).text();
     const discoveryHtml=await (await fetch(base+'/admin/prowlarr-discovery',{headers:{Cookie:cookie}})).text();
     assert.ok(discoveryHtml.includes('Catch-up progress') && discoveryHtml.includes('Event discovery status'));
-    for (const tab of ['overview','events','prowlarr','preparation']) {
+    for (const tab of ['events','prowlarr','preparation']) {
       const response=await fetch(base+'/admin/discovery?tab='+tab,{headers:{Cookie:cookie}});
       assert.strictEqual(response.status,200);
-      assert.ok((await response.text()).includes('Save promotion selection') || tab!=='overview');
+      assert.ok(!(await response.text()).includes('>Overview</a>'));
     }
     assert.strictEqual((await fetch(base+'/admin/discovery',{headers:{Cookie:regularCookie}})).status,403);
+    assert.strictEqual((await fetch(base+'/assets/discovery-controls.js')).status,200);
     await post('/admin/prowlarr-discovery',{enabled:'1',intervalSeconds:'120',dailyRequests:'100',lookbackDays:'7',timeoutSeconds:'120',promotions:['ucl','mlb']},cookie);
     assert.deepEqual(require('../lib/settings').getProwlarrDiscovery().promotions,['ucl','mlb']);
     const selectedQueue=await (await fetch(base+'/admin/discovery?tab=prowlarr',{headers:{Cookie:cookie}})).text();
@@ -114,12 +115,19 @@ function listen(app) {
     assert.ok(bitmagnetHtml.includes('>Bitmagnet</a>'));
     assert.ok(!bitmagnetHtml.includes('name="prepareUsenet"') && !bitmagnetHtml.includes('name="prepareEasynews"'));
     assert.strictEqual((await post('/admin/discovery/promotions',{promotions:'mlb'},regularCookie)).status,403);
-    await post('/admin/discovery/promotions',{promotions:'mlb'},cookie);
-    assert.strictEqual(require('../lib/settings').discoveryIncludes('mlb:fixture'),true);
-    assert.strictEqual(require('../lib/settings').discoveryIncludes('nfl:fixture'),false);
-    await post('/admin/discovery/promotions',{},cookie);
-    assert.strictEqual(require('../lib/settings').discoveryIncludes('mlb:fixture'),false);
-    await post('/admin/discovery/promotions',{promotions:require('../lib/promotions').all.map(p=>p.id)},cookie);
+    assert.strictEqual((await post('/admin/discovery/bitmagnet/promotions',{promotions:'mlb'},regularCookie)).status,403);
+    assert.strictEqual((await post('/admin/discovery/promotions',{},cookie)).status,410);
+    await post('/admin/discovery/bitmagnet/promotions',{promotions:'mlb'},cookie);
+    const discoverySettings=require('../lib/settings');
+    assert.strictEqual(discoverySettings.sourceDiscoveryIncludes('bitmagnet','mlb:fixture'),true);
+    assert.strictEqual(discoverySettings.sourceDiscoveryIncludes('bitmagnet','nfl:fixture'),false);
+    await post('/admin/discovery/bitmagnet/promotions',{},cookie);
+    assert.strictEqual(discoverySettings.sourceDiscoveryIncludes('bitmagnet','mlb:fixture'),false);
+    assert.deepEqual(discoverySettings.getProwlarrDiscovery().promotions,['ucl','mlb']);
+    await post('/admin/discovery/sport-video/promotions',{promotions:'nfl'},cookie);
+    assert.strictEqual(discoverySettings.sourceDiscoveryIncludes('sport-video','nfl:fixture'),true);
+    assert.strictEqual(discoverySettings.sourceDiscoveryIncludes('sport-video','mlb:fixture'),false);
+    for(const source of ['bitmagnet','sport-video']) await post('/admin/discovery/'+source+'/promotions',{promotions:require('../lib/promotions').all.map(p=>p.id)},cookie);
     assert.ok(metadataHtml.includes('Metadata API keys') && metadataHtml.includes('Force Metadata Refresh'));
     await post('/admin/metadata-keys',{footballDataApiKey:'test-football-key',apiFootballApiKey:'test-api-key',tmdbApiKey:'test-tmdb-key'},cookie);
     assert.strictEqual(require('../lib/settings').getTmdb().apiKey,'test-tmdb-key');
@@ -230,7 +238,7 @@ function listen(app) {
       }).toString(),
     });
     assert.strictEqual(saveDatabase.status, 302, 'Database settings save successfully');
-    assert.ok(String(saveDatabase.headers.get('location')).startsWith('/admin/database?flash='));
+    assert.ok(String(saveDatabase.headers.get('location')).startsWith('/admin/discovery?tab=preparation&flash='));
     assert.equal(require('../lib/settings').getAvailabilityWarm().windowDays, 10);
     assert.equal(require('../lib/settings').getAvailabilityWarm().serveConfirmed, true);
     assert.equal(require('../lib/settings').getAvailabilityWarm().prepareTorrent, true);

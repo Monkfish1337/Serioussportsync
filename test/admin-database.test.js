@@ -14,6 +14,23 @@ const adminDatabase = require('../lib/admin-database');
 
 test.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
 
+test('legacy shared promotions migrate into independent source selections without expanding coverage',()=>{
+  const file=process.env.SETTINGS_FILE;
+  const previous=fs.existsSync(file)?fs.readFileSync(file):null;
+  try {
+    fs.writeFileSync(file,JSON.stringify({discoveryPromotions:['mlb'],prowlarrDiscovery:{promotions:['mlb','nfl']}}));
+    assert.deepEqual(settings.getProwlarrDiscovery().promotions,['mlb']);
+    assert.deepEqual(settings.getSourceDiscoveryPromotions('bitmagnet'),['mlb']);
+    settings.setSourceDiscoveryPromotions('bitmagnet',[]);
+    assert.equal(settings.sourceDiscoveryIncludes('bitmagnet','mlb:1'),false);
+    assert.equal(settings.sourceDiscoveryIncludes('sport-video','mlb:1'),true);
+    assert.deepEqual(settings.getProwlarrDiscovery().promotions,['mlb']);
+    settings.setProwlarrDiscovery({promotions:['nfl']});
+    assert.deepEqual(settings.getProwlarrDiscovery().promotions,['nfl']);
+    assert.equal(settings.sourceDiscoveryIncludes('bitmagnet','nfl:1'),false);
+  } finally {if(previous) fs.writeFileSync(file,previous);else fs.unlinkSync(file);}
+});
+
 test('persists validated warmer settings and restores environment defaults', () => {
   const saved = settings.setAvailabilityWarm({
     enabled: false, serveConfirmed: true, windowDays: 14, intervalHours: 1.5,

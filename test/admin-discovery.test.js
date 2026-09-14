@@ -17,7 +17,16 @@ test('Discovery promotion filter excludes other events and escapes flash text',(
   assert.doesNotMatch(html,/Pirates vs Cubs/);
   assert.match(html,/&lt;script&gt;/);
 });
-test('Explicit empty promotion selection stays empty rather than resetting to all',()=>{
-  assert.doesNotMatch(render({...base,tab:'overview',selected:[]}),/ checked/);
-  assert.match(render({...base,tab:'overview',selected:null}),/ checked/);
+test('saved Prowlarr coverage remains visible when the event leaves the active queue',()=>{
+  const html=render({...base,releases:[],queue:{eventStates:[],matchedEvents:[{id:'mlb:1'}]}});
+  assert.match(html,/Pirates vs Cubs/);
+  assert.match(html,/<td>Prowlarr<\/td>/);
+});
+test('source promotion selection preserves empty selections and Overview is removed',()=>{
+  const empty=render({...base,tab:'preparation',selection:{source:'bitmagnet',ids:[]}});
+  assert.doesNotMatch(empty,/ checked/);
+  assert.match(empty,/0 selected/);
+  assert.match(empty,/\/admin\/discovery\/bitmagnet\/promotions/);
+  assert.match(render({...base,tab:'preparation',selection:{source:'bitmagnet',ids:null}}),/ checked/);
+  assert.doesNotMatch(render({...base,tab:'overview'}),/>Overview</);
 });

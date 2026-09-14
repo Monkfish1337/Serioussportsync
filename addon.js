@@ -1244,19 +1244,28 @@ function createApp() {
     res.set('Cache-Control','no-store');
     try {
       const ui=require('./lib/admin-discovery');
-      const tab=Object.hasOwn(ui.tabs,req.query.tab)?req.query.tab:'overview';
+      const tab=Object.hasOwn(ui.tabs,req.query.tab)?req.query.tab:'events';
       const data={tab,flash:req.query.flash,promotion:String(req.query.promotion || ''),
-        selected:settings.getDiscoveryPromotions(),promotions:promotions.all.map(p=>({id:p.id,name:p.name})),
+        promotions:promotions.all.map(p=>({id:p.id,name:p.name})),
         events:store.getEvents(),queue:require('./lib/prowlarr-discovery').getDefault().status(),
         releases:sportVideo.load().releases || []};
-      if(tab==='prowlarr') data.body=require('./lib/admin-prowlarr-discovery').render();
+      if(tab==='prowlarr') data.body=require('./lib/admin-prowlarr-discovery').render(data.queue);
       if(tab==='sport-video') data.body=adminSportVideo.renderBody(await sportVideoSnapshot(req.user));
       if(tab==='preparation') data.body=adminDatabase.renderBody({...databaseSnapshot(),discovery:true});
+      if(tab==='preparation' || tab==='sport-video') {
+        const source=tab==='preparation'?'bitmagnet':'sport-video';
+        data.selection={source,ids:settings.getSourceDiscoveryPromotions(source)};
+      }
       res.send(tablerChrome.tablerPage('Discovery',ui.render(data),{user:req.user,currentSection:'discovery'}));
     } catch(error) {res.status(503).send('Discovery unavailable: '+security.safeErrorMessage(error));}
   });
-  app.post('/admin/discovery/promotions',requireAdmin,(req,res)=>{
-    try {settings.setDiscoveryPromotions(req.body.promotions);res.redirect(303,'/admin/discovery?flash=Promotion%20selection%20saved');}
+  app.post('/admin/discovery/promotions',requireAdmin,(_req,res)=>res.status(410).send('Use the promotion selection on each source tab.'));
+  app.post('/admin/discovery/:source/promotions',requireAdmin,(req,res)=>{
+    try {
+      settings.setSourceDiscoveryPromotions(req.params.source,req.body.promotions);
+      const tab=req.params.source==='bitmagnet'?'preparation':req.params.source;
+      res.redirect(303,'/admin/discovery?tab='+tab+'&flash=Promotion%20selection%20saved');
+    }
     catch(error) {res.status(400).send(security.safeErrorMessage(error));}
   });
 
@@ -1445,16 +1454,16 @@ function createApp() {
         startDelaySeconds: req.body.startDelaySeconds,
       });
       availabilityScheduler.reconfigure();
-      res.redirect('/admin/database?flash=' + encodeURIComponent('Automatic preparation settings saved and applied.'));
+      res.redirect('/admin/discovery?tab=preparation&flash=' + encodeURIComponent('Automatic preparation settings saved and applied.'));
     } catch (error) {
-      res.redirect('/admin/database?flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(error)));
+      res.redirect('/admin/discovery?tab=preparation&flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(error)));
     }
   });
 
   app.post('/admin/database/settings/reset', requireAdmin, (_req, res) => {
     settings.resetAvailabilityWarm();
     availabilityScheduler.reconfigure();
-    res.redirect('/admin/database?flash=' + encodeURIComponent('Warmer settings reset to environment defaults.'));
+    res.redirect('/admin/discovery?tab=preparation&flash=' + encodeURIComponent('Warmer settings reset to environment defaults.'));
   });
 
   app.post('/admin/database/catalog-gate', requireAdmin, (req, res) => {
@@ -1465,7 +1474,7 @@ function createApp() {
     });
     // The snapshot is cached for a minute; a save should take effect at once.
     eventAvailability.invalidate();
-    res.redirect('/admin/database?flash=' + encodeURIComponent(gate.enabled
+    res.redirect('/admin/discovery?tab=preparation&flash=' + encodeURIComponent(gate.enabled
       ? ('Catalog availability gate on'
         + (gate.keepUpcoming ? ', future fixtures kept.' : '.')
         + ' Clients may need to refresh before the change shows.')
@@ -1477,7 +1486,7 @@ function createApp() {
     availabilityScheduler.runNow('manual', { force: true }).catch((error) => {
       console.error('[availability] manual warm-up failed:', error.message);
     });
-    res.redirect('/admin/database?flash=' + encodeURIComponent(alreadyRunning
+    res.redirect('/admin/discovery?tab=preparation&flash=' + encodeURIComponent(alreadyRunning
       ? 'Automatic preparation is already running.' : 'Automatic preparation started.'));
   });
 
