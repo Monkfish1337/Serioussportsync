@@ -97,8 +97,8 @@ test('renders a dedicated, filterable source console without exposing torrent UR
   for (const script of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
     assert.doesNotThrow(() => new vm.Script(script[1]));
   }
-  assert.ok(uiShell.destinations(true).some((section) => section.id === 'sport-video'),
-    'Sport-Video must be reachable from the rail');
+  assert.ok(uiShell.destinations(true).some((section) => section.id === 'discovery'),
+    'Sport-Video controls must be reachable through Discovery');
 });
 
 test('feeds a matched direct release into TorBox discovery without Companion or Prowlarr', async () => {

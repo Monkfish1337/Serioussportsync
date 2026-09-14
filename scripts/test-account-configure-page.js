@@ -96,6 +96,19 @@ function listen(app) {
     const metadataHtml=await (await fetch(base+'/admin/metadata',{headers:{Cookie:cookie}})).text();
     const discoveryHtml=await (await fetch(base+'/admin/prowlarr-discovery',{headers:{Cookie:cookie}})).text();
     assert.ok(discoveryHtml.includes('Catch-up progress') && discoveryHtml.includes('Event discovery status'));
+    for (const tab of ['overview','events','prowlarr','preparation']) {
+      const response=await fetch(base+'/admin/discovery?tab='+tab,{headers:{Cookie:cookie}});
+      assert.strictEqual(response.status,200);
+      assert.ok((await response.text()).includes('Save promotion selection') || tab!=='overview');
+    }
+    assert.strictEqual((await fetch(base+'/admin/discovery',{headers:{Cookie:regularCookie}})).status,403);
+    assert.strictEqual((await post('/admin/discovery/promotions',{promotions:'mlb'},regularCookie)).status,403);
+    await post('/admin/discovery/promotions',{promotions:'mlb'},cookie);
+    assert.strictEqual(require('../lib/settings').discoveryIncludes('mlb:fixture'),true);
+    assert.strictEqual(require('../lib/settings').discoveryIncludes('nfl:fixture'),false);
+    await post('/admin/discovery/promotions',{},cookie);
+    assert.strictEqual(require('../lib/settings').discoveryIncludes('mlb:fixture'),false);
+    await post('/admin/discovery/promotions',{promotions:require('../lib/promotions').all.map(p=>p.id)},cookie);
     assert.ok(metadataHtml.includes('Metadata API keys') && metadataHtml.includes('Force Metadata Refresh'));
     await post('/admin/metadata-keys',{footballDataApiKey:'test-football-key',apiFootballApiKey:'test-api-key',tmdbApiKey:'test-tmdb-key'},cookie);
     assert.strictEqual(require('../lib/settings').getTmdb().apiKey,'test-tmdb-key');
@@ -184,7 +197,8 @@ function listen(app) {
     const database = await fetch(base + '/admin/database', { headers: { Cookie: cookie } });
     assert.strictEqual(database.status, 200, 'Database page is available to admins');
     const databaseHtml = await database.text();
-    for (const expected of ['Database', 'Automatic preparation', 'Recent searches', 'What should SSS prepare?']) {
+    assert.ok(!databaseHtml.includes('What should SSS prepare?'));
+    for (const expected of ['Database maintenance', 'Discovery', 'Prune expired rows', 'Wipe database']) {
       assert.ok(databaseHtml.includes(expected), 'Database page includes ' + expected);
     }
     assert.ok(!databaseHtml.includes('Legacy positive history'), 'legacy Health content is removed');

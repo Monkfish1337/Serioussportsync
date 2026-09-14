@@ -48,6 +48,13 @@ attempts over at least one hour. They cover the untouched backlog, not completio
 of retries or guaranteed playback. **Database → Recent searches** distinguishes
 discovered candidates, matching releases and ready links for the searched account.
 
+Untouched games receive their first queue search ahead of ordinary retries;
+explicitly prioritised games still take precedence. Torrent metadata recovery
+focuses on fixtures without a saved seeded match. The retry table shows missing
+games in the current window, rather than old completed jobs. “Matching titles
+found — no usable torrent saved” means discovery has recognised a release title
+but has not saved playable torrent metadata; it is not confirmed playback coverage.
+
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `TSDB_API_KEY` | `123` | TheSportsDB API key. Replace with your own key when available. |
@@ -135,3 +142,18 @@ Other advanced controls include:
 
 See [Security](SECURITY.md) before changing proxy trust, bind addresses, or
 direct Internet exposure.
+# Unified Discovery
+
+The admin sidebar now has a Discovery page with Overview, Events, Prowlarr,
+Sport-Video and Preparation tabs. The Overview promotion selection controls
+automatic Prowlarr event work, Sport-Video torrent preparation and warming,
+and automatic availability preparation. Existing source switches, supported
+promotions, categories, team filters and account catalog selections still apply.
+Before a selection is saved, existing coverage is preserved. Selecting no
+promotions pauses automatic event work without deleting saved results.
+Sport-Video listing collection and manual actions are unaffected.
+
+The Events tab combines saved Prowlarr and Sport-Video evidence by event and
+preserves source names. It does not combine account-specific playable counts.
+Existing source pages and form endpoints remain compatible. This first phase
+unifies controls; source storage and workers remain separate.

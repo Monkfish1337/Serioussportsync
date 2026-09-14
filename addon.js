@@ -1240,6 +1240,26 @@ function createApp() {
     };
   }
 
+  app.get('/admin/discovery', requireAdmin, async (req,res) => {
+    res.set('Cache-Control','no-store');
+    try {
+      const ui=require('./lib/admin-discovery');
+      const tab=Object.hasOwn(ui.tabs,req.query.tab)?req.query.tab:'overview';
+      const data={tab,flash:req.query.flash,promotion:String(req.query.promotion || ''),
+        selected:settings.getDiscoveryPromotions(),promotions:promotions.all.map(p=>({id:p.id,name:p.name})),
+        events:store.getEvents(),queue:require('./lib/prowlarr-discovery').getDefault().status(),
+        releases:sportVideo.load().releases || []};
+      if(tab==='prowlarr') data.body=require('./lib/admin-prowlarr-discovery').render();
+      if(tab==='sport-video') data.body=adminSportVideo.renderBody(await sportVideoSnapshot(req.user));
+      if(tab==='preparation') data.body=adminDatabase.renderBody({...databaseSnapshot(),discovery:true});
+      res.send(tablerChrome.tablerPage('Discovery',ui.render(data),{user:req.user,currentSection:'discovery'}));
+    } catch(error) {res.status(503).send('Discovery unavailable: '+security.safeErrorMessage(error));}
+  });
+  app.post('/admin/discovery/promotions',requireAdmin,(req,res)=>{
+    try {settings.setDiscoveryPromotions(req.body.promotions);res.redirect(303,'/admin/discovery?flash=Promotion%20selection%20saved');}
+    catch(error) {res.status(400).send(security.safeErrorMessage(error));}
+  });
+
   app.get('/admin/database', requireAdmin, (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
@@ -1250,7 +1270,7 @@ function createApp() {
       snapshot.flash = 'Database unavailable: ' + security.safeErrorMessage(error);
     }
     snapshot.flash = req.query.flash || snapshot.flash || null;
-    res.send(tablerChrome.tablerPage('Database', adminDatabase.renderBody(snapshot), {
+    res.send(tablerChrome.tablerPage('Database', adminDatabase.renderBody({...snapshot,maintenance:true}), {
       user: req.user, currentSection: 'database',
     }));
   });
@@ -1286,25 +1306,8 @@ function createApp() {
     };
   }
 
-  app.get('/admin/sport-video', requireAdmin, async (req, res) => {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-store');
-    let snapshot;
-    try { snapshot = await sportVideoSnapshot(req.user); }
-    catch (error) {
-      snapshot = {
-        config: settings.getSportVideo(), status: sportVideo.status(),
-        promotions: promotions.enabled.map((promotion) => ({ id: promotion.id, name: promotion.name })),
-        catalogTeams: [],
-        releases: sportVideo.load().releases.slice(0, 200), cached: new Set(),
-        torboxConfigured: Boolean(req.user.config && req.user.config.torboxApiKey),
-        flash: 'TorBox availability check failed: ' + security.safeErrorMessage(error),
-      };
-    }
-    snapshot.flash = req.query.flash || snapshot.flash || null;
-    res.send(tablerChrome.tablerPage('Sport-Video', adminSportVideo.renderBody(snapshot), {
-      user: req.user, currentSection: 'sport-video',
-    }));
+  app.get('/admin/sport-video', requireAdmin, (req,res) => {
+    res.redirect(302,'/admin/discovery?tab=sport-video&flash='+encodeURIComponent(req.query.flash || ''));
   });
 
   app.post('/admin/sport-video/settings', requireAdmin, (req, res) => {
@@ -1791,9 +1794,7 @@ function createApp() {
   });
 
   app.get('/admin/prowlarr-discovery', requireAdmin, (req,res) => {
-    res.set('Cache-Control','no-store');
-    res.send(tablerChrome.tablerPage('Prowlarr discovery',require('./lib/admin-prowlarr-discovery').render(),
-      {user:req.user,currentSection:'prowlarr-discovery'}));
+    res.redirect(302,'/admin/discovery?tab=prowlarr&flash='+encodeURIComponent(req.query.flash || ''));
   });
   app.post('/admin/prowlarr-discovery', requireAdmin, (req,res) => {
     settings.setProwlarrDiscovery({enabled:req.body.enabled==='1',intervalSeconds:Number(req.body.intervalSeconds),

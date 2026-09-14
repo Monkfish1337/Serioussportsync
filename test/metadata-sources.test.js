@@ -101,7 +101,7 @@ test('every admin page is reachable from the rail, and nothing retired is', () =
   // no destination is a page nobody can find.
   const uiShell = require('../lib/ui/shell');
   const ids = uiShell.destinations(true).map((item) => item.id);
-  for (const page of ['promotions', 'database', 'sport-video', 'nuvio-collections',
+  for (const page of ['promotions', 'database', 'discovery', 'nuvio-collections',
     'metadata', 'logs', 'backup', 'admin']) {
     assert.ok(ids.includes(page), page + ' has no rail destination');
   }

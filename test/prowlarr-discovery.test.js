@@ -134,6 +134,63 @@ test('broad query zero results are shared across fixtures rather than repeated',
   try {await queue.run();advance(120000);await queue.run();assert.equal(queries.length,2);assert.equal(queries[0],'MLB 2026.09.11');assert.notEqual(queries[0],queries[1]);}
   finally {queue.close();}
 });
+
+test('untouched games receive a first search before recent due retries',async()=>{
+  const events=Array.from({length:3},(_,i)=>({id:'mlb:'+i,name:'Game '+i,date:'2026-09-'+String(11-i).padStart(2,'0')}));
+  const selected=[];
+  const {deps,advance}=setup({events:()=>events,search:async(q)=>{selected.push(q[0]);return {ok:true,partial:false,results:[]};}});
+  const queue=discovery.createQueue(':memory:',deps);
+  try {
+    await queue.run();advance(2*HOUR);await queue.run();advance(2*HOUR);await queue.run();
+    assert.deepEqual(selected,['MLB 2026.09.11','MLB 2026.09.10','MLB 2026.09.09']);
+    assert.equal(queue.status().progress.untouched,0);
+  } finally {queue.close();}
+});
+
+test('preseason week queries include their phase',async()=>{
+  let selected;
+  const event={id:'nfl:phase',name:'Cowboys at Giants',date:'2026-09-11',seasonSpan:'2026-2027',seasonPhase:'preseason',week:2};
+  const {deps,promo}=setup({events:()=>[event],search:async(q)=>{selected=q[0];return {ok:true,partial:false,results:[]};}});
+  promo.id='nfl';
+  const queue=discovery.createQueue(':memory:',deps);
+  try {await queue.run();assert.equal(selected,'NFL 2026-2027 PS W02');} finally {queue.close();}
+});
+
+test('hydration filters out covered fixtures and exposes matching titles without usable torrent metadata',async()=>{
+  let calls=0;
+  const {deps,advance}=setup({search:async(q,opts)=>{
+    calls++;
+    const covered={title:'MLB Mets vs Yankees 1080p',infoHash:'a'.repeat(40),seeders:5};
+    const missing={title:'MLB Mariners vs Rangers 1080p',downloadUrl:'http://prowlarr/download'};
+    if(calls===1) return {ok:true,partial:false,results:[covered]};
+    assert.equal(opts.filterResults(covered),false,'covered games cannot consume hydration requests');
+    assert.equal(opts.filterResults(missing),true);
+    opts.onRawResults([missing]);
+    return {ok:true,partial:false,results:[]};
+  }});
+  const queue=discovery.createQueue(':memory:',deps);
+  try {
+    await queue.run();advance(120000);await queue.run();
+    assert.match(queue.status().eventStates.find(e=>e.id==='mlb:2').state,/Matching titles found/);
+    assert.equal(queue.status().retryJobs.some(j=>j.event==='mlb:1'),false);
+  } finally {queue.close();}
+});
+
+test('a batch search saves separate exact-date releases for consecutive MLB series games',async()=>{
+  const promo=require('../lib/promotions').all.find(p=>p.id==='mlb');
+  const events=[11,12,13].map(day=>({id:'mlb:series-'+day,name:'Pittsburgh Pirates vs Chicago Cubs',date:'2026-09-'+day}));
+  const results=events.map((e,i)=>({title:'MLB 2026 / RS / '+[11,12,13][i]+'.09.2026 / Pittsburgh Pirates @ Chicago Cubs ('+(i+1)+'/3) [Baseball, WEB-DL HD/720p/60fps, MKV/H.264, EN/SNP]',infoHash:String(i+1).repeat(40),seeders:5,indexer:'720pier'}));
+  const {deps,advance}=setup({events:()=>events,promotion:()=>promo,search:async()=>({ok:true,partial:false,results})});
+  advance(24*HOUR);
+  const queue=discovery.createQueue(':memory:',deps);
+  try {
+    assert.equal((await queue.run()).matched,3);
+    for(let i=0;i<events.length;i++) {
+      assert.deepEqual(queue.candidates(events[i]).map(c=>c.infoHash),[String(i+1).repeat(40)]);
+    }
+    assert.equal(queue.status().retryJobs.length,0);
+  } finally {queue.close();}
+});
 test('indexer internal failure cannot create successful zero-hit alias evidence',async()=>{
   const observations=[];
   const {deps}=setup({statuses:async()=>[{indexerId:30,disabledTill:'2026-09-13T14:00:00Z'}],
