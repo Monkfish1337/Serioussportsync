@@ -19,12 +19,31 @@ const RELEASES = [
   { id: 'r2', title: 'Iga Swiatek vs Nadia Podoroska 03.09.2026', date: '2026-09-03', category: 'other', detailUrl: '/b.html', matches: [] },
   { id: 'r3', title: 'Bradford Bulls v Castleford Tigers 03.09.2026', date: '2026-09-03', category: 'rugby', detailUrl: '/c.html', matches: [] },
   // Claimed by a real promotion — a feed covers this, so it must not be ingested.
-  { id: 'r4', title: 'Toulouse vs Lille 03.09.2026', date: '2026-09-03', category: 'football', detailUrl: '/d.html', matches: [{ promotion: 'ligue1', eventId: 'ligue1:1' }] },
+  { id: 'r4', title: 'Arsenal vs Chelsea 03.09.2026', date: '2026-09-03', category: 'football', detailUrl: '/d.html', matches: [{ promotion: 'epl', eventId: 'epl:1' }] },
   // Claimed only by the event it previously created.
   { id: 'r5', title: 'Fremantle Dockers v Hawthorn Hawks 03.09.2026', date: '2026-09-03', category: 'rugby', detailUrl: '/e.html', matches: [{ promotion: 'discovered-rugby', eventId: 'discovered-rugby:old' }] },
 ];
 
 const fakeState = { load: () => ({ releases: RELEASES }) };
+
+test('old overflow matches enter the correct Discovery feed and link back for playback', () => {
+  const cases = [
+    ['wnba', 'basketball', 'Connecticut Sun vs Las Vegas Aces'],
+    ['ncaaf', 'americanfootball', 'Colorado Buffaloes vs Georgia Tech Yellow Jackets'],
+    ...['laliga', 'efl-championship', 'seriea', 'brasileirao', 'ligue1', 'bundesliga', 'eredivisie']
+      .map((id) => [id, 'football', 'Toulouse vs Lille']),
+  ];
+  for (const [id, category, name] of cases) {
+    const record = { id, title: name + ' 03.09.2026', date: '2026-09-03', category,
+      matches: [{ promotion: id, eventId: id + ':old' }] };
+    const raw = releaseIngest.fetchAll({ sport: category, sportVideo: { load: () => ({ releases: [record] }) } });
+    assert.equal(raw.length, 1, id + ' must not be blocked by a stale match');
+    const promotion = promotions.byPrefix[releaseIngest.promotionIdFor(category)];
+    const event = require('../lib/transform').fromWiki(raw[0], promotion);
+    const matches = sportVideo.matchRelease(record, [event], promotions);
+    assert.ok(matches.some((match) => match.eventId === event.id), id + ' must remain playable');
+  }
+});
 
 function ingest(sport) {
   return releaseIngest.fetchAll({ sport, sportVideo: fakeState, log: () => {} });

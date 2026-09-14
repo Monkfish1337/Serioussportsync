@@ -44,7 +44,7 @@ for (const folder of all[0].folders) {
     // letters-only pattern was incidental to the four original names, not a
     // rule about asset filenames, and it failed CI for a file that is
     // perfectly valid.
-    /^https:\/\/sss\.example\/assets\/collection-[a-z0-9-]+\.png$/,
+    /^https:\/\/sss\.example\/assets\/collection-[a-z0-9-]+\.png\?v=[a-f0-9]{12}$/,
     folder.title + ' uses dedicated collection artwork',
   );
   assert.strictEqual(

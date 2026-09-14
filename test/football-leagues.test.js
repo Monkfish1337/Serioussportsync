@@ -11,7 +11,17 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const promotions = require('../lib/promotions');
+const registry = require('../lib/promotions');
+// Keep generic club-matching regressions independent of the shipped catalogs.
+const promotions = { ...registry, byPrefix: { ...registry.byPrefix } };
+for (const id of ['laliga', 'efl-championship', 'seriea', 'brasileirao', 'ligue1', 'bundesliga', 'eredivisie']) {
+  promotions.byPrefix[id] = registry.createGenericPromotion({ id, idPrefix: id, name: id,
+    source: 'football-data', competitionId: 'XX', requireDateInTitle: true });
+}
+for (const id of ['wnba', 'ncaaf']) {
+  promotions.byPrefix[id] = registry.createGenericPromotion({ id, idPrefix: id, name: id,
+    source: 'espn', league: id, requireDateInTitle: true });
+}
 const transform = require('../lib/transform');
 const espn = require('../lib/sources/espn');
 
@@ -38,15 +48,12 @@ const OSNABRUCK = ['VfL Osnabrück', 'Osnabrück', 'OSN'];
 const LILLE = ['LOSC Lille', 'Lille', 'LIL'];
 const TOULOUSE = ['Toulouse FC', 'Toulouse', 'TOU'];
 
-test('the leagues Sport-Video actually carries are registered', () => {
-  for (const id of ['laliga', 'epl', 'efl-championship', 'seriea',
-    'brasileirao', 'ligue1', 'bundesliga', 'eredivisie']) {
-    const promotion = promotions.byPrefix[id];
-    assert.ok(promotion, 'missing promotion: ' + id);
-    assert.equal(promotion.source.type, 'football-data');
-    assert.ok(promotion.source.competitionId, id + ' has no competition code');
-    assert.equal(promotion.catalogs.length, 2);
+test('overflow competitions are absent from the registry while EPL remains', () => {
+  for (const id of require('../lib/sources/release-ingest').RETIRED_PROMOTIONS) {
+    assert.equal(registry.byPrefix[id], undefined);
+    assert.equal(registry.all.some((p) => p.id === id), false);
   }
+  assert.ok(registry.byPrefix.epl);
 });
 
 test('a club is recognised whichever naming form the release used', () => {

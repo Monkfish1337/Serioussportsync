@@ -145,3 +145,14 @@ test('the three push modes are offered and merge is the default', () => {
   // default could ever be chosen.
   assert.match(nuvio.panel(), /value="merge"[^>]*selected/);
 });
+
+test('pinning moves the SSS collection first and preserves other collections', () => {
+  const existing = [{ id: 'a' }, { id: 'sss' }, { id: 'b' }];
+  const incoming = [{ id: 'sss', pinToTop: true }];
+  const result = nuvio.mergeCollections(existing, incoming, 'merge');
+  assert.deepEqual(result.next.map((item) => item.id), ['sss', 'a', 'b']);
+  assert.equal(result.next[0].pinToTop, true);
+  assert.deepEqual(nuvio.mergeCollections(existing, incoming, 'add').next, existing);
+  assert.deepEqual(nuvio.mergeCollections([{ id: 'a' }], incoming, 'add').next.map((item) => item.id), ['sss', 'a']);
+  assert.match(nuvio.panel(), /id="nuvio-pin-top"/);
+});
