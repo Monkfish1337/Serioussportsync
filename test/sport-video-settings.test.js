@@ -18,8 +18,8 @@ test('Sport-Video is opt-in with conservative automatic scan defaults', () => {
   const value = settings.getSportVideo();
   assert.equal(value.enabled, false);
   assert.equal(value.autoScan, true);
-  assert.equal(value.intervalHours, 6);
-  assert.equal(value.maxDetailsPerScan, 50);
+  assert.equal(value.intervalHours, 1);
+  assert.equal(value.maxDetailsPerScan, 25);
   assert.equal(value.archivePages, 12);
   assert.deepEqual(value.autoWarmPromotions, []);
   assert.equal(value.autoWarmPerScan, 5);

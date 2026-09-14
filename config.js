@@ -189,8 +189,8 @@ module.exports = {
     prepareUsenet: (process.env.AVAILABILITY_PREPARE_USENET || 'false') === 'true',
     prepareEasynews: (process.env.AVAILABILITY_PREPARE_EASYNEWS || 'false') === 'true',
     windowDays: Math.max(1, parseInt(process.env.AVAILABILITY_WARM_WINDOW_DAYS || '3', 10) || 3),
-    intervalHours: Math.max(0.25, parseFloat(process.env.AVAILABILITY_WARM_INTERVAL_HOURS || '6') || 6),
-    maxEventsPerRun: Math.max(1, parseInt(process.env.AVAILABILITY_WARM_MAX_EVENTS_PER_RUN || '25', 10) || 25),
+    intervalHours: Math.max(0.25, parseFloat(process.env.AVAILABILITY_WARM_INTERVAL_HOURS || '1') || 1),
+    maxEventsPerRun: Math.max(1, parseInt(process.env.AVAILABILITY_WARM_MAX_EVENTS_PER_RUN || '50', 10) || 50),
     startDelaySeconds: Math.max(5, parseInt(process.env.AVAILABILITY_WARM_START_DELAY_SECONDS || '60', 10) || 60),
   },
 

@@ -29,6 +29,22 @@ test('queue excludes future, running, cancelled and unrelated events',()=>{
     {id:'nfl:5',date:'2026-09-14'},{id:'mlb:6',date:'2026-09-11',status:'cancelled'},{id:'ucl:7',date:'2026-09-11'}];
   assert.deepEqual(discovery.eligible(rows,clock,30).map(e=>e.id),['nfl:4','mlb:1','mlb:2']);
 });
+
+test('upstream Retry-After prevents another request and extends the stored cooldown',async()=>{
+  let calls=0;
+  const {deps}=setup({fetch:async()=>{calls++;return {status:429,ok:false,headers:{get:()=> '14400'}};},
+    search:async(_queries,opts)=>{
+      await opts.fetchImpl('http://prowlarr/search',{});
+      await assert.rejects(opts.fetchImpl('http://prowlarr/detail',{}),/retry delay/);
+      return {ok:false,upstreamFailed:true,results:[]};
+    }});
+  const queue=discovery.createQueue(':memory:',deps);
+  try {
+    await queue.run();
+    assert.equal(calls,1);
+    assert.equal(queue.status().indexers[0].next_at,deps.now()+4*HOUR);
+  } finally {queue.close();}
+});
 test('one indexer search matches multiple fixtures and suppresses repeat searches',async()=>{
   let calls=0;
   const {deps,advance}=setup({search:async(queries,opts)=>{

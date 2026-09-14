@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const warmer = require('../lib/availability-warmer');
 
 function event(id, date) {
-  return { id: 'ufc:' + id, name: 'UFC ' + id, date };
+  return { id: 'ufc:' + id, name: 'UFC ' + id, date, time:'00:00:00' };
 }
 test('automatic preparation disables fast Usenet and Easynews searches even with legacy settings',async()=>{
   warmer._test.resetForTests();
@@ -44,6 +44,19 @@ test('prepares only events present in an account selected catalogs', () => {
   assert.equal(warmer._test.profileIncludesEvent({
     id: 'profile-1', config: { catalogs: [] },
   }, ufcEvent), true);
+});
+
+test('automatic batches exclude retired, cancelled and not-yet-ready events',async()=>{
+  warmer._test.resetForTests();
+  const visited=[];
+  await warmer.run({force:true,now:new Date('2026-08-27T18:00:00Z'),windowDays:7,
+    events:[event('ready','2026-08-26'),{id:'wnba:old',date:'2026-08-26'},
+      {...event('cancel','2026-08-26'),status:'cancelled'},
+      {...event('playing','2026-08-27'),time:'17:00:00'},
+      {id:'mlb:unknown-time',date:'2026-08-27'}],profiles:[{id:'system',config:{}}],log:()=>{},
+    prefetch:async({event})=>{visited.push(event.id);return {ok:true,errors:[]};}});
+  assert.deepEqual(visited,['ufc:ready']);
+  assert.equal(warmer.status().eligibleEvents,1);
 });
 
 test('rotates bounded batches through the complete recent window', async () => {
