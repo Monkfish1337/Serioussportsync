@@ -63,7 +63,11 @@ function listen(app) {
     assert.strictEqual(forgedSave.status,302);
     assert.strictEqual(users.findById(regular.id).config.diyUsenetEnabled,false);
 
-    const post = (route, body, auth) => fetch(base+route,{method:'POST',redirect:'manual',headers:{'Content-Type':'application/x-www-form-urlencoded',...(auth ? {Cookie:auth} : {})},body:new URLSearchParams(body).toString()});
+    const post = (route, body, auth) => {
+      const form=new URLSearchParams();
+      for(const [key,value] of Object.entries(body)) for(const entry of [].concat(value)) form.append(key,entry);
+      return fetch(base+route,{method:'POST',redirect:'manual',headers:{'Content-Type':'application/x-www-form-urlencoded',...(auth ? {Cookie:auth} : {})},body:form.toString()});
+    };
     assert.ok((await (await fetch(base+'/login')).text()).includes('href="/request-access"'));
     assert.strictEqual((await post('/request-access',{username:'pending-test',password,role:'admin'})).status,202);
     assert.strictEqual(users.findByUsername('pending-test'),null);
@@ -102,6 +106,13 @@ function listen(app) {
       assert.ok((await response.text()).includes('Save promotion selection') || tab!=='overview');
     }
     assert.strictEqual((await fetch(base+'/admin/discovery',{headers:{Cookie:regularCookie}})).status,403);
+    await post('/admin/prowlarr-discovery',{enabled:'1',intervalSeconds:'120',dailyRequests:'100',lookbackDays:'7',timeoutSeconds:'120',promotions:['ucl','mlb']},cookie);
+    assert.deepEqual(require('../lib/settings').getProwlarrDiscovery().promotions,['ucl','mlb']);
+    const selectedQueue=await (await fetch(base+'/admin/discovery?tab=prowlarr',{headers:{Cookie:cookie}})).text();
+    assert.ok(selectedQueue.includes('name="promotions" value="ucl" checked'));
+    const bitmagnetHtml=await (await fetch(base+'/admin/discovery?tab=preparation',{headers:{Cookie:cookie}})).text();
+    assert.ok(bitmagnetHtml.includes('>Bitmagnet</a>'));
+    assert.ok(!bitmagnetHtml.includes('name="prepareUsenet"') && !bitmagnetHtml.includes('name="prepareEasynews"'));
     assert.strictEqual((await post('/admin/discovery/promotions',{promotions:'mlb'},regularCookie)).status,403);
     await post('/admin/discovery/promotions',{promotions:'mlb'},cookie);
     assert.strictEqual(require('../lib/settings').discoveryIncludes('mlb:fixture'),true);

@@ -7,6 +7,20 @@ const warmer = require('../lib/availability-warmer');
 function event(id, date) {
   return { id: 'ufc:' + id, name: 'UFC ' + id, date };
 }
+test('automatic preparation disables fast Usenet and Easynews searches even with legacy settings',async()=>{
+  warmer._test.resetForTests();
+  const settings=require('../lib/settings');
+  const original=settings.getAvailabilityWarm;
+  settings.getAvailabilityWarm=()=>({...original(),prepareUsenet:true,prepareEasynews:true});
+  let received;
+  try {
+    await warmer.run({force:true,events:[event('only-bitmagnet','2026-08-27')],
+      now:new Date('2026-08-27T18:00:00Z'),profiles:[{id:'system',config:{}}],log:()=>{},
+      prefetch:async args=>{received=args.prepare;return {ok:true,errors:[]};}});
+    assert.equal(received.prepareUsenet,false);
+    assert.equal(received.prepareEasynews,false);
+  } finally {settings.getAvailabilityWarm=original;}
+});
 
 test('selects only the rolling seven-day aired-event window', () => {
   const selected = warmer.eligibleEvents([

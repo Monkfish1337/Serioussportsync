@@ -1797,9 +1797,12 @@ function createApp() {
     res.redirect(302,'/admin/discovery?tab=prowlarr&flash='+encodeURIComponent(req.query.flash || ''));
   });
   app.post('/admin/prowlarr-discovery', requireAdmin, (req,res) => {
+    try {
     settings.setProwlarrDiscovery({enabled:req.body.enabled==='1',intervalSeconds:Number(req.body.intervalSeconds),
-      dailyRequests:Number(req.body.dailyRequests),lookbackDays:Number(req.body.lookbackDays),timeoutSeconds:Number(req.body.timeoutSeconds)});
+      dailyRequests:Number(req.body.dailyRequests),lookbackDays:Number(req.body.lookbackDays),timeoutSeconds:Number(req.body.timeoutSeconds),
+      promotions:[].concat(req.body.promotions || [])});
     res.redirect(303,'/admin/prowlarr-discovery');
+    } catch(error) {res.status(400).send(security.safeErrorMessage(error));}
   });
   app.post('/admin/prowlarr-discovery/queue', requireAdmin, (req,res) => {
     const event = store.getEvent(String(req.body.eventId || ''));
@@ -2409,7 +2412,7 @@ function renderAdminPage(currentUser, opts) {
           'Unticking keeps the URL and API key but takes Prowlarr out of discovery.')
           + '<input type="hidden" name="prowlarrLiveSearchPresent" value="1">'
           + sourceToggle('prowlarrLiveSearchEnabled', 'Prowlarr live search enabled', _prowlarr.liveSearchEnabled,
-          'Untick to use saved Prowlarr releases without live searches during playback or Improve Matching. The measured background queue keeps running. Companion torrent searches are also skipped because they can query Prowlarr. MLB, NFL and NBA already use saved releases while the queue is enabled.')
+          'Untick to use saved Prowlarr releases without live searches during playback. Explicit admin Improve Matching searches remain available. The measured background queue keeps running. Companion torrent searches are also skipped because they can query Prowlarr. MLB, NFL and NBA already use saved releases while the queue is enabled.')
           + '<div class="mb-3">'
           + '<label class="form-label">Prowlarr URL</label>'
           + '<input class="form-control text-mono" type="url" name="prowlarrUrl" value="' + escapeHtml(_prowlarr.url) + '" placeholder="http://prowlarr:9696" autocomplete="off">'

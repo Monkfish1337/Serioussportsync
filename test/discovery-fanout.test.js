@@ -184,7 +184,7 @@ test('a complete search is still cached', () => {
 test('the index build asks Bitmagnet and nobody else', () => {
   const source = require('fs').readFileSync(
     require('path').join(__dirname, '..', 'lib', 'streams.js'), 'utf8');
-  assert.match(source, /const warmTorrentSources = warmAllSources \? null : new Set\(\['bitmagnet'\]\)/);
+  assert.match(source, /const warmTorrentSources = new Set\(\['bitmagnet'\]\)/);
   assert.match(source, /onlySources: warmTorrentSources/);
 });
 
@@ -216,8 +216,6 @@ test('an index build with no Bitmagnet says so instead of falling back', () => {
   // exists to prevent.
   const source = require('fs').readFileSync(
     require('path').join(__dirname, '..', 'lib', 'streams.js'), 'utf8');
-  assert.match(source, /index build needs Bitmagnet/);
-  assert.match(source, /so its indexers are not disabled for over-use/);
-  assert.match(source, /AVAILABILITY_WARM_ALL_TORRENT_SOURCES/,
-    'and there has to be a way back for anyone who wants the old behaviour');
+  assert.match(source, /automatic preparation needs an enabled Bitmagnet endpoint/);
+  assert.doesNotMatch(source, /AVAILABILITY_WARM_ALL_TORRENT_SOURCES/);
 });

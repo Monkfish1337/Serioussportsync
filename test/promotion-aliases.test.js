@@ -7,6 +7,40 @@ const { createGenericPromotion } = require('../lib/promotions');
 const adminPromotions = require('../lib/admin-promotions');
 const customPromotions = require('../lib/custom-promotions');
 
+test('Improve Matching searches Prowlarr titles for queued promotions with playback live search disabled',async()=>{
+  const settings=require('../lib/settings');
+  const prowlarr=require('../lib/sources/prowlarr');
+  const original={pw:settings.getProwlarr,bm:settings.getBitmagnet,queue:settings.getProwlarrDiscovery,search:prowlarr.multiSearch};
+  settings.getProwlarr=()=>({url:'http://prowlarr:9696',apiKey:'research-secret',enabled:true,liveSearchEnabled:false});
+  settings.getBitmagnet=()=>({enabled:false});
+  settings.getProwlarrDiscovery=()=>({enabled:true,promotions:['ucl','mlb','nfl','nba']});
+  let searches=0;
+  prowlarr.multiSearch=async(queries,options)=>{
+    searches++;
+    assert.ok(queries.length>0);
+    assert.equal(options.titlesOnly,true);
+    assert.ok(options.deadlineMs>0 && options.timeoutMs>0);
+    return {ok:true,results:[{title:'UCL.2026.09.10.Manchester.United.vs.Sabah.FK.1080p',indexer:'Research indexer'}]};
+  };
+  try {
+    for(const promotionId of ['ucl','mlb','nfl','nba']) {
+      const result=await adminPromotions.researchAliases({}, {promotionId,name:promotionId.toUpperCase(),
+        eventName:'Manchester United vs Sabah FK',eventDate:'2026-09-10',query:promotionId+' 2026.09.10'},
+        {companionConfig:{},intelligenceSearch:async()=>({ok:true,results:[]})});
+      assert.equal(result.ok,true);
+      const provider=result.providers.find(p=>p.id==='prowlarr');
+      assert.equal(provider.name,'Prowlarr torrents');
+      assert.equal(provider.count,1);
+      assert.ok(provider.queries.length>0);
+      assert.doesNotMatch(JSON.stringify(result),/research-secret/);
+    }
+    assert.equal(searches,4);
+  } finally {
+    settings.getProwlarr=original.pw;settings.getBitmagnet=original.bm;
+    settings.getProwlarrDiscovery=original.queue;prowlarr.multiSearch=original.search;
+  }
+});
+
 test('UCL stage and matchday labels do not reject the first team in genuine releases',()=>{
   const promotion=require('../lib/promotions').all.find(p=>p.id==='ucl');
   const event={id:'ucl:test',name:'Manchester United vs Sabah FC',date:'2026-09-10',

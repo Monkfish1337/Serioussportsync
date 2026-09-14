@@ -7,6 +7,12 @@ const os = require('os');
 const path = require('path');
 const discovery = require('../lib/prowlarr-discovery');
 const HOUR = 3600000;
+test('measured discovery supports selected promotions beyond the original leagues',()=>{
+  const events=[{id:'ucl:test',date:'2026-09-10'},{id:'mlb:test',date:'2026-09-10'}];
+  const now=Date.parse('2026-09-14T12:00:00Z');
+  assert.deepEqual(discovery.eligible(events,now,7,['ucl']).map(e=>e.id),['ucl:test']);
+  assert.deepEqual(discovery.eligible(events,now,7,[]),[]);
+});
 const fixtures = [{id:'mlb:1',name:'Mets vs Yankees',date:'2026-09-11'}, {id:'mlb:2',name:'Mariners vs Rangers',date:'2026-09-11'}];
 function setup(extra={}) {
   let clock = Date.parse('2026-09-13T12:00:00Z');
@@ -230,9 +236,10 @@ test('live search switch blocks direct and companion searches outside queue prom
   pw.multiSearch=companion.scrape=async()=>{searches++;throw new Error('unexpected live request');};
   try {
     await streams.discoverTorrentCandidates({promo:{id:'ucl'},event:{id:'ucl:1',name:'Celtic vs LASK',date:'2026-09-11'},titles:['Celtic LASK'],log:()=>{},discoveryBudgetMs:1000,liveProwlarr:true});
+    assert.equal(searches,0,'playback must not search when live search is off');
     await require('../lib/admin-promotions').researchAliases({}, {name:'UEFA Champions League',eventName:'Celtic vs LASK',eventDate:'2026-09-11'}, {
       prowlarrSearch:pw.multiSearch,companionSearch:companion.scrape,intelligenceSearch:companion.scrape});
-    assert.equal(searches,0);
+    assert.equal(searches,1,'explicit admin research still searches direct Prowlarr');
   } finally {[settings.getProwlarrDiscovery,settings.getCompanion,settings.getBitmagnet,settings.getProwlarr,settings.getSportVideo,pw.multiSearch,companion.scrape]=originals;}
 });
 test('research retains unmatched titles without treating them as playback matches or retaining URLs',async()=>{

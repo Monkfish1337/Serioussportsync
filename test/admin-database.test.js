@@ -66,14 +66,15 @@ test('renders database visibility, live warming and safe maintenance controls', 
       searchedAt: Date.now(), expiresAt: Date.now() + 10000 }],
   });
   for (const expected of [
-    'Automatic preparation', 'UFC 300', 'Recent searches', 'ufc:300', 'Pereira vs Hill',
+    'Bitmagnet preparation', 'UFC 300', 'Recent searches', 'ufc:300', 'Pereira vs Hill',
     'Preparation diagnostics', 'Suppressed', 'network timeout',
     '153 discovered', '2 matched', '1 ready', 'Discovery funnel',
     'Use previously confirmed playable results first',
-    'name="prepareTorrent"', 'name="prepareUsenet"', 'name="prepareEasynews"',
+    'name="prepareTorrent"',
     'name="windowDays"', 'name="intervalHours"', 'name="maxEventsPerRun"',
     '/admin/database/prune', '/admin/database/wipe', '/admin/database/status.json',
   ]) assert.match(html, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.doesNotMatch(html,/name="prepareUsenet"|name="prepareEasynews"/);
   const script = html.match(/<script>([\s\S]+)<\/script>/);
   assert.ok(script, 'database live-refresh script is present');
   assert.doesNotThrow(() => new Function(script[1]));

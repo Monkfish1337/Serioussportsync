@@ -144,8 +144,19 @@ See [Security](SECURITY.md) before changing proxy trust, bind addresses, or
 direct Internet exposure.
 # Unified Discovery
 
+Prowlarr's live-search switch controls playback searches. Explicit admin
+Improve Matching research still searches configured, enabled Prowlarr directly,
+including promotions using the measured queue. Research requests are bounded
+and title-only, so they do not fetch torrent metadata or start downloads.
+
 The admin sidebar now has a Discovery page with Overview, Events, Prowlarr,
-Sport-Video and Preparation tabs. The Overview promotion selection controls
+Sport-Video and Bitmagnet tabs. Prowlarr has its own promotion selection, defaulting
+to MLB, NFL and NBA; other promotions can opt into the measured queue. The
+Overview selection must also include promotions selected for Prowlarr.
+The Bitmagnet tab prepares only Bitmagnet torrent results and their TorBox
+availability. UU and Easynews remain live responders; legacy preparation
+settings and the old all-torrent-sources override cannot enable them here.
+The Overview promotion selection controls
 automatic Prowlarr event work, Sport-Video torrent preparation and warming,
 and automatic availability preparation. Existing source switches, supported
 promotions, categories, team filters and account catalog selections still apply.
