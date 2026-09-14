@@ -991,6 +991,10 @@ function createApp() {
   // 0.90.8 — apply a skin. One console, one skin: this is an operator choice
   // about the machine, not a per-account preference, so it is admin-only and
   // takes effect for everyone on the next page load.
+  app.post('/admin/time-zone', requireAdmin, (req,res) => {
+    try { settings.setDisplayTimeZone((req.body || {}).timeZone); res.redirect(303,'/admin?flash='+encodeURIComponent('Display time zone saved.')); }
+    catch (err) { res.redirect(303,'/admin?flash='+encodeURIComponent(err.message)); }
+  });
   app.post('/admin/appearance', requireAdmin, (req, res) => {
     try {
       const applied = settings.setAppearance({ skin: (req.body || {}).skin });
@@ -1743,7 +1747,7 @@ function createApp() {
   app.get('/admin/prowlarr-discovery', requireAdmin, (req,res) => {
     res.set('Cache-Control','no-store');
     res.send(tablerChrome.tablerPage('Prowlarr discovery',require('./lib/admin-prowlarr-discovery').render(),
-      {user:req.user,currentSection:'server'}));
+      {user:req.user,currentSection:'prowlarr-discovery'}));
   });
   app.post('/admin/prowlarr-discovery', requireAdmin, (req,res) => {
     settings.setProwlarrDiscovery({enabled:req.body.enabled==='1',intervalSeconds:Number(req.body.intervalSeconds),
@@ -2202,6 +2206,10 @@ function renderAdminPage(currentUser, opts) {
     +   '</div>'
     + '</div>'
     + flashHtml
+    + '<div class="card mb-3"><div class="card-header"><h3 class="card-title">Display time zone</h3></div><form method="POST" action="/admin/time-zone"><div class="card-body">'
+    + '<label for="server-time-zone">Time zone</label><input class="form-control" id="server-time-zone" name="timeZone" list="server-time-zones" value="'+escapeHtml(settings.getDisplayTimeZone())+'" required>'
+    + '<datalist id="server-time-zones">'+Array.from(new Set(['UTC','Europe/London'].concat(Intl.supportedValuesOf('timeZone')))).map(zone=>'<option value="'+escapeHtml(zone)+'"></option>').join('')+'</datalist>'
+    + '<p class="text-secondary">Europe/London adjusts automatically for GMT and BST. Changes displayed log and discovery times; event dates are unchanged.</p><button class="btn btn-primary">Save time zone</button></div></form></div>'
 
     // Discovery pipelines, one collapsible block each.
     //

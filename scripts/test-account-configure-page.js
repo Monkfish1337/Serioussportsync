@@ -48,6 +48,17 @@ function listen(app) {
     const cookie = String(login.headers.get('set-cookie') || '').split(';', 1)[0];
     assert.ok(cookie.startsWith('sss_session='), 'login returns the signed session cookie');
 
+    const serverPage = await fetch(base + '/admin', {headers:{Cookie:cookie}});
+    const serverHtml = await serverPage.text();
+    assert.ok(serverHtml.indexOf('server-time-zone') < serverHtml.indexOf('<h3 class="card-title">Discovery pipelines'), 'time zone appears above source settings');
+    assert.ok(serverHtml.includes('href="/admin/prowlarr-discovery"'), 'discovery has its own sidebar link');
+    const saveZone = await fetch(base + '/admin/time-zone', {method:'POST',redirect:'manual',headers:{Cookie:cookie,'Content-Type':'application/x-www-form-urlencoded'},body:'timeZone=Europe%2FLondon'});
+    assert.strictEqual(saveZone.status,303);
+    assert.strictEqual(require('../lib/settings').getDisplayTimeZone(),'Europe/London');
+    const logsPage = await fetch(base + '/admin/logs', {headers:{Cookie:cookie}});
+    assert.ok((await logsPage.text()).includes('Europe/London · click'), 'logs use the selected zone');
+    if (process.env.SSS_UI_PREVIEW) fs.writeFileSync(process.env.SSS_UI_PREVIEW,serverHtml);
+
     const account = await fetch(base + '/account', { headers: { Cookie: cookie } });
     assert.strictEqual(account.status, 200);
     assert.strictEqual(account.headers.get('cache-control'), 'no-store');

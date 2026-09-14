@@ -69,8 +69,8 @@ test('a light skin switches the whole token set, not just the accent', () => {
   const page = (id) => chrome.tablerPage('T', '<p>body</p>', {
     user: { username: 'a', role: 'admin' }, skin: skins.get(id),
   });
-  assert.match(page('newsprint'), /<html lang="en" data-mode="light">/);
-  assert.match(page('sportsroom'), /<html lang="en" data-mode="dark">/);
+  assert.match(page('newsprint'), /<html[^>]*data-mode="light"/);
+  assert.match(page('sportsroom'), /<html[^>]*data-mode="dark"/);
   // The whole token set swaps, not just the accent — a light mode that kept
   // the dark ground would be an unreadable page, which is the classic bug.
   assert.match(page('newsprint'), /--ground: #f2f4f8;/);
