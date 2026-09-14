@@ -5,6 +5,45 @@ const assert = require('node:assert/strict');
 const http = require('http');
 const fetch = require('node-fetch');
 const playback = require('../lib/sources/nntp-playback');
+const {execFile} = require('node:child_process');
+const {promisify} = require('node:util');
+
+for (const mode of ['prefetch-failure','disconnect','write-error']) test('NNTP stream survives '+mode+' during backpressure',async()=>{
+  // Use strict rejection mode in a separate process: an orphaned prefetch must
+  // fail this test by killing the child, even if serve() has a route-level catch.
+  const script = `
+    const assert=require('node:assert/strict');
+    const {EventEmitter}=require('node:events');
+    const playback=require(${JSON.stringify(require.resolve('../lib/sources/nntp-playback'))});
+    const mode=${JSON.stringify(mode)};
+    const res=new EventEmitter();
+    res.setHeader=()=>{};res.write=()=>false;res.end=()=>{res.writableEnded=true;};
+    const descriptor={id:'regression',kind:'direct',filename:'test.mkv',size:8,chunkSize:4,segments:[{messageId:'first'},{messageId:'second'}],firstPart:{data:Buffer.from('ABCD'),begin:0,endExclusive:4,totalSize:8}};
+    let destroyed=0, rejectBody, bodyStarted;
+    const started=new Promise(resolve=>bodyStarted=resolve);
+    const config={maxConnections:1};
+    const options={windowSizeBytes:4,connect:async()=>({body:()=>{bodyStarted();return new Promise((resolve,reject)=>{rejectBody=reject;});},close(){},destroy(){destroyed++;if(rejectBody)rejectBody(new Error('NNTP connection closed'));}})};
+    (async()=>{
+      const served=playback.serve({method:'GET',headers:{}},res,descriptor,config,options);
+      // Attach the route catch immediately, just like the production handler.
+      const outcome=served.then(()=>null,error=>error);
+      await started;
+      if(mode==='prefetch-failure'){
+        rejectBody(new Error('NNTP connection closed'));
+        await new Promise(resolve=>setTimeout(resolve,30));
+        res.emit('drain');
+      } else if(mode==='disconnect') {res.destroyed=true;res.emit('close');}
+      else {res.emit('error',new Error('player write failed'));}
+      const error=await outcome;
+      if(mode==='disconnect') {assert.equal(error,null);assert.ok(destroyed>0);}
+      else {assert.match(error.message,mode==='prefetch-failure'?/NNTP connection closed/:/player write failed/);}
+      for(const event of ['close','drain','error'])assert.equal(res.listenerCount(event),0);
+      console.log('ok');
+    })().catch(error=>{console.error(error);process.exitCode=1;});
+  `;
+  const result=await promisify(execFile)(process.execPath,['--unhandled-rejections=strict','-e',script],{timeout:5000});
+  assert.match(result.stdout,/ok/);
+});
 
 function listen(server) {
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server.address().port)));
