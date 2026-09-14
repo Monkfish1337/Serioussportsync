@@ -65,6 +65,9 @@ test('discovery page shows event names, successes and matched events without tes
   try {
     const html=page.render();assert.match(html,/Successes/);assert.match(html,/Successfully matched events/);
     assert.match(html,/Mets &lt;vs&gt; Yankees/);assert.doesNotMatch(html,/<td>mlb:1<\/td>/);
+    assert.match(html,/action="\/admin\/prowlarr-discovery\/reset-cooldown"/);
+    assert.match(html,/name="indexerId" value="30"/);
+    assert.match(html,/aria-label="Reset cooldown for RuTracker" disabled/);
     assert.doesNotMatch(html,/Test playback|\/stream\//);
   } finally {[discovery.getDefault,store.getEvents]=originals;}
 });
@@ -169,4 +172,100 @@ test('Prowlarr source reuses recovered hashes without requesting metadata again'
     for (let i=0;i<2;i++) assert.equal((await source.multiSearch(['Mets Yankees'],{detailed:true,indexerId:30,hashCache,fetchImpl,hydrationLimit:3,hydrationConcurrency:1})).results.length,1);
     assert.equal(searches,2);assert.equal(downloads,1);
   } finally {settings.getProwlarr=original;}
+});
+
+test('limited hash recovery saves matches without cooling down a healthy indexer',async()=>{
+  const settings=require('../lib/settings'),source=require('../lib/sources/prowlarr'),{Response}=require('node-fetch');
+  const original=settings.getProwlarr;
+  settings.getProwlarr=()=>({url:'http://prowlarr.invalid',apiKey:'fixture'});
+  let downloads=0;
+  const {deps}=setup({search:async(q,opts)=>source.multiSearch(q,{...opts,fetchImpl:async url=>{
+    if (url.includes('/api/v1/search?')) return new Response(JSON.stringify(Array.from({length:10},(_,i)=>({
+      title:'MLB Mets vs Yankees 1080p',downloadUrl:'/download/'+i,seeders:10,indexer:'RuTracker'}))));
+    downloads++;return new Response(null,{status:302,headers:{location:'magnet:?xt=urn:btih:'+String(downloads).repeat(40)}});
+  }})});
+  const queue=discovery.createQueue(':memory:',deps);
+  try {
+    const result=await queue.run();
+    assert.equal(downloads,3);assert.equal(result.matched,3);assert.equal(result.partial,false);
+    assert.equal(queue.status().indexers[0].failures,0);
+    assert.equal(queue.status().indexers[0].successes,1);
+    assert.equal(queue.candidates(fixtures[0]).length,3);
+  } finally {queue.close();settings.getProwlarr=original;}
+});
+
+test('real Prowlarr search and metadata failures still cool down the indexer',async()=>{
+  const settings=require('../lib/settings'),source=require('../lib/sources/prowlarr'),{Response}=require('node-fetch');
+  const original=settings.getProwlarr;
+  settings.getProwlarr=()=>({url:'http://prowlarr.invalid',apiKey:'fixture'});
+  try {
+    for (const failure of ['search','metadata-http','metadata-timeout']) {
+      const {deps}=setup({search:async(q,opts)=>source.multiSearch(q,{...opts,fetchImpl:async url=>{
+        if (url.includes('/api/v1/search?')) {
+          if (failure==='search') throw new Error('request timed out');
+          return new Response(JSON.stringify([{title:'MLB Mets vs Yankees',downloadUrl:'/download/one',seeders:10,indexer:'RuTracker'}]));
+        }
+        if (failure==='metadata-timeout') throw new Error('request timed out');
+        return new Response('unavailable',{status:503});
+      }})});
+      const queue=discovery.createQueue(':memory:',deps);
+      try {
+        assert.equal((await queue.run()).partial,true,failure);
+        assert.equal(queue.status().indexers[0].failures,1,failure);
+      } finally {queue.close();}
+    }
+  } finally {settings.getProwlarr=original;}
+});
+
+test('a healthy limited search resets previous consecutive failures',async()=>{
+  let calls=0;
+  const {deps,advance}=setup({search:async()=>++calls===1
+    ? {ok:false,partial:true,upstreamFailed:true,results:[]}
+    : {ok:true,partial:true,upstreamFailed:false,results:[]}});
+  const queue=discovery.createQueue(':memory:',deps);
+  try {
+    await queue.run();assert.equal(queue.status().indexers[0].failures,1);
+    advance(2*HOUR);assert.equal((await queue.run()).partial,false);
+    assert.equal(queue.status().indexers[0].failures,0);
+  } finally {queue.close();}
+});
+
+test('manual cooldown reset is durable and preserves budgets, successes and fixture retries',async()=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'sss-cooldown-reset-')),file=path.join(dir,'queue.sqlite');
+  const {deps,advance}=setup({search:async(q,opts)=>{
+    await opts.fetchImpl('http://mock/search',{});
+    return {ok:true,partial:true,upstreamFailed:true,results:[{title:'MLB Mets vs Yankees',infoHash:'a'.repeat(40),seeders:5}]};
+  }});
+  let queue=discovery.createQueue(file,deps);
+  try {
+    await queue.run();const before=queue.status();
+    assert.equal(before.indexers[0].failures,1);
+    assert.throws(()=>queue.resetCooldown('invalid'),/valid indexer/);
+    assert.throws(()=>queue.resetCooldown(999),/not found/);
+    assert.deepEqual(queue.resetCooldown('30'),{reset:true});
+    queue.close();queue=discovery.createQueue(file,deps);
+    const after=queue.status();
+    assert.equal(after.indexers[0].failures,0);assert.equal(after.indexers[0].next_at,0);
+    assert.equal(after.indexers[0].requests,before.indexers[0].requests);
+    assert.equal(after.indexers[0].day,before.indexers[0].day);
+    assert.equal(after.indexers[0].successes,before.indexers[0].successes);
+    assert.deepEqual(after.jobs,before.jobs);assert.equal(after.matches,before.matches);
+    assert.deepEqual(queue.resetCooldown(30),{reset:false});
+    assert.equal((await queue.run()).skipped,'spacing');
+    advance(120000);await queue.run();assert.equal(queue.status().indexers[0].requests,2);
+  } finally {queue.close();fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+test('cooldown reset cannot bypass an exhausted daily budget',async()=>{
+  let calls=0;
+  const {deps,advance}=setup({
+    options:()=>({enabled:true,intervalSeconds:120,dailyRequests:1,lookbackDays:30,timeoutSeconds:120}),
+    search:async(q,opts)=>{calls++;await opts.fetchImpl('http://mock/search',{});return {ok:false,partial:true,results:[]};}
+  });
+  const queue=discovery.createQueue(':memory:',deps);
+  try {
+    await queue.run();queue.resetCooldown(30);advance(120000);
+    assert.equal((await queue.run()).skipped,'no-due-games');
+    assert.equal(calls,1);assert.equal(queue.status().indexers[0].requests,1);
+  } finally {queue.close();}
 });

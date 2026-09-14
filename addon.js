@@ -1756,6 +1756,12 @@ function createApp() {
     try {require('./lib/prowlarr-discovery').getDefault().enqueue(event); res.redirect(303,'/admin/prowlarr-discovery');}
     catch (error) {res.status(400).send(error.message);}
   });
+  app.post('/admin/prowlarr-discovery/reset-cooldown', requireAdmin, (req,res) => {
+    try {
+      require('./lib/prowlarr-discovery').getDefault().resetCooldown(req.body.indexerId);
+      res.redirect(303,'/admin/prowlarr-discovery');
+    } catch (error) {res.status(400).send(error.message);}
+  });
   app.get('/admin/promotions/:id/aliases', requireAdmin, (req, res) => {
     const promotion = promotions.all.find(item => item.id === req.params.id);
     if (!promotion) return res.status(404).send('Promotion not found');
