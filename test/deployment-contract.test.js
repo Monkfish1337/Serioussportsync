@@ -73,6 +73,11 @@ test('a build only publishes after its own verification passes', () => {
   assert.ok(verify !== -1, 'container.yml must run the unit suite before building');
   assert.ok(build !== -1, 'container.yml must contain a build step');
   assert.ok(verify < build, 'verification must precede the build and push');
+  const startup = container.indexOf('up -d --wait');
+  const publish = container.indexOf('docker push');
+  assert.ok(startup > build && publish > startup, 'the built container must pass startup before publishing');
+  assert.match(container, /pull_policy: never/);
+  assert.doesNotMatch(container.slice(container.indexOf('- name: Verify release candidate'),publish), /if: github.ref/,'tags must receive the same startup checks');
 });
 
 test('CI runs the full suite, not a subset', () => {

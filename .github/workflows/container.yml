@@ -81,34 +81,43 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
 
-      - name: Build and publish image
+      - name: Build release candidate
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          load: true
+          push: false
+          tags: sss-release-candidate:ci
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Verify public image through Compose
-        if: github.ref == 'refs/heads/main'
+      - name: Verify release candidate through Compose
         run: |
           cp .env.example .env
-          docker logout ghcr.io
-          docker compose pull
-          docker compose up -d --wait --wait-timeout 120
+          printf 'services:\n  serioussportsync:\n    image: sss-release-candidate:ci\n    pull_policy: never\n' > compose.ci.yml
+          docker compose -f docker-compose.yml -f compose.ci.yml up -d --wait --wait-timeout 120
           curl --fail --show-error --retry 5 --retry-delay 2 http://127.0.0.1:7000/health
+
+      - name: Publish tested image
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            docker tag sss-release-candidate:ci "$tag"
+            docker push "$tag"
+          done <<< "$IMAGE_TAGS"
 
       # Diagnostics and cleanup must never be what turns a run red. Both failed
       # in #180 only because .env is created by the step that had already been
       # skipped, turning one real error into three.
       - name: Show container logs on failure
-        if: failure() && github.ref == 'refs/heads/main'
+        if: failure()
         continue-on-error: true
-        run: docker compose logs --no-color
+        run: docker compose -f docker-compose.yml -f compose.ci.yml logs --no-color
 
       - name: Stop test stack
-        if: always() && github.ref == 'refs/heads/main'
+        if: always()
         continue-on-error: true
-        run: docker compose down --volumes --remove-orphans
+        run: docker compose -f docker-compose.yml -f compose.ci.yml down --volumes --remove-orphans

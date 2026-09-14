@@ -26,6 +26,28 @@ development only. It must never be used for a real deployment.
 
 ## Metadata
 
+The **Metadata** page holds football-data.org, API-Football and TMDB credentials.
+Use **Force Metadata Refresh** there to update enabled promotions immediately.
+Saving discovery pipelines on **Server** does not change metadata credentials.
+
+**User Management** contains users, account creation, invitations and access requests.
+Applicants choose a username and password from **Request access** on the login page;
+they cannot sign in until an administrator approves them as a regular user.
+Requests can be closed without blocking review of existing requests. Pending requests
+expire after 14 days by default (configurable from 1 to 90 days), removing their password
+hashes on the next review or request. The latest 500 approval/decline decisions record
+the administrator and time. Restarting SSS resets the public request rate limiter.
+
+DIY Usenet is restricted to administrators, including saved configurations and
+background preparation. Its settings remain accessible through **Configure** for
+administrators; it is no longer a sidebar destination.
+
+**Prowlarr discovery** shows first-pass progress, saved match coverage and retry
+reasons for eligible MLB, NFL and NBA events. Estimates start after three event
+attempts over at least one hour. They cover the untouched backlog, not completion
+of retries or guaranteed playback. **Database → Recent searches** distinguishes
+discovered candidates, matching releases and ready links for the searched account.
+
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `TSDB_API_KEY` | `123` | TheSportsDB API key. Replace with your own key when available. |

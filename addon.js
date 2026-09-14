@@ -133,6 +133,13 @@ function createApp() {
   app.use(express.urlencoded({ extended: false, limit: '256kb', parameterLimit: 500 }));
 
   // Attach req.user from session cookie if present.
+  app.use((req,res,next) => {
+    try { users.userCount(); next(); }
+    catch (err) {
+      if (err.code !== 'ACCOUNT_STORE_UNAVAILABLE') return next(err);
+      res.status(503).send(authPage('Account storage needs attention','<p>'+escapeHtml(err.message)+'</p>'));
+    }
+  });
   function loadSession(req, res, next) {
     const sess = sessions.readSession(req);
     if (sess && sess.userId) {
@@ -239,7 +246,7 @@ function createApp() {
     const username = String(req.body.username || '').trim();
     const password = String(req.body.password || '');
     try {
-      const u = await users.createUser({ username, password, role: 'admin' });
+      const u = await users.createUser({ username, password, role: 'admin', initialAdminOnly: true });
       sessions.setCookie(res, u, req);
       res.redirect('/account');
     } catch (err) {
@@ -259,7 +266,7 @@ function createApp() {
       + '<label class="form-label">Password</label>'
       + '<input class="form-control" name="password" type="password" required>'
       + '<button class="btn btn-primary w-100 mt-3" type="submit">Sign in</button>'
-      + '</form><a class="btn btn-outline-primary w-100 mt-3" href="/request-access">Request access</a>'
+      + '</form>' + (users.accessPolicy().enabled ? '<a class="btn btn-outline-primary w-100 mt-3" href="/request-access">Request access</a>' : '')
     ));
   });
 
@@ -312,10 +319,12 @@ function createApp() {
   const accessForm = '<p>Choose your login details. An administrator must approve your request before you can sign in.</p><form method="POST" action="/request-access"><label class="form-label">Username</label><input class="form-control" name="username" autocomplete="username" required minlength="3" maxlength="32" pattern="[A-Za-z0-9_.-]{3,32}"><label class="form-label">Password</label><input class="form-control" type="password" name="password" autocomplete="new-password" required minlength="8" maxlength="256"><button class="btn btn-primary w-100 mt-3" type="submit">Request access</button></form><p><a href="/login">Back to sign in</a></p>';
   app.get('/request-access', (req,res) => {
     if (!users.userCount()) return res.redirect('/setup');
+    if (!users.accessPolicy().enabled) return res.status(403).send(authPage('Access requests closed','<p>Please contact the administrator.</p><p><a href="/login">Sign in</a></p>'));
     res.send(authPage('Request access', accessForm));
   });
   app.post('/request-access', async (req,res) => {
     if (!users.userCount()) return res.redirect('/setup');
+    if (!users.accessPolicy().enabled) return res.status(403).send(authPage('Access requests closed','<p>Please contact the administrator.</p>'));
     const now = Date.now(), ip = clientIp(req);
     for (const [key,entry] of accessAttempts) if (now-entry.start >= 3600000) accessAttempts.delete(key);
     const entry = accessAttempts.get(ip) || {start:now,count:0};
@@ -335,7 +344,13 @@ function createApp() {
   });
   for (const action of ['approve','decline']) app.post('/admin/access-requests/:id/'+action, requireAdmin, (req,res) => {
     let message;
-    try { const name = users.reviewAccessRequest(req.params.id,action==='approve'); message = name + (action==='approve' ? ' approved. They can now sign in.' : ' declined.'); }
+    try { const name = users.reviewAccessRequest(req.params.id,action==='approve',req.user); message = name + (action==='approve' ? ' approved. They can now sign in.' : ' declined.'); }
+    catch (err) { message=err.message; }
+    res.redirect(303,'/admin/user-management?flash='+encodeURIComponent(message));
+  });
+  app.post('/admin/access-policy', requireAdmin, (req,res) => {
+    let message;
+    try { users.setAccessPolicy({enabled:req.body.enabled==='1',expiryDays:req.body.expiryDays}); message='Access request settings saved.'; }
     catch (err) { message=err.message; }
     res.redirect(303,'/admin/user-management?flash='+encodeURIComponent(message));
   });
@@ -2204,9 +2219,13 @@ function renderUserManagement(currentUser, opts) {
 
 
   const pending = users.listAccessRequests();
+  const policy = users.accessPolicy();
+  const policyHtml = '<div class="card mb-3"><div class="card-header"><h3 class="card-title">Access request settings</h3></div><div class="card-body"><form method="POST" action="/admin/access-policy"><label class="form-check"><input class="form-check-input" type="checkbox" name="enabled" value="1"'+(policy.enabled?' checked':'')+'><span class="form-check-label">Allow access requests from the login page</span></label><label class="form-label">Expire pending requests after (days)</label><input class="form-control" type="number" name="expiryDays" min="1" max="90" value="'+policy.expiryDays+'" required><p class="text-secondary small">Expired requests and their password hashes are removed. Existing pending requests can still be reviewed when new requests are closed.</p><button class="btn btn-primary" type="submit">Save access settings</button></form></div></div>';
+  const reviews = users.listAccessReviews();
+  const reviewHtml = '<div class="card mb-3"><div class="card-header"><h3 class="card-title">Recent access decisions</h3></div><div class="table-responsive"><table class="table"><thead><tr><th>Username</th><th>Decision</th><th>Administrator</th><th>Time</th></tr></thead><tbody>'+reviews.map(r=>'<tr><td>'+escapeHtml(r.username)+'</td><td>'+escapeHtml(r.outcome)+'</td><td>'+escapeHtml(r.adminUsername || 'Unknown')+'</td><td>'+escapeHtml(require('./lib/display-time').displayTime(r.at))+'</td></tr>').join('')+'</tbody></table></div></div>';
   const requests = '<div class="card mb-3"><div class="card-header"><h3 class="card-title">Access requests (' + pending.length + ')</h3></div><div class="card-body">'
     + (pending.length ? '<div class="table-responsive"><table class="table"><thead><tr><th>Username</th><th>Requested</th><th>Review</th></tr></thead><tbody>' + pending.map(r => '<tr><td>' + escapeHtml(r.username) + '</td><td>' + escapeHtml(require('./lib/display-time').displayTime(r.createdAt)) + '</td><td>' + ['approve','decline'].map(action => '<form method="POST" action="/admin/access-requests/' + escapeHtml(r.id) + '/' + action + '" class="d-inline"><button class="btn btn-sm btn-outline-primary" type="submit">' + (action === 'approve' ? 'Approve' : 'Decline') + '</button></form>').join(' ') + '</td></tr>').join('') + '</tbody></table></div>' : '<p>No pending requests.</p>') + '</div></div>';
-  const body = (opts.flash ? '<div class="alert alert-info">' + escapeHtml(opts.flash) + '</div>' : '') + requests
+  const body = (opts.flash ? '<div class="alert alert-info">' + escapeHtml(opts.flash) + '</div>' : '') + policyHtml + requests + reviewHtml
     // Users
     + '<div class="card mb-3">'
     +   '<div class="card-header"><h3 class="card-title">Users (' + all.length + ')</h3></div>'

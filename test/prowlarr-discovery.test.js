@@ -37,6 +37,10 @@ test('one indexer search matches multiple fixtures and suppresses repeat searche
     assert.equal(queue.status().indexers[0].requests,1);
     assert.equal(queue.status().indexers[0].successes,1);
     assert.equal(queue.status().matchedEvents.length,2);
+    assert.equal(queue.status().progress.eligible,2);
+    assert.equal(queue.status().progress.matched,2);
+    assert.equal(queue.status().progress.outstanding,0);
+    assert.match(queue.status().eventStates[0].state,/playback check required/);
     assert.equal(queue.status().matchedEvents[0].name,fixtures[0].name);
     queue.enqueue(fixtures[0]); advance(120000);
     assert.equal((await queue.run()).skipped,'no-due-games'); assert.equal(calls,1);
@@ -54,6 +58,28 @@ test('success counts survive restart and count partial matched searches once',as
     assert.equal(queue.status().matchedEvents[0].releases,2);
     assert.deepEqual(queue.status().matchedEvents[0].indexers,['RuTracker']);
   } finally {queue.close();fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+test('backlog estimates wait for measured history and failed searches remain distinguishable',async()=>{
+  const events=Array.from({length:4},(_,i)=>({id:'mlb:'+(i+10),name:'Game '+i,date:'2026-09-'+String(11-i).padStart(2,'0')}));
+  const {deps,advance}=setup({events:()=>events,search:async()=>({ok:true,partial:false,results:[]})});
+  const queue=discovery.createQueue(':memory:',deps);
+  try {
+    assert.equal(queue.status().progress.untouched,4);
+    assert.equal(queue.status().progress.firstPassEstimateMs,null);
+    for(let i=0;i<3;i++) { await queue.run(); advance(1800000); }
+    const progress=queue.status().progress;
+    assert.ok(progress.sampleEvents>=3);
+    assert.ok(progress.firstPassEstimateMs!==null);
+    assert.ok(queue.status().eventStates.some(e=>e.state==='No matches — awaiting retry'));
+  } finally {queue.close();}
+  const failure=setup({search:async()=>{throw new Error('indexer timed out');}});
+  const failedQueue=discovery.createQueue(':memory:',failure.deps);
+  try {
+    await failedQueue.run();
+    assert.ok(failedQueue.status().eventStates.some(e=>e.state==='Indexer failure — awaiting retry'));
+    assert.equal(failedQueue.status().progress.searched,1);
+  } finally {failedQueue.close();}
 });
 
 test('discovery page shows event names, successes and matched events without test playback controls',()=>{

@@ -85,7 +85,17 @@ function listen(app) {
     await post('/admin/access-requests/'+declined.id+'/decline',{},cookie);
     assert.strictEqual(users.findByUsername('declined-test'),null);
     assert.strictEqual(users.listAccessRequests().length,0);
+    const decisions=users.listAccessReviews();
+    assert.equal(decisions[0].outcome,'declined');
+    assert.equal(decisions[0].adminId,user.id);
+    assert.strictEqual((await post('/admin/access-policy',{enabled:'1',expiryDays:'7'},regularCookie)).status,403);
+    await post('/admin/access-policy',{expiryDays:'7'},cookie);
+    assert.ok(!(await (await fetch(base+'/login')).text()).includes('href="/request-access"'));
+    assert.strictEqual((await post('/request-access',{username:'blocked-test',password})).status,403);
+    await post('/admin/access-policy',{enabled:'1',expiryDays:'14'},cookie);
     const metadataHtml=await (await fetch(base+'/admin/metadata',{headers:{Cookie:cookie}})).text();
+    const discoveryHtml=await (await fetch(base+'/admin/prowlarr-discovery',{headers:{Cookie:cookie}})).text();
+    assert.ok(discoveryHtml.includes('Catch-up progress') && discoveryHtml.includes('Event discovery status'));
     assert.ok(metadataHtml.includes('Metadata API keys') && metadataHtml.includes('Force Metadata Refresh'));
     await post('/admin/metadata-keys',{footballDataApiKey:'test-football-key',apiFootballApiKey:'test-api-key',tmdbApiKey:'test-tmdb-key'},cookie);
     assert.strictEqual(require('../lib/settings').getTmdb().apiKey,'test-tmdb-key');
@@ -428,6 +438,7 @@ function listen(app) {
   } finally {
     await new Promise((resolve) => server.close(resolve));
     try { require('../lib/availability-index').getDefault().close(); } catch (_) { /* already closed */ }
+    try { require('../lib/prowlarr-discovery').getDefault().close(); } catch (_) { /* already closed */ }
   }
 })().catch((err) => {
   console.error(err);
