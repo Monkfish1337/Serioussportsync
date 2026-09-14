@@ -7,6 +7,36 @@ const { createGenericPromotion } = require('../lib/promotions');
 const adminPromotions = require('../lib/admin-promotions');
 const customPromotions = require('../lib/custom-promotions');
 
+test('UCL stage and matchday labels do not reject the first team in genuine releases',()=>{
+  const promotion=require('../lib/promotions').all.find(p=>p.id==='ucl');
+  const event={id:'ucl:test',name:'Manchester United vs Sabah FC',date:'2026-09-10',
+    teamNames:{home:['Manchester United','MUN'],away:['Sabah FC','SAB']}};
+  for (const title of [
+    'UCL.2026.09.10.League.Phase.Manchester.United.Vs.Sabah.FK.1080p.AHDTV.x264-DARKSPORT',
+    'UCL.2026.09.10.League.Phase.Manchester.United.Vs.Sabah.FK.1080p.AHDTV.x264-DARKSPORT-FTP',
+    '20260910_UCL_26.27_LP_MD1_MUN_vs_SAB_[rgfootball.net]_1080p.50.mkv',
+    '20260910_UCL_26.27_LP_MD1_MUN_vs_SAB_[rgfootball.net]_720p.50.mkv',
+    '20260910_UCL_26.27_LP_MUN_vs_SAB_1080p.mkv',
+    'UCL.2026.09.10.Group.Phase.Manchester.United.Vs.Sabah.FK.1080p',
+  ]) {
+    assert.equal(promotion.isRelevantStreamTitle(title,event).ok,true,title);
+    assert.equal(promotion.isRelevantStreamTitle(title,{...event,date:'2026-09-05'}).reason,'wrong-date');
+    assert.equal(promotion.isRelevantStreamTitle(title,{...event,name:'Manchester United vs Arsenal FC',
+      teamNames:{home:['Manchester United','MUN'],away:['Arsenal FC','ARS']}}).ok,false);
+  }
+});
+
+test('competition stage support preserves club collision and highlights exclusions',()=>{
+  const promotion=createGenericPromotion({id:'club-test',name:'Champions League',source:'football-data',competitionId:'CL',
+    promotionAliases:['UCL'],relevanceKeywords:['ucl'],exclusionKeywords:['highlights'],requireDateInTitle:true});
+  const event={name:'AC Milan vs Arsenal',date:'2026-09-10',teamNames:{home:['AC Milan','Milan','MIL'],away:['Arsenal','ARS']}};
+  assert.equal(promotion.isRelevantStreamTitle('UCL.2026.09.10.League.Phase.Inter.Milan.vs.Arsenal.1080p',event).ok,false);
+  assert.equal(promotion.isRelevantStreamTitle('UCL.2026.09.10.Unknown.Phase.Milan.vs.Arsenal.1080p',event).ok,false);
+  assert.equal(promotion.isRelevantStreamTitle('UCL.2026.09.10.League.Phase.AC.Milan.vs.Arsenal.Highlights.1080p',event).ok,false);
+  for (const stage of ['MD1','R01','Round1','GW1','Gameweek1'])
+    assert.equal(promotion.isRelevantStreamTitle('UCL.2026.09.10.'+stage+'.AC.Milan.vs.Arsenal.1080p',event).ok,true,stage);
+});
+
 test('football season and matchday releases require both teams, competition and exact season/round',()=>{
   const promotion=createGenericPromotion({id:'epl-test',name:'Premier League',source:'football-data',competitionId:'PL',
     teamAliasPreset:'epl',promotionAliases:['Premier League','EPL'],relevanceKeywords:['premier league','epl'],requireDateInTitle:true});
