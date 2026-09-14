@@ -100,10 +100,11 @@ function listen(app) {
     const metadataHtml=await (await fetch(base+'/admin/metadata',{headers:{Cookie:cookie}})).text();
     const discoveryHtml=await (await fetch(base+'/admin/prowlarr-discovery',{headers:{Cookie:cookie}})).text();
     assert.ok(discoveryHtml.includes('Catch-up progress') && discoveryHtml.includes('Event discovery status'));
-    for (const tab of ['events','prowlarr','preparation']) {
+    for (const tab of ['overview','events','prowlarr','preparation']) {
       const response=await fetch(base+'/admin/discovery?tab='+tab,{headers:{Cookie:cookie}});
       assert.strictEqual(response.status,200);
-      assert.ok(!(await response.text()).includes('>Overview</a>'));
+      const html=await response.text();
+      if(tab==='overview') assert.ok(html.includes('Coverage by promotion') && html.includes('Missing usable identities'));
     }
     assert.strictEqual((await fetch(base+'/admin/discovery',{headers:{Cookie:regularCookie}})).status,403);
     assert.strictEqual((await fetch(base+'/assets/discovery-controls.js')).status,200);

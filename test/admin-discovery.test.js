@@ -28,5 +28,5 @@ test('source promotion selection preserves empty selections and Overview is remo
   assert.match(empty,/0 selected/);
   assert.match(empty,/\/admin\/discovery\/bitmagnet\/promotions/);
   assert.match(render({...base,tab:'preparation',selection:{source:'bitmagnet',ids:null}}),/ checked/);
-  assert.doesNotMatch(render({...base,tab:'overview'}),/>Overview</);
+  assert.match(render({...base,tab:'overview'}),/>Overview</);
 });

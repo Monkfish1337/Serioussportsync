@@ -40,6 +40,15 @@ const path=require('path');
     assert.equal(await bitSettings.isVisible(),false);
     await page.locator('.card').filter({has:page.locator('h3').filter({hasText:'Bitmagnet preparation settings'})}).getByRole('button',{name:'Show',exact:true}).click();
     assert.equal(await bitSettings.isVisible(),true);
+    const data={tab:'overview',events,promotions:[{id:'mlb',name:'MLB'}],queue:status,releases:[],indexTitles:[],relevant:()=>true};
+    data.coverage=require('../lib/discovery-coverage').coverage(data,Date.parse('2026-09-14T12:00:00Z'));
+    await page.setContent('<div>'+require('../lib/admin-discovery').render(data)+'</div>');
+    await page.addScriptTag({path:path.join(__dirname,'../public/discovery-controls.js')});
+    assert.equal(await page.getByText('Coverage by promotion',{exact:true}).isVisible(),true);
+    assert.equal(await page.locator('table').last().locator('tbody tr:visible').count(),15);
+    await page.getByRole('button',{name:'Next',exact:true}).click();
+    await page.getByRole('textbox',{name:'Filter table',exact:true}).fill('Game 30');
+    assert.equal(await page.locator('table').last().locator('tbody tr:visible').count(),1);
     assert.deepEqual(errors,[]);
     console.log('OK — all three source tabs, pagination, Sport-Video filters and settings folds verified in Chromium.');
   } finally {await browser.close();}

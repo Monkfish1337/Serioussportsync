@@ -29,6 +29,21 @@ function temporaryIndex(start) {
     close() { index.close(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); },
   };
 }
+test('coverage title lookup distinguishes usable identities from metadata and exposes no private URL',()=>{
+  const temp=temporaryIndex();
+  try {
+    temp.index.recordEventCandidates({eventId:'mlb:coverage',provider:'torrent',scope:'coverage',results:[
+      {title:'Usable torrent',infoHash:'a'.repeat(40)},
+      {title:'Metadata only'},
+      {title:'Usable NZB',nzbUrl:'https://private.example/release?apikey=secret'}]});
+    const rows=temp.index.eventReleaseTitles(['mlb:coverage','mlb:coverage']);
+    assert.equal(rows.length,3);
+    assert.equal(rows.find(r=>r.title==='Metadata only').usable,0);
+    assert.equal(rows.filter(r=>r.usable).length,2);
+    assert.doesNotMatch(JSON.stringify(rows),/apikey|private.example/);
+    assert.deepEqual(temp.index.eventReleaseTitles([]),[]);
+  } finally {temp.close();}
+});
 
 test('stores encrypted reusable searches and isolates provider scopes', () => {
   const fixture = temporaryIndex();

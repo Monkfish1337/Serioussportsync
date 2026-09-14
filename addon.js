@@ -1244,11 +1244,21 @@ function createApp() {
     res.set('Cache-Control','no-store');
     try {
       const ui=require('./lib/admin-discovery');
-      const tab=Object.hasOwn(ui.tabs,req.query.tab)?req.query.tab:'events';
+      const tab=Object.hasOwn(ui.tabs,req.query.tab)?req.query.tab:'overview';
       const data={tab,flash:req.query.flash,promotion:String(req.query.promotion || ''),
-        promotions:promotions.all.map(p=>({id:p.id,name:p.name})),
+        promotions:promotions.all.map(p=>({id:p.id,name:p.name,enabled:p.enabled})),
         events:store.getEvents(),queue:require('./lib/prowlarr-discovery').getDefault().status(),
         releases:sportVideo.load().releases || []};
+      if(tab==='overview') {
+        const coverage=require('./lib/discovery-coverage');
+        const now=Date.now();
+        data.background={bitmagnet:{enabled:settings.getAvailabilityWarm().enabled && settings.getAvailabilityWarm().prepareTorrent && settings.getBitmagnet().enabled && Boolean(settings.getBitmagnet().url),selected:settings.getSourceDiscoveryPromotions('bitmagnet')},
+          sportVideo:{enabled:settings.getSportVideo().enabled && settings.getSportVideo().autoScan,selected:settings.getSourceDiscoveryPromotions('sport-video')}};
+        try {data.indexTitles=availabilityStore.getDefault().eventReleaseTitles(coverage.recentEvents(data.events,now).map(e=>e.id));}
+        catch(error) {data.coverageError=security.safeErrorMessage(error);}
+        data.relevant=(title,event)=>promotions.getByEventId(event.id)?.isRelevantStreamTitle(title,event).ok===true;
+        data.coverage=coverage.coverage(data,now);
+      }
       if(tab==='prowlarr') data.body=require('./lib/admin-prowlarr-discovery').render(data.queue);
       if(tab==='sport-video') data.body=adminSportVideo.renderBody(await sportVideoSnapshot(req.user));
       if(tab==='preparation') data.body=adminDatabase.renderBody({...databaseSnapshot(),discovery:true});

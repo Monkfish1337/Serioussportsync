@@ -149,10 +149,17 @@ Improve Matching research still searches configured, enabled Prowlarr directly,
 including promotions using the measured queue. Research requests are bounded
 and title-only, so they do not fetch torrent metadata or start downloads.
 
-The admin sidebar now has a Discovery page with Events, Prowlarr,
+The admin sidebar now has a Discovery page with Overview, Events, Prowlarr,
 Sport-Video and Bitmagnet tabs. Prowlarr has its own promotion selection, defaulting
 to MLB, NFL and NBA; other promotions can opt into the measured queue.
-Each source has an independent promotion selection. Events is the default tab.
+Each source has an independent promotion selection. Overview is the default tab
+and shows deduplicated past events in a rolling seven-day window, usable release
+coverage per promotion, and missing events with recorded source states and retry
+times. It makes no provider searches. Metadata-only titles and unprepared
+Sport-Video matches do not count toward usable coverage. Database candidates
+must still pass event relevance; a usable identity requires account credentials
+and a playback availability check. Events without a start time enter the count
+after their dated day ends in UTC; cancelled and postponed fixtures are excluded.
 The former Overview filter is migrated into each source's effective selection
 without expanding background work; saving a source changes only that source.
 The Bitmagnet tab prepares only Bitmagnet torrent results and their TorBox
