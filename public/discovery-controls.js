@@ -39,6 +39,7 @@
       if(sport) document.getElementById('sv-count').textContent=matches.length+' matching';
     };
     previous.addEventListener('click',()=>{page--;render();});next.addEventListener('click',()=>{page++;render();});
+    table.addEventListener('sss:table-sorted',()=>{page=0;render();});
     for(const input of sport?['sv-search','sv-state','sv-category'].map(id=>document.getElementById(id)):[search]) input.addEventListener(input.tagName==='SELECT'?'change':'input',()=>{page=0;render();});
     new MutationObserver(render).observe(body,{childList:true});render();
   }

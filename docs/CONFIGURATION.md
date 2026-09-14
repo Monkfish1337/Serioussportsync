@@ -176,6 +176,12 @@ Settings and long histories can be expanded as needed. Tables show 15 rows per
 page and can be filtered without hiding matches on later pages. Bitmagnet saves
 and manual preparation return to its source tab.
 
+Data table headings throughout the GUI sort their rows when clicked. Click
+again to reverse the order; arrows show the current direction. Numeric counts,
+dates, file sizes and latency values use their underlying order. Empty values
+remain last. Sorting is local to the displayed table and preserves row actions,
+filters and Discovery pagination; it does not change saved configuration.
+
 The Events tab combines saved Prowlarr and Sport-Video evidence by event and
 preserves source names. It does not combine account-specific playable counts.
 Existing source pages and form endpoints remain compatible. This first phase
