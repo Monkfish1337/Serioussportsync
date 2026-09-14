@@ -27,6 +27,41 @@ const UNITED = {
 
 test.afterEach(() => teamPicker.clearCache());
 
+test('all team choosers produce square artwork', () => {
+  for (const key of ['epl', 'nfl', 'nba', 'mlb']) {
+    assert.equal(teamPicker.specFor(key, key === 'epl' ? UNITED : COWBOYS).posterShape, 'square');
+  }
+});
+
+test('existing team catalogs are migrated on disk and stored events use the new shape', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { execFileSync } = require('node:child_process');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sss-team-shape-'));
+  const file = path.join(dir, 'custom-promotions.json');
+  try {
+    const team = { ...teamPicker.specFor('nfl', COWBOYS), posterShape: 'landscape', enabled: false };
+    fs.writeFileSync(file, JSON.stringify({ version: 1, promotions: [team,
+      { id: 'other-league', source: 'espn', league: 'nfl', posterShape: 'landscape' }] }));
+    execFileSync(process.execPath, ['-e', "require('./lib/custom-promotions').load()"], {
+      cwd: path.resolve(__dirname, '..'), env: { ...process.env, CUSTOM_PROMOTIONS_FILE: file },
+    });
+    const saved = JSON.parse(fs.readFileSync(file, 'utf8')).promotions;
+    assert.equal(saved[0].posterShape, 'square');
+    assert.equal(saved[0].enabled, false);
+    assert.deepEqual(saved[0].teamFilter, team.teamFilter);
+    assert.equal(saved[1].posterShape, 'landscape');
+    assert.equal(customPromotions.normaliseSpec(team).posterShape, 'square');
+    const promotion = promotions.createGenericPromotion(customPromotions.normaliseSpec(team));
+    promotions.byPrefix[promotion.idPrefix] = promotion;
+    try {
+      assert.equal(transform.toCatalogMeta({ id: promotion.idPrefix + ':old', promotion: promotion.idPrefix,
+        posterShape: 'landscape', name: 'Old fixture' }).posterShape, 'square');
+    } finally { delete promotions.byPrefix[promotion.idPrefix]; }
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
 // A football club gets a team-scoped feed, which is the whole reason the
 // shipped Man United promotion spans the league, both cups and Europe.
 // Substituting a league feed filtered to one club would silently drop every
