@@ -48,8 +48,51 @@ function listen(app) {
     const cookie = String(login.headers.get('set-cookie') || '').split(';', 1)[0];
     assert.ok(cookie.startsWith('sss_session='), 'login returns the signed session cookie');
 
+    const regular = await users.createUser({username:'restricted-test',password,role:'user'});
+    const regularLogin = await fetch(base+'/login',{method:'POST',redirect:'manual',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({username:regular.username,password}).toString()});
+    const regularCookie = regularLogin.headers.get('set-cookie').split(';',1)[0];
+    for (const route of ['/account/usenet','/account/usenet/save','/account/test-diy-search','/account/test-nntp','/account/test-nzbdav']) {
+      const response = await fetch(base+route,{method:route==='/account/usenet'?'GET':'POST',headers:{Cookie:regularCookie}});
+      assert.strictEqual(response.status,403,'regular users cannot access '+route);
+    }
+    const restrictedPage = await fetch(base+'/account',{headers:{Cookie:regularCookie}});
+    const restrictedHtml = await restrictedPage.text();
+    assert.ok(restrictedHtml.includes('DIY Usenet is admin only'));
+    assert.ok(!restrictedHtml.includes('href="/account/usenet"'));
+    const forgedSave = await fetch(base+'/account/save',{method:'POST',redirect:'manual',headers:{Cookie:regularCookie,'Content-Type':'application/x-www-form-urlencoded'},body:'diyUsenetEnabled=on'});
+    assert.strictEqual(forgedSave.status,302);
+    assert.strictEqual(users.findById(regular.id).config.diyUsenetEnabled,false);
+
+    const post = (route, body, auth) => fetch(base+route,{method:'POST',redirect:'manual',headers:{'Content-Type':'application/x-www-form-urlencoded',...(auth ? {Cookie:auth} : {})},body:new URLSearchParams(body).toString()});
+    assert.ok((await (await fetch(base+'/login')).text()).includes('href="/request-access"'));
+    assert.strictEqual((await post('/request-access',{username:'pending-test',password,role:'admin'})).status,202);
+    assert.strictEqual(users.findByUsername('pending-test'),null);
+    assert.strictEqual((await post('/login',{username:'pending-test',password})).status,401);
+    assert.strictEqual((await post('/request-access',{username:'PENDING-test',password})).status,400);
+    const pending=users.listAccessRequests()[0];
+    assert.ok(!JSON.stringify(pending).includes('password'));
+    assert.ok(!fs.readFileSync(process.env.USERS_FILE,'utf8').includes(password));
+    assert.strictEqual((await fetch(base+'/admin/user-management',{headers:{Cookie:regularCookie}})).status,403);
+    assert.strictEqual((await post('/admin/access-requests/'+pending.id+'/approve',{},regularCookie)).status,403);
+    const managementHtml=await (await fetch(base+'/admin/user-management',{headers:{Cookie:cookie}})).text();
+    assert.ok(managementHtml.includes('pending-test') && managementHtml.includes('Approve') && managementHtml.includes('Create a new user'));
+    assert.ok(!managementHtml.includes('passwordHash'));
+    assert.strictEqual((await post('/admin/access-requests/'+pending.id+'/approve',{},cookie)).status,303);
+    assert.strictEqual(users.findByUsername('pending-test').role,'user');
+    assert.strictEqual((await post('/login',{username:'pending-test',password})).status,302);
+    assert.strictEqual((await post('/request-access',{username:'declined-test',password})).status,202);
+    const declined=users.listAccessRequests()[0];
+    await post('/admin/access-requests/'+declined.id+'/decline',{},cookie);
+    assert.strictEqual(users.findByUsername('declined-test'),null);
+    assert.strictEqual(users.listAccessRequests().length,0);
+    const metadataHtml=await (await fetch(base+'/admin/metadata',{headers:{Cookie:cookie}})).text();
+    assert.ok(metadataHtml.includes('Metadata API keys') && metadataHtml.includes('Force Metadata Refresh'));
+    await post('/admin/metadata-keys',{footballDataApiKey:'test-football-key',apiFootballApiKey:'test-api-key',tmdbApiKey:'test-tmdb-key'},cookie);
+    assert.strictEqual(require('../lib/settings').getTmdb().apiKey,'test-tmdb-key');
+
     const serverPage = await fetch(base + '/admin', {headers:{Cookie:cookie}});
     const serverHtml = await serverPage.text();
+    assert.ok(!serverHtml.includes('Metadata API keys') && !serverHtml.includes('Create a new user') && !serverHtml.includes('Refresh catalogs now'));
     assert.ok(serverHtml.indexOf('server-time-zone') < serverHtml.indexOf('<h3 class="card-title">Discovery pipelines'), 'time zone appears above source settings');
     assert.ok(serverHtml.includes('href="/admin/prowlarr-discovery"'), 'discovery has its own sidebar link');
     const saveZone = await fetch(base + '/admin/time-zone', {method:'POST',redirect:'manual',headers:{Cookie:cookie,'Content-Type':'application/x-www-form-urlencoded'},body:'timeZone=Europe%2FLondon'});

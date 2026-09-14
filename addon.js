@@ -259,7 +259,7 @@ function createApp() {
       + '<label class="form-label">Password</label>'
       + '<input class="form-control" name="password" type="password" required>'
       + '<button class="btn btn-primary w-100 mt-3" type="submit">Sign in</button>'
-      + '</form>'
+      + '</form><a class="btn btn-outline-primary w-100 mt-3" href="/request-access">Request access</a>'
     ));
   });
 
@@ -307,6 +307,45 @@ function createApp() {
   });
 
   app.post('/logout', (req, res) => { sessions.clearCookie(res, req); res.redirect('/login'); });
+
+  const accessAttempts = new Map();
+  const accessForm = '<p>Choose your login details. An administrator must approve your request before you can sign in.</p><form method="POST" action="/request-access"><label class="form-label">Username</label><input class="form-control" name="username" autocomplete="username" required minlength="3" maxlength="32" pattern="[A-Za-z0-9_.-]{3,32}"><label class="form-label">Password</label><input class="form-control" type="password" name="password" autocomplete="new-password" required minlength="8" maxlength="256"><button class="btn btn-primary w-100 mt-3" type="submit">Request access</button></form><p><a href="/login">Back to sign in</a></p>';
+  app.get('/request-access', (req,res) => {
+    if (!users.userCount()) return res.redirect('/setup');
+    res.send(authPage('Request access', accessForm));
+  });
+  app.post('/request-access', async (req,res) => {
+    if (!users.userCount()) return res.redirect('/setup');
+    const now = Date.now(), ip = clientIp(req);
+    for (const [key,entry] of accessAttempts) if (now-entry.start >= 3600000) accessAttempts.delete(key);
+    const entry = accessAttempts.get(ip) || {start:now,count:0};
+    if (entry.count >= 5 || accessAttempts.size >= 10000 && !accessAttempts.has(ip)) {
+      res.setHeader('Retry-After','3600');
+      return res.status(429).send(authPage('Request access','<p>Too many requests. Please try again later.</p>'));
+    }
+    entry.count++; accessAttempts.set(ip,entry);
+    try {
+      await users.requestAccess(req.body || {});
+      res.status(202).send(authPage('Request received','<p>Your access request is awaiting administrator approval. Once approved, sign in with the username and password you chose.</p><p><a href="/login">Back to sign in</a></p>'));
+    } catch (err) { res.status(400).send(authPage('Request access','<p class="alert alert-warning">'+escapeHtml(err.message)+'</p>'+accessForm)); }
+  });
+  app.get('/admin/user-management', requireAdmin, (req,res) => {
+    res.setHeader('Cache-Control','no-store');
+    res.send(renderUserManagement(req.user,{flash:req.query.flash || null}));
+  });
+  for (const action of ['approve','decline']) app.post('/admin/access-requests/:id/'+action, requireAdmin, (req,res) => {
+    let message;
+    try { const name = users.reviewAccessRequest(req.params.id,action==='approve'); message = name + (action==='approve' ? ' approved. They can now sign in.' : ' declined.'); }
+    catch (err) { message=err.message; }
+    res.redirect(303,'/admin/user-management?flash='+encodeURIComponent(message));
+  });
+  app.post('/admin/metadata-keys', requireAdmin, (req,res) => {
+    const b=req.body || {};
+    settings.setFootballData({apiKey:String(b.footballDataApiKey || '')});
+    settings.setApiFootball({apiKey:String(b.apiFootballApiKey || '')});
+    settings.setTmdb({apiKey:String(b.tmdbApiKey || '')});
+    res.redirect(303,'/admin/metadata?flash='+encodeURIComponent('Metadata keys saved.'));
+  });
 
   // 0.91.0 — Configure, rebuilt as a stepped flow in the new design system.
   //
@@ -494,7 +533,7 @@ function createApp() {
   });
 
   // --- DIY Usenet, on its own page -----------------------------------
-  app.get('/account/usenet', requireLogin, (req, res) => {
+  app.get('/account/usenet', requireAdmin, (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
     const body = accountUsenetPage.renderBody({
@@ -508,7 +547,7 @@ function createApp() {
     }));
   });
 
-  app.post('/account/usenet/save', requireLogin, (req, res) => {
+  app.post('/account/usenet/save', requireAdmin, (req, res) => {
     const b = req.body || {};
     try {
       users.updateUserConfig(req.user.id, {
@@ -592,8 +631,8 @@ function createApp() {
         // NNTP field is saved by /account/usenet/save — including them here
         // would blank the lot on any Configure save, because the inputs are
         // simply not in this form any more.
-        diyUsenetEnabled: b.diyUsenetEnabled === 'on'
-          || b.diyUsenetEnabled === '1' || b.diyUsenetEnabled === 'true',
+        diyUsenetEnabled: req.user.role === 'admin' && (b.diyUsenetEnabled === 'on'
+          || b.diyUsenetEnabled === '1' || b.diyUsenetEnabled === 'true'),
         catalogs: finalCats,
         catalogsNone,
         // Served and shown are different choices, so they are stored
@@ -620,7 +659,7 @@ function createApp() {
     }
   });
 
-  app.post('/account/test-nzbdav', requireLogin, async (req, res) => {
+  app.post('/account/test-nzbdav', requireAdmin, async (req, res) => {
     const b = req.body || {};
     try {
       const api = await nzbdavClient.testConnection({
@@ -639,7 +678,7 @@ function createApp() {
     }
   });
 
-  app.post('/account/test-diy-search', requireLogin, async (req, res) => {
+  app.post('/account/test-diy-search', requireAdmin, async (req, res) => {
     const b = req.body || {};
     const query = String(b.diySearchTestQuery || 'UFC').trim().slice(0, 200) || 'UFC';
     try {
@@ -659,7 +698,7 @@ function createApp() {
     }
   });
 
-  app.post('/account/test-nntp', requireLogin, async (req, res) => {
+  app.post('/account/test-nntp', requireAdmin, async (req, res) => {
     const b = req.body || {};
     try {
       const result = await nntpClient.testConnection({
@@ -701,7 +740,7 @@ function createApp() {
       const { userId, apiToken } = req.params;
       const u = users.findByApiToken(userId, apiToken);
       if (!u) return res.status(404).send('Not found');
-      req.userAccount = u;
+      req.userAccount = {...u, config: require('./lib/diy-access').playbackConfig(u)};
       users.touchLastSeen(u.id);
       next();
     });
@@ -782,6 +821,7 @@ function createApp() {
     const urlSign = require('./lib/url-sign');
     r.get('/resolve/:provider/:eventId/:infoHash', async (req, res) => {
       const { provider, eventId, infoHash } = req.params;
+      if (['nzbdav','nntp'].includes(provider) && req.userAccount.role !== 'admin') return res.status(403).send('DIY Usenet is available to administrators only.');
       const v = urlSign.verifyResolve({
         userId: req.params.userId,
         provider, eventId, infoHash,
@@ -915,22 +955,22 @@ function createApp() {
     const role = b.role === 'admin' ? 'admin' : 'user';
     try {
       const u = await users.createUser({ username, password, role });
-      res.redirect('/admin?flash=' + encodeURIComponent('Created user "' + u.username + '" (id ' + u.id + ')'));
+      res.redirect('/admin/user-management?flash=' + encodeURIComponent('Created user "' + u.username + '" (id ' + u.id + ')'));
     } catch (err) {
-      res.redirect('/admin?flash=' + encodeURIComponent('Create failed: ' + err.message));
+      res.redirect('/admin/user-management?flash=' + encodeURIComponent('Create failed: ' + err.message));
     }
   });
 
   app.post('/admin/users/:id/delete', requireAdmin, (req, res) => {
     const id = req.params.id;
     if (id === req.user.id) {
-      return res.redirect('/admin?flash=' + encodeURIComponent('You cannot delete your own account here.'));
+      return res.redirect('/admin/user-management?flash=' + encodeURIComponent('You cannot delete your own account here.'));
     }
     try {
       const ok = users.deleteUser(id);
-      res.redirect('/admin?flash=' + encodeURIComponent(ok ? 'User deleted.' : 'User not found.'));
+      res.redirect('/admin/user-management?flash=' + encodeURIComponent(ok ? 'User deleted.' : 'User not found.'));
     } catch (err) {
-      res.redirect('/admin?flash=' + encodeURIComponent('Delete failed: ' + err.message));
+      res.redirect('/admin/user-management?flash=' + encodeURIComponent('Delete failed: ' + err.message));
     }
   });
 
@@ -938,9 +978,9 @@ function createApp() {
     const id = req.params.id;
     try {
       users.regenerateApiToken(id);
-      res.redirect('/admin?flash=' + encodeURIComponent('API token regenerated for user ' + id + '. Their old install URL is now invalid.'));
+      res.redirect('/admin/user-management?flash=' + encodeURIComponent('API token regenerated for user ' + id + '. Their old install URL is now invalid.'));
     } catch (err) {
-      res.redirect('/admin?flash=' + encodeURIComponent('Regenerate failed: ' + err.message));
+      res.redirect('/admin/user-management?flash=' + encodeURIComponent('Regenerate failed: ' + err.message));
     }
   });
 
@@ -949,9 +989,9 @@ function createApp() {
     const newPass = String(req.body.newPassword || '');
     try {
       await users.setPassword(id, newPass);
-      res.redirect('/admin?flash=' + encodeURIComponent('Password updated for user ' + id + '.'));
+      res.redirect('/admin/user-management?flash=' + encodeURIComponent('Password updated for user ' + id + '.'));
     } catch (err) {
-      res.redirect('/admin?flash=' + encodeURIComponent('Set password failed: ' + err.message));
+      res.redirect('/admin/user-management?flash=' + encodeURIComponent('Set password failed: ' + err.message));
     }
   });
 
@@ -968,9 +1008,9 @@ function createApp() {
         }
       }
       users.setRole(id, newRole);
-      res.redirect('/admin?flash=' + encodeURIComponent('Role updated for user ' + id + ' (now ' + newRole + ').'));
+      res.redirect('/admin/user-management?flash=' + encodeURIComponent('Role updated for user ' + id + ' (now ' + newRole + ').'));
     } catch (err) {
-      res.redirect('/admin?flash=' + encodeURIComponent('Set role failed: ' + err.message));
+      res.redirect('/admin/user-management?flash=' + encodeURIComponent('Set role failed: ' + err.message));
     }
   });
 
@@ -985,7 +1025,7 @@ function createApp() {
         return availabilityWarmer.run({ reason: 'manual-catalog-refresh' });
       })
       .catch((err) => console.error('[admin] manual events refresh failed:', err.message));
-    res.redirect('/admin?flash=' + encodeURIComponent('Catalog refresh started in the background — pulls events from TSDB for every promotion. Check server logs for progress.'));
+    res.redirect('/admin/metadata?flash=' + encodeURIComponent('Metadata refresh started in the background — pulls events from TSDB for every promotion. Check server logs for progress.'));
   });
 
   // 0.90.8 — apply a skin. One console, one skin: this is an operator choice
@@ -1536,15 +1576,6 @@ function createApp() {
         }
         sportVideo.startScheduler();
       }
-      // 0.38.1: football-data.org API key — admin-saved value wins over the
-      // FOOTBALL_DATA_API_KEY env var. Empty input is allowed (falls back to env).
-      settings.setFootballData({
-        apiKey: String(b.footballDataApiKey || ''),
-      });
-      settings.setApiFootball({
-        apiKey: String(b.apiFootballApiKey || ''),
-      });
-      if (settings.setTmdb) settings.setTmdb({ apiKey: String(b.tmdbApiKey || '') });
       res.redirect('/admin?flash=' + encodeURIComponent('Sources saved.'));
     } catch (err) {
       res.redirect('/admin?flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(err)));
@@ -1557,15 +1588,15 @@ function createApp() {
     const role = b.role === 'admin' ? 'admin' : 'user';
     try {
       const inv = users.createInvite({ username, role });
-      res.redirect('/admin?flash=' + encodeURIComponent('Invite created for "' + inv.username + '". URL is in the Invites section below.'));
+      res.redirect('/admin/user-management?flash=' + encodeURIComponent('Invite created for "' + inv.username + '". URL is in the Invites section below.'));
     } catch (err) {
-      res.redirect('/admin?flash=' + encodeURIComponent('Invite create failed: ' + err.message));
+      res.redirect('/admin/user-management?flash=' + encodeURIComponent('Invite create failed: ' + err.message));
     }
   });
 
   app.post('/admin/invites/:token/revoke', requireAdmin, (req, res) => {
     const ok = users.revokeInvite(req.params.token);
-    res.redirect('/admin?flash=' + encodeURIComponent(ok ? 'Invite revoked.' : 'Invite not found.'));
+    res.redirect('/admin/user-management?flash=' + encodeURIComponent(ok ? 'Invite revoked.' : 'Invite not found.'));
   });
 
   // --- 0.35.0: promotion creator (admin-added TSDB-backed promotions) ---
@@ -1638,7 +1669,7 @@ function createApp() {
   app.get('/admin/metadata', requireAdmin, (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
-    res.send(tablerChrome.tablerPage('Metadata', adminMetadata.renderBody({ flash: req.query.flash || null }), {
+    res.send(tablerChrome.tablerPage('Metadata', renderMetadataSettings() + adminMetadata.renderBody({ flash: req.query.flash || null }), {
       user: req.user, currentSection: 'metadata',
     }));
   });
@@ -2042,17 +2073,50 @@ function sourceToggle(name, label, enabled, hint) {
     + (hint ? '<div class="form-hint mb-3">' + escapeHtml(hint) + '</div>' : '');
 }
 
-function renderAdminPage(currentUser, opts) {
-  opts = opts || {};
+
+function adminUtilitiesScript() {
+  return ''
+    + '<script>'
+    + 'document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e.target.closest(".btn-reveal"):null;if(!b)return;e.preventDefault();var g=b.closest(".input-group");if(!g)return;var i=g.querySelector("input");if(!i)return;var sh=i.type==="password";i.type=sh?"text":"password";b.textContent=sh?"Hide":"Show";});'
+    + 'function sssCopy(text){if(navigator.clipboard&&navigator.clipboard.writeText&&window.isSecureContext){return navigator.clipboard.writeText(text).then(function(){return true;}).catch(function(){return sssLegacyCopy(text);});}return Promise.resolve(sssLegacyCopy(text));}'
+    + 'function sssLegacyCopy(text){var a=document.createElement("textarea");a.value=text;a.setAttribute("readonly","");a.style.position="fixed";a.style.opacity=".01";document.body.appendChild(a);a.focus();a.select();var ok=false;try{ok=document.execCommand("copy");}finally{document.body.removeChild(a);}return ok;}'
+    + 'document.addEventListener("click",function(e){var c=e.target&&e.target.closest?e.target.closest(".btn-copy"):null;if(!c)return;var u=c.getAttribute("data-copy");if(!u)return;var t=c.textContent;sssCopy(u).then(function(ok){c.textContent=ok?"Copied!":"Press Ctrl+C";setTimeout(function(){c.textContent=t;},1500);});});'
+    + '</script>';
+}
+
+function renderMetadataSettings() {
+  const _fd = settings.getFootballData();
+  const _apiFootball = settings.getApiFootball();
+  const _tmdb = settings.getTmdb();
+  return '<div class="card mb-3"><form method="POST" action="/admin/metadata-keys"><div class="card-body">'
+    +       '<h4 class="mb-2">Metadata API keys</h4>'
+    +       '<p class="text-secondary small mb-3">Not discovery — these fetch the fixtures themselves. football-data.org backs the eight shipped domestic leagues; its free tier covers about 10 requests a minute (<a href="https://www.football-data.org/client/register" target="_blank" rel="noopener" class="link-primary">register</a>). API-Football is only used by providers you create in Metadata; the shipped Champions League provider reads UEFA directly and needs no key. Either value saved here overrides its environment variable.</p>'
+    +       secretField('football-data.org API key', 'footballDataApiKey', _fd.apiKey, 'paste your football-data.org token')
+    +       secretField('API-Football API key', 'apiFootballApiKey', _apiFootball.apiKey, 'paste your API-Football key')
+    // Match of the Day was the one shipped promotion with no way to configure
+    // it from the interface at all: it needs a TMDB key, there was no field for
+    // one, and nothing said so. On an install without the environment variable
+    // it simply showed no events, with the cure undiscoverable.
+    +       secretField('TMDB API key', 'tmdbApiKey', _tmdb.apiKey, 'used by the shipped Match of the Day promotion')
+
+
+    + '<button class="btn btn-primary" type="submit">Save metadata keys</button></div></form></div>'
+    // Force metadata refresh
+    + '<div class="card mb-3">'
+    +   '<div class="card-header"><h3 class="card-title">Force Metadata Refresh</h3></div>'
+    +   '<div class="card-body">'
+    +     '<p class="text-secondary small mb-3">Pulls fresh event metadata from TSDB (and any other configured sources) for every enabled promotion — built-in and custom. Runs in the background; scheduled refresh fires every 6h regardless. Use this button after adding a new custom promotion so its events appear without waiting on the scheduler.</p>'
+    +     '<form method="POST" action="/admin/refresh-events" class="d-inline">'
+    +       '<button class="btn btn-primary" type="submit">Force Metadata Refresh</button>'
+    +     '</form>'
+    +   '</div>'
+    + '</div>'
+
+
+    + adminUtilitiesScript();
+}
+function renderUserManagement(currentUser, opts) {
   const all = users.listUsers();
-
-  const flashHtml = opts.flash
-    ? '<div class="alert alert-info alert-dismissible" role="alert">'
-      + '<div>' + escapeHtml(opts.flash) + '</div>'
-      + '<a class="btn-close" data-bs-dismiss="alert"></a>'
-      + '</div>'
-    : '';
-
   // Active invites — table + create form, all in a single card.
   users.cleanExpiredInvites();
   const invites = users.listInvites();
@@ -2075,50 +2139,6 @@ function renderAdminPage(currentUser, opts) {
       + '</tr>';
   }).join('');
 
-  // 0.90.8 — Appearance. A skin is a handful of CSS variables layered over the
-  // one vendored Tabler stylesheet, so the picker is a plain radio group: no
-  // second stylesheet, no build step, and no font request. The choice applies
-  // to every page for everyone, because there is one admin console rather than
-  // one per account.
-  const _skins = require('./lib/skins');
-  const _activeSkin = settings.getAppearance().skin;
-  const _radiusLabel = (radius) => radius === '0px' ? 'sharp corners'
-    : radius === '4px' ? 'default corners' : 'soft corners';
-  const appearanceHtml = ''
-    + '<div class="card mb-3">'
-    +   '<div class="card-header"><div><h3 class="card-title">Appearance</h3>'
-    +     '<div class="text-secondary small">Applies to the whole admin, for everyone. Colour, light or dark, and corner style — no fonts are fetched, so an install that cannot reach a CDN is unaffected.</div></div></div>'
-    +   '<form method="POST" action="/admin/appearance"><div class="card-body">'
-    +     '<style>'
-    +       '.sss-skin{display:block;cursor:pointer;border:1px solid var(--tblr-border-color);border-radius:10px;padding:12px;height:100%}'
-    +       '.sss-skin:has(input:checked){border-color:var(--sss-accent);box-shadow:0 0 0 1px var(--sss-accent)}'
-    +       '.sss-skin input{margin-right:7px}'
-    +       '.sss-skin-swatch{display:flex;gap:5px;align-items:center;margin:9px 0 7px}'
-    +       '.sss-skin-chip{width:26px;height:26px;border:1px solid rgba(128,128,128,.35)}'
-    +       '.sss-skin-bar{flex:1;height:26px;border:1px solid rgba(128,128,128,.35)}'
-    +     '</style>'
-    +     '<div class="row g-2">'
-    +     _skins.list().map(function skinCard(skin) {
-        const isDark = skin.mode === 'dark';
-        return '<div class="col-md-6 col-xl-3"><label class="sss-skin">'
-          + '<input type="radio" name="skin" value="' + escapeHtml(skin.id) + '"'
-            + (skin.id === _activeSkin ? ' checked' : '') + '>'
-          + '<strong>' + escapeHtml(skin.name) + '</strong>'
-          + '<div class="sss-skin-swatch">'
-            + '<span class="sss-skin-chip" style="background:' + escapeHtml(skin.accent)
-              + ';border-radius:' + escapeHtml(skin.radius) + '"></span>'
-            + '<span class="sss-skin-bar" style="background:' + (isDark ? '#1a1d24' : '#f6f8fb')
-              + ';border-radius:' + escapeHtml(skin.radius) + '"></span>'
-          + '</div>'
-          + '<div class="text-secondary small">' + escapeHtml(skin.description) + '</div>'
-          + '<div class="text-secondary" style="font-size:.72rem">' + (isDark ? 'Dark' : 'Light')
-            + ' · ' + escapeHtml(_radiusLabel(skin.radius)) + '</div>'
-          + '</label></div>';
-      }).join('')
-    +     '</div>'
-    +   '</div>'
-    +   '<div class="card-footer"><button class="btn btn-primary" type="submit">Apply skin</button></div>'
-    + '</form></div>';
 
   const invitesHtml = ''
     + '<div class="card mb-3">'
@@ -2182,17 +2202,115 @@ function renderAdminPage(currentUser, opts) {
       + '</tr>';
   }).join('');
 
+
+  const pending = users.listAccessRequests();
+  const requests = '<div class="card mb-3"><div class="card-header"><h3 class="card-title">Access requests (' + pending.length + ')</h3></div><div class="card-body">'
+    + (pending.length ? '<div class="table-responsive"><table class="table"><thead><tr><th>Username</th><th>Requested</th><th>Review</th></tr></thead><tbody>' + pending.map(r => '<tr><td>' + escapeHtml(r.username) + '</td><td>' + escapeHtml(require('./lib/display-time').displayTime(r.createdAt)) + '</td><td>' + ['approve','decline'].map(action => '<form method="POST" action="/admin/access-requests/' + escapeHtml(r.id) + '/' + action + '" class="d-inline"><button class="btn btn-sm btn-outline-primary" type="submit">' + (action === 'approve' ? 'Approve' : 'Decline') + '</button></form>').join(' ') + '</td></tr>').join('') + '</tbody></table></div>' : '<p>No pending requests.</p>') + '</div></div>';
+  const body = (opts.flash ? '<div class="alert alert-info">' + escapeHtml(opts.flash) + '</div>' : '') + requests
+    // Users
+    + '<div class="card mb-3">'
+    +   '<div class="card-header"><h3 class="card-title">Users (' + all.length + ')</h3></div>'
+    +   '<div class="table-responsive">'
+    +     '<table class="table table-vcenter card-table">'
+    +       '<thead><tr><th>Username</th><th>Role</th><th>Created</th><th>Last seen</th><th class="w-1"></th></tr></thead>'
+    +       '<tbody>' + rows + '</tbody>'
+    +     '</table>'
+    +   '</div>'
+    + '</div>'
+
+    // Create new user
+    + '<div class="card mb-3">'
+    +   '<div class="card-header"><h3 class="card-title">Create a new user</h3></div>'
+    +   '<div class="card-body">'
+    +     '<p class="text-secondary small mb-3">After creating a user, they log in at the root URL and copy their own install URL from their account page. Install URLs and API tokens are private to each user and are never shown here.</p>'
+    +     '<form method="POST" action="/admin/users/create" class="row g-2 align-items-end">'
+    +       '<div class="col-md-4">'
+    +         '<label class="form-label">Username</label>'
+    +         '<input class="form-control" name="username" required minlength="3" maxlength="32" pattern="[A-Za-z0-9_.\\-]{3,32}" placeholder="3-32 chars">'
+    +       '</div>'
+    +       '<div class="col-md-3">'
+    +         '<label class="form-label">Password</label>'
+    +         '<input class="form-control" name="password" type="password" required minlength="8" placeholder="min 8 chars">'
+    +       '</div>'
+    +       '<div class="col-md-2">'
+    +         '<label class="form-label">Role</label>'
+    +         '<select class="form-select" name="role"><option value="user" selected>user</option><option value="admin">admin</option></select>'
+    +       '</div>'
+    +       '<div class="col-md-3">'
+    +         '<button class="btn btn-primary w-100" type="submit">Create user</button>'
+    +       '</div>'
+    +     '</form>'
+    +   '</div>'
+    + '</div>'
+
+    + invitesHtml
+
+    + adminUtilitiesScript();
+  return tablerChrome.tablerPage('User Management', body, {user:currentUser,currentSection:'user-management'});
+}
+
+function renderAdminPage(currentUser, opts) {
+  opts = opts || {};
+  const all = users.listUsers();
+
+  const flashHtml = opts.flash
+    ? '<div class="alert alert-info alert-dismissible" role="alert">'
+      + '<div>' + escapeHtml(opts.flash) + '</div>'
+      + '<a class="btn-close" data-bs-dismiss="alert"></a>'
+      + '</div>'
+    : '';
+
+  // 0.90.8 — Appearance. A skin is a handful of CSS variables layered over the
+  // one vendored Tabler stylesheet, so the picker is a plain radio group: no
+  // second stylesheet, no build step, and no font request. The choice applies
+  // to every page for everyone, because there is one admin console rather than
+  // one per account.
+  const _skins = require('./lib/skins');
+  const _activeSkin = settings.getAppearance().skin;
+  const _radiusLabel = (radius) => radius === '0px' ? 'sharp corners'
+    : radius === '4px' ? 'default corners' : 'soft corners';
+  const appearanceHtml = ''
+    + '<div class="card mb-3">'
+    +   '<div class="card-header"><div><h3 class="card-title">Appearance</h3>'
+    +     '<div class="text-secondary small">Applies to the whole admin, for everyone. Colour, light or dark, and corner style — no fonts are fetched, so an install that cannot reach a CDN is unaffected.</div></div></div>'
+    +   '<form method="POST" action="/admin/appearance"><div class="card-body">'
+    +     '<style>'
+    +       '.sss-skin{display:block;cursor:pointer;border:1px solid var(--tblr-border-color);border-radius:10px;padding:12px;height:100%}'
+    +       '.sss-skin:has(input:checked){border-color:var(--sss-accent);box-shadow:0 0 0 1px var(--sss-accent)}'
+    +       '.sss-skin input{margin-right:7px}'
+    +       '.sss-skin-swatch{display:flex;gap:5px;align-items:center;margin:9px 0 7px}'
+    +       '.sss-skin-chip{width:26px;height:26px;border:1px solid rgba(128,128,128,.35)}'
+    +       '.sss-skin-bar{flex:1;height:26px;border:1px solid rgba(128,128,128,.35)}'
+    +     '</style>'
+    +     '<div class="row g-2">'
+    +     _skins.list().map(function skinCard(skin) {
+        const isDark = skin.mode === 'dark';
+        return '<div class="col-md-6 col-xl-3"><label class="sss-skin">'
+          + '<input type="radio" name="skin" value="' + escapeHtml(skin.id) + '"'
+            + (skin.id === _activeSkin ? ' checked' : '') + '>'
+          + '<strong>' + escapeHtml(skin.name) + '</strong>'
+          + '<div class="sss-skin-swatch">'
+            + '<span class="sss-skin-chip" style="background:' + escapeHtml(skin.accent)
+              + ';border-radius:' + escapeHtml(skin.radius) + '"></span>'
+            + '<span class="sss-skin-bar" style="background:' + (isDark ? '#1a1d24' : '#f6f8fb')
+              + ';border-radius:' + escapeHtml(skin.radius) + '"></span>'
+          + '</div>'
+          + '<div class="text-secondary small">' + escapeHtml(skin.description) + '</div>'
+          + '<div class="text-secondary" style="font-size:.72rem">' + (isDark ? 'Dark' : 'Light')
+            + ' · ' + escapeHtml(_radiusLabel(skin.radius)) + '</div>'
+          + '</label></div>';
+      }).join('')
+    +     '</div>'
+    +   '</div>'
+    +   '<div class="card-footer"><button class="btn btn-primary" type="submit">Apply skin</button></div>'
+    + '</form></div>';
+
   // Torrent discovery endpoints are optional and may be used together.
   const _comp = settings.getCompanion();
   const _prowlarr = settings.getProwlarr();
   const _bitmagnet = settings.getBitmagnet();
   const _timing = settings.getDiscoveryTiming();
   const _sportVideo = settings.getSportVideo();
-  const _tmdb = settings.getTmdb ? settings.getTmdb() : { apiKey: '' };
-  // 0.38.1: football-data.org API key field on /admin Sources so admins can
-  // save/rotate the key without editing docker-compose.yml.
-  const _fd = settings.getFootballData();
-  const _apiFootball = settings.getApiFootball();
 
   const body = ''
     + '<div class="page-header">'
@@ -2362,80 +2480,17 @@ function renderAdminPage(currentUser, opts) {
     // FOOTBALL_DATA_API_KEY env var. Used by custom promotions whose source
     // === 'football-data' (FIFA WC, EPL, Champions League, etc.).
     +       '<hr class="my-4">'
-    +       '<h4 class="mb-2">Metadata API keys</h4>'
-    +       '<p class="text-secondary small mb-3">Not discovery — these fetch the fixtures themselves. football-data.org backs the eight shipped domestic leagues; its free tier covers about 10 requests a minute (<a href="https://www.football-data.org/client/register" target="_blank" rel="noopener" class="link-primary">register</a>). API-Football is only used by providers you create in Metadata; the shipped Champions League provider reads UEFA directly and needs no key. Either value saved here overrides its environment variable.</p>'
-    +       secretField('football-data.org API key', 'footballDataApiKey', _fd.apiKey, 'paste your football-data.org token')
-    +       secretField('API-Football API key', 'apiFootballApiKey', _apiFootball.apiKey, 'paste your API-Football key')
-    // Match of the Day was the one shipped promotion with no way to configure
-    // it from the interface at all: it needs a TMDB key, there was no field for
-    // one, and nothing said so. On an install without the environment variable
-    // it simply showed no events, with the cure undiscoverable.
-    +       secretField('TMDB API key', 'tmdbApiKey', _tmdb.apiKey, 'used by the shipped Match of the Day promotion')
-
     +       '<hr class="my-4">'
     +       '<button class="btn btn-primary" type="submit">Save sources</button>'
     +     '</form>'
     +   '</div>'
     + '</div>'
 
-    // Catalogs / refresh
-    + '<div class="card mb-3">'
-    +   '<div class="card-header"><h3 class="card-title">Catalogs</h3></div>'
-    +   '<div class="card-body">'
-    +     '<p class="text-secondary small mb-3">Pulls fresh event metadata from TSDB (and any other configured sources) for every enabled promotion — built-in and custom. Runs in the background; scheduled refresh fires every 6h regardless. Use this button after adding a new custom promotion so its events appear without waiting on the scheduler.</p>'
-    +     '<form method="POST" action="/admin/refresh-events" class="d-inline">'
-    +       '<button class="btn btn-primary" type="submit">Refresh catalogs now</button>'
-    +     '</form>'
-    +   '</div>'
-    + '</div>'
-
-    // Users
-    + '<div class="card mb-3">'
-    +   '<div class="card-header"><h3 class="card-title">Users (' + all.length + ')</h3></div>'
-    +   '<div class="table-responsive">'
-    +     '<table class="table table-vcenter card-table">'
-    +       '<thead><tr><th>Username</th><th>Role</th><th>Created</th><th>Last seen</th><th class="w-1"></th></tr></thead>'
-    +       '<tbody>' + rows + '</tbody>'
-    +     '</table>'
-    +   '</div>'
-    + '</div>'
-
-    // Create new user
-    + '<div class="card mb-3">'
-    +   '<div class="card-header"><h3 class="card-title">Create a new user</h3></div>'
-    +   '<div class="card-body">'
-    +     '<p class="text-secondary small mb-3">After creating a user, they log in at the root URL and copy their own install URL from their account page. Install URLs and API tokens are private to each user and are never shown here.</p>'
-    +     '<form method="POST" action="/admin/users/create" class="row g-2 align-items-end">'
-    +       '<div class="col-md-4">'
-    +         '<label class="form-label">Username</label>'
-    +         '<input class="form-control" name="username" required minlength="3" maxlength="32" pattern="[A-Za-z0-9_.\\-]{3,32}" placeholder="3-32 chars">'
-    +       '</div>'
-    +       '<div class="col-md-3">'
-    +         '<label class="form-label">Password</label>'
-    +         '<input class="form-control" name="password" type="password" required minlength="8" placeholder="min 8 chars">'
-    +       '</div>'
-    +       '<div class="col-md-2">'
-    +         '<label class="form-label">Role</label>'
-    +         '<select class="form-select" name="role"><option value="user" selected>user</option><option value="admin">admin</option></select>'
-    +       '</div>'
-    +       '<div class="col-md-3">'
-    +         '<button class="btn btn-primary w-100" type="submit">Create user</button>'
-    +       '</div>'
-    +     '</form>'
-    +   '</div>'
-    + '</div>'
-
-    + invitesHtml
     + appearanceHtml
 
     // Shared inline JS: password show/toggle + copy button.
     // (Sidebar nav links replaced the bottom footer strip — chrome handles nav.)
-    + '<script>'
-    + 'document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e.target.closest(".btn-reveal"):null;if(!b)return;e.preventDefault();var g=b.closest(".input-group");if(!g)return;var i=g.querySelector("input");if(!i)return;var sh=i.type==="password";i.type=sh?"text":"password";b.textContent=sh?"Hide":"Show";});'
-    + 'function sssCopy(text){if(navigator.clipboard&&navigator.clipboard.writeText&&window.isSecureContext){return navigator.clipboard.writeText(text).then(function(){return true;}).catch(function(){return sssLegacyCopy(text);});}return Promise.resolve(sssLegacyCopy(text));}'
-    + 'function sssLegacyCopy(text){var a=document.createElement("textarea");a.value=text;a.setAttribute("readonly","");a.style.position="fixed";a.style.opacity=".01";document.body.appendChild(a);a.focus();a.select();var ok=false;try{ok=document.execCommand("copy");}finally{document.body.removeChild(a);}return ok;}'
-    + 'document.addEventListener("click",function(e){var c=e.target&&e.target.closest?e.target.closest(".btn-copy"):null;if(!c)return;var u=c.getAttribute("data-copy");if(!u)return;var t=c.textContent;sssCopy(u).then(function(ok){c.textContent=ok?"Copied!":"Press Ctrl+C";setTimeout(function(){c.textContent=t;},1500);});});'
-    + '</script>';
+    + adminUtilitiesScript();
 
   return tablerChrome.tablerPage('Server', body, { user: currentUser, currentSection: 'admin' });
 }
@@ -2724,12 +2779,12 @@ function renderAccountPage(user, opts) {
     +       '<div class="wide"><label class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" name="uuEnabled" value="on"' + (cfg.uuEnabled !== false ? ' checked' : '') + '><span class="form-check-label"><strong>Enable Usenet Ultimate stream rows</strong></span></label><p class="text-secondary small mb-2">When disabled, the DIY pipeline may still use UU for text search, but UU’s own playback rows are hidden.</p><label class="form-label" for="uu-url">Usenet Ultimate manifest URL</label><input class="form-control text-mono" type="url" id="uu-url" name="uuManifestUrl" value="' + escapeHtml(cfg.uuManifestUrl || '') + '" placeholder="https://your-uu.example/stremio/&lt;config&gt;/manifest.json"></div>'
     +     '</div>'
     +   '</div></section>'
-    +   '<details class="config-fold"><summary>DIY Usenet pipeline</summary><div class="config-fold-body">'
+    +   (isAdmin ? '<details class="config-fold"><summary>DIY Usenet pipeline</summary><div class="config-fold-body">'
     +     '<p class="text-secondary small mb-3">Your own indexer and playback backend, for events the shared pipelines miss. '
     +       'The switch below turns it on; its thirty-odd settings live on their own page so they do not bury the rest of this one.</p>'
     +     '<label class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" name="diyUsenetEnabled" value="on"' + (cfg.diyUsenetEnabled === true ? ' checked' : '') + '><span class="form-check-label"><strong>Enable the DIY Usenet pipeline</strong></span></label>'
     +     '<a class="btn btn-outline-primary" href="/account/usenet">Open DIY Usenet settings</a>'
-    +   '</div></details>'
+    +   '</div></details>' : '')
     +   '<details class="config-fold"><summary>Catalogs and display order</summary>' + catalogsPanel + '</details>'
     +   '<details class="config-fold"><summary>Advanced playback settings</summary><div class="config-fold-body">'
     +     '<div class="provider-grid">'
