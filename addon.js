@@ -1246,7 +1246,8 @@ function createApp() {
       const ui=require('./lib/admin-discovery');
       const tab=Object.hasOwn(ui.tabs,req.query.tab)?req.query.tab:'overview';
       const data={tab,flash:req.query.flash,promotion:String(req.query.promotion || ''),
-        promotions:promotions.all.map(p=>({id:p.id,name:p.name,enabled:p.enabled})),
+        promotions:promotions.all.map(p=>({id:p.id,name:p.name,enabled:p.enabled,
+          releaseDerived:p.source?.type==='sport-video' && p.id.startsWith('discovered-')})),
         events:store.getEvents(),queue:require('./lib/prowlarr-discovery').getDefault().status(),
         releases:sportVideo.load().releases || []};
       if(tab==='overview') {

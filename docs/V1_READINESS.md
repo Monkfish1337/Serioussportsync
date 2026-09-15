@@ -121,3 +121,10 @@ Document their outcomes before creating the v1 tag.
 The 271/242/29 snapshot above included disabled promotions. Discovery Overview
 now excludes disabled promotions as well as removed ones; collect a fresh seven-day
 snapshot after the corrected container is deployed before comparing coverage.
+
+Sport-Video release-derived Discovered catalogs are also excluded from the main
+fixture coverage totals. Their events are built from releases the same source
+found, so counting them as scheduled-event coverage inflates the rate. The
+catalogs remain available, and Sport-Video's discovered/matched/prepared counts
+continue to show their source output. Record a fresh Overview baseline after
+this correction; earlier totals are not comparable.
