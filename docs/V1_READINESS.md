@@ -83,3 +83,37 @@ Document their outcomes before creating the v1 tag.
 - Real Nuvio playback across representative UCL, MLB, NFL and NBA events, sustained
   queue observations, and the production-data restore drill are not marked passed
   by automated fixture checks. Record these outcomes against the candidate image.
+
+## Candidate observation on 15 September 2026
+
+- Candidate `df6e7479` passed [CI](https://github.com/Monkfish1337/Serioussportsync/actions/runs/34900557352)
+  and [container publication](https://github.com/Monkfish1337/Serioussportsync/actions/runs/34900557301).
+  The local unit suite passed 617 tests. These workflows also run the account,
+  Nuvio and recovery suites; container publication starts the candidate under the
+  hardened Compose configuration and checks the recovery drill there.
+- The live admin page shows the candidate's new Prowlarr retry wording, and its
+  schedule settings show hourly Bitmagnet and Sport-Video work. This is evidence
+  of the new code in the running container; the UI version remains `0.98.1`.
+- At about 19:08 Europe/London, Discovery Overview recorded 271 recent events,
+  242 with a usable or warmable identity and 29 missing. Its promotion groups
+  exclude the retired overflow catalogs. Counts are saved identity coverage,
+  not verified playback. Disabled promotions are still included and labelled.
+- Prowlarr recorded 119 eligible events, 105 searched, 102 with saved matches,
+  17 missing a seeded match and zero awaiting a first search. On the budget day,
+  720pier had 117 requests, 85 cumulative successful searches and no consecutive
+  failures; RuTracker had 102, 17 and none. TheRARBG had one consecutive failure
+  and an SSS cooldown. Review the next few days for sustained coverage and new
+  Prowlarr disablements before calling this gate complete.
+- Bitmagnet's latest hourly batch attempted 50 of 235 eligible events. It showed
+  two `no-search-titles` errors, rather than the 183 errors seen in the pre-fix
+  full batch. Its diagnostics recorded 97 successful torrent/TorBox provider
+  attempts and zero provider failures; this does not establish every event was
+  searched successfully. Sport-Video's latest scan used the unchanged search
+  index, with no scan error, 2,122 matched and 776 prepared releases.
+- The recent stream-log buffer contained no request timing entries when checked,
+  so first/repeat response speed is still unmeasured for this candidate. Capture
+  timed requests soon after real Nuvio trials, while the ring buffer retains them.
+- Real Nuvio playback samples and an isolated restore of actual production data
+  remain open manual gates. The disposable recovery drill proves the mechanism,
+  but cannot establish production-account or provider availability. Do not create
+  a v1 tag until these checks are recorded.
