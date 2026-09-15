@@ -19,22 +19,22 @@ test('database candidates must pass relevance before contributing to coverage',(
   assert.equal(coverage({...base,indexTitles:[{eventId:'mlb:1',title:'Wrong game',usable:1}],relevant:()=>false},now).matched,0);
 });
 
-test('removed promotions cannot inflate coverage totals, matches or missing-event lists',()=>{
+test('removed and disabled promotions cannot inflate coverage totals, matches or missing-event lists',()=>{
   const retired=[...require('../lib/sources/release-ingest').RETIRED_PROMOTIONS];
   const stale=[...retired,'deleted-custom'].map(id=>({id:id+':old',name:'Stored old event',date:'2026-09-12'}));
   const current=[...events,{id:'custom:1',date:'2026-09-12'},{id:'disabled:1',date:'2026-09-12'}];
   const promotions=[...base.promotions,{id:'custom'},{id:'disabled',enabled:false}];
+  const excluded=[...stale,...current.filter(e=>e.id.startsWith('disabled:'))];
   const result=coverage({...base,events:[...current,...stale],promotions,
-    releases:[{infoHash:'a'.repeat(40),matches:stale.map(e=>({eventId:e.id}))}],
-    queue:{...base.queue,eventStates:stale.map(e=>({id:e.id,matched:true,seeded:true})),
-      matchedEvents:stale.map(e=>({event:e.id,warmable:true}))},
-    indexTitles:stale.map(e=>({eventId:e.id,title:'Old match',usable:1}))},now);
-  assert.equal(result.total,6);assert.equal(result.matched,0);assert.equal(result.missing,6);
+    releases:[{infoHash:'a'.repeat(40),matches:excluded.map(e=>({eventId:e.id}))}],
+    queue:{...base.queue,eventStates:excluded.map(e=>({id:e.id,matched:true,seeded:true})),
+      matchedEvents:excluded.map(e=>({event:e.id,warmable:true}))},
+    indexTitles:excluded.map(e=>({eventId:e.id,title:'Old match',usable:1}))},now);
+  assert.equal(result.total,5);assert.equal(result.matched,0);assert.equal(result.missing,5);
   assert.equal(result.titleOnly,0);
-  assert.deepEqual(result.promotions.map(p=>p.id),['custom','disabled','mlb']);
-  assert.deepEqual(result.rows.map(e=>e.id),current.map(e=>e.id));
-  assert.deepEqual(recentEvents([...current,...stale],now,promotions).map(e=>e.id),current.map(e=>e.id));
-  assert.match(result.rows.find(e=>e.promotion==='disabled').reason,/Promotion disabled/);
+  assert.deepEqual(result.promotions.map(p=>p.id),['custom','mlb']);
+  assert.deepEqual(result.rows.map(e=>e.id),current.filter(e=>!e.id.startsWith('disabled:')).map(e=>e.id));
+  assert.deepEqual(recentEvents([...current,...stale],now,promotions).map(e=>e.id),result.rows.map(e=>e.id));
 });
 test('missing reasons preserve recorded failure and mark incomplete database evidence',()=>{
   const queue={...base.queue,eventStates:[{id:'mlb:1',state:'Indexer failure — awaiting retry'}]};

@@ -117,3 +117,7 @@ Document their outcomes before creating the v1 tag.
   remain open manual gates. The disposable recovery drill proves the mechanism,
   but cannot establish production-account or provider availability. Do not create
   a v1 tag until these checks are recorded.
+
+The 271/242/29 snapshot above included disabled promotions. Discovery Overview
+now excludes disabled promotions as well as removed ones; collect a fresh seven-day
+snapshot after the corrected container is deployed before comparing coverage.
