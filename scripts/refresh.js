@@ -481,6 +481,27 @@ async function runRefresh(options) {
     totalUpdated += updated;
     totalSkipped += skipped;
 
+    // Promotion-level post-filter hook: catches bad upstream data that can
+    // only be seen across the whole batch (e.g. WWE's same-date collision
+    // between two distinctly-named events — see lib/promotions.js wwe
+    // .sanitizeEvents). Runs before synthesis so expandEvents never derives
+    // extras from a record this step is about to drop.
+    if (typeof p.sanitizeEvents === 'function') {
+      const beforeCount = promotionEvents.length;
+      const kept = p.sanitizeEvents(promotionEvents, log) || [];
+      const keptIds = new Set(kept.map((e) => e.id));
+      const droppedCount = beforeCount - kept.length;
+      if (droppedCount > 0) {
+        for (const ev of promotionEvents) {
+          if (!keptIds.has(ev.id)) byId.delete(ev.id);
+        }
+        promotionEvents.length = 0;
+        promotionEvents.push(...kept);
+        log('  ' + p.id + ': -' + droppedCount + ' dropped by sanity filter');
+        totalSkipped += droppedCount;
+      }
+    }
+
     // 0.31.1: per-promotion synthesis hook. Lets a promotion add derived
     // events that aren't in the source's data — e.g. MotoGP Qualifying,
     // synthesised from Race events because TSDB doesn't catalogue separate
