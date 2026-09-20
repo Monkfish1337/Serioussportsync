@@ -159,28 +159,30 @@ test('a custom promotion can be created against an ESPN league', () => {
   assert.equal(custom.normaliseSpec(spec({ league: 'NHL' })).league, 'nhl');
 });
 
-// A 120-day refresh window (the default eventWindowDaysBack/Ahead) answered as
-// one ESPN response exceeded the adapter's byte cap, so the NFL promotion could
-// only ever report "ESPN scoreboard exceeded its size limit". The range is now
-// split, which bounds each response rather than raising the ceiling and hoping.
-test('splits a long window into bounded date chunks', () => {
-  const windows = espn.dateWindows('2026-08-04', '2026-12-02');
-  assert.ok(windows.length >= 4, 'expected a 121-day range to split, got ' + windows.length);
-  assert.equal(windows[0][0], '2026-08-04');
-  assert.equal(windows[windows.length - 1][1], '2026-12-02');
-  for (const [from, to] of windows) {
-    const days = (Date.parse(to) - Date.parse(from)) / 86400000 + 1;
-    assert.ok(days <= espn.CHUNK_DAYS, 'window ' + from + '..' + to + ' spans ' + days + ' days');
-  }
-  // Contiguous and non-overlapping: no fixture can fall between two windows.
-  for (let i = 1; i < windows.length; i += 1) {
-    assert.equal(Date.parse(windows[i][0]) - Date.parse(windows[i - 1][1]), 86400000,
-      'gap or overlap between ' + windows[i - 1][1] + ' and ' + windows[i][0]);
-  }
+test('plans calendar-month requests and includes adjacent local dates at boundaries', () => {
+  assert.deepEqual(espn.monthKeys('2026-08-04', '2026-12-02'),
+    ['202608', '202609', '202610', '202611', '202612']);
+  assert.deepEqual(espn.monthKeys('2026-10-01', '2026-10-01'), ['202609', '202610']);
+  assert.deepEqual(espn.monthKeys('2026-12-31', '2026-12-31'), ['202612', '202701']);
+  assert.deepEqual(espn.monthKeys('2026-09-10', '2026-09-01'), []);
+  assert.deepEqual(espn.monthKeys('nonsense', '2026-09-01'), []);
 });
 
-test('a range inside one chunk stays a single request, and a bad range is empty', () => {
-  assert.deepEqual(espn.dateWindows('2026-09-01', '2026-09-10'), [['2026-09-01', '2026-09-10']]);
-  assert.deepEqual(espn.dateWindows('2026-09-10', '2026-09-01'), []);
-  assert.deepEqual(espn.dateWindows('nonsense', '2026-09-01'), []);
+test('fetches monthly scoreboards, deduplicates, and keeps only requested UTC dates', async () => {
+  const requested = [];
+  const fixture = NFL_SCOREBOARD.events[0];
+  const request = async (url) => {
+    requested.push(url);
+    const month = url.match(/dates=(\d{6})$/)[1];
+    const events = month === '202608'
+      ? [{ ...fixture, id: 'outside', date: '2026-08-31T20:00Z' }]
+      : [fixture, { ...fixture, id: 'outside', date: '2026-08-31T20:00Z' }];
+    return { ok: true, headers: { get: () => null }, text: async () => JSON.stringify({ events }) };
+  };
+  const results = await espn.fetchAll({
+    league: 'nfl', dateFrom: '2026-09-01', dateTo: '2026-09-30', fetch: request,
+  });
+  assert.deepEqual(requested.map((url) => url.match(/dates=(\d{6})$/)[1]),
+    ['202608', '202609', '202610']);
+  assert.deepEqual(results.map((event) => event.sourceId), ['401872657']);
 });
