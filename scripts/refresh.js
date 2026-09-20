@@ -356,6 +356,7 @@ async function runRefresh(options) {
   const existing = store.loadFromDisk();
   const byId = new Map();
   let prunedExisting = 0;
+  let prunedExcluded = 0;
   let prunedStaleSource = 0;
   let preservedOther = 0;
   let prunedOrphans = 0;
@@ -403,6 +404,31 @@ async function runRefresh(options) {
       continue;
     }
 
+    // A promotion filter applies to stored events too. Otherwise changing a
+    // rule only stops new weekly episodes; already cached ones stay forever.
+    if (p && p.id === 'wwe' && typeof p.includeEvent === 'function' && !p.includeEvent(ev, config)) {
+      prunedExcluded++;
+      continue;
+    }
+
+    // Apply authoritative corrections to cached records even when the source
+    // fetch is delayed. The next successful fetch will replace the full row.
+    if (p && typeof p.correctDate === 'function') {
+      const corrected = p.correctDate(ev.name, ev.date);
+      if (corrected && corrected !== ev.date) {
+        ev.date = corrected;
+        ev.dateLocal = corrected;
+        ev.time = null;
+        ev.timestamp = null;
+      }
+    }
+    if (p && p.id === 'wwe' && !ev.hasSourceImage && p.defaults && p.defaults.poster) {
+      ev.poster = p.defaults.poster;
+      ev.thumb = p.defaults.poster;
+      ev.fanart = p.defaults.fanart || p.defaults.poster;
+      ev.banner = p.defaults.fanart || p.defaults.poster;
+    }
+
     const expectedSourceType = p && p.source && p.source.type;
     const cachedSourceType = ev.source && ev.source.type;
 
@@ -425,6 +451,7 @@ async function runRefresh(options) {
     else prunedExisting++;
   }
   if (prunedOrphans > 0) log('[refresh] pruned ' + prunedOrphans + ' events whose promotion no longer exists');
+  if (prunedExcluded > 0) log('[refresh] pruned ' + prunedExcluded + ' events excluded by promotion filters');
   if (prunedStaleSource > 0) log('[refresh] pruned ' + prunedStaleSource + ' events from previous source(s)');
   if (prunedExisting > 0) log('[refresh] pruned ' + prunedExisting + ' existing events outside scope');
   if (preservedOther > 0) log('[refresh] preserved ' + preservedOther + ' events from other promotions');
