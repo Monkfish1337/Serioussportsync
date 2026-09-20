@@ -1086,9 +1086,11 @@ function createApp() {
 
     (async () => {
       const failed = [];
+      const sourceCache = new Map();
       for (const promotion of selected) {
         try {
-          const result = await runEventsRefresh({ promotionId: promotion.id, log: (m) => console.log(m) });
+          const result = await runEventsRefresh({ promotionId: promotion.id, sourceCache,
+            log: (m) => console.log(m) });
           if (result && result.ok) console.log('[admin] bulk refresh "' + promotion.id + '" complete: ' + JSON.stringify(result));
           else { failed.push(promotion.id); console.error('[admin] bulk refresh "' + promotion.id + '" failed: ' + JSON.stringify(result)); }
         } catch (err) {
@@ -1798,6 +1800,28 @@ function createApp() {
       events: (store.loadFromDisk().events || []),
     });
     res.send(tablerChrome.tablerPage('Promotions', body, { user: req.user, currentSection: 'promotions' }));
+  });
+
+  app.post('/admin/promotions/:id/metadata-start-date', requireAdmin, (req, res) => {
+    const id = String(req.params.id || '').trim();
+    try {
+      settings.setPromotionMetadataStartDate(id, req.body && req.body.metadataStartDate);
+      promotions.reload();
+      const promotion = promotions.all.find((item) => item.id === id);
+      const floor = promotion.metadataStartDate || process.env.EVENT_WINDOW_START_DATE || '2025-01-01';
+      const stored = store.loadFromDisk();
+      const events = stored.events || [];
+      const kept = events.filter((event) => event.promotion !== id || !event.date || event.date >= floor);
+      if (kept.length !== events.length) {
+        store.saveToDisk({ ...stored, updatedAt: new Date().toISOString(), events: kept });
+      }
+      res.redirect(303, '/admin/promotions?flash=' + encodeURIComponent(
+        'Metadata start date saved for ' + promotion.name + '. Removed ' + (events.length - kept.length)
+        + ' older stored events. Refresh this promotion if you moved the date earlier.'));
+    } catch (error) {
+      res.redirect(303, '/admin/promotions?flash=' + encodeURIComponent(
+        'Metadata start date was not saved: ' + error.message));
+    }
   });
 
   app.post('/admin/promotions/create', requireAdmin, (req, res) => {

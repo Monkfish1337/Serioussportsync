@@ -209,7 +209,7 @@ test('one season cannot spend the whole round-walk budget', () => {
     .split('\n').filter((line) => !/^\s*\/\//.test(line)).join('\n');
   assert.match(source, /seasonDeadlineAt/,
     'each season needs its own stop, not the run-wide one');
-  assert.match(source, /fetchSeasonAllRounds\(leagueId, season, log, seasonDeadlineAt\)/);
+  assert.match(source, /fetchSeasonAllRounds\(leagueId, season, log, seasonDeadlineAt(?:,|\))/);
   // Anchored on `await`, because the declaration of fetchSeasonAllRounds
   // itself names its fourth parameter deadlineAt — it is the call that must
   // pass the per-season stop.

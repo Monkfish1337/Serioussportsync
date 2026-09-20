@@ -70,14 +70,22 @@ function isOrphanEventId(eventId, knownPrefixes) {
 }
 
 function inScope(ev, promotion) {
+  if (promotion && promotion.metadataStartDate && (!ev || !ev.date || ev.date < promotion.metadataStartDate)) {
+    return false;
+  }
   if (promotion && typeof promotion.eventScope === 'function') {
     return promotion.eventScope(ev);
   }
   return withinWindow(ev);
 }
 
-function activeSeasons() {
-  if (Array.isArray(config.tsdb.seasons) && config.tsdb.seasons.length > 0) return config.tsdb.seasons;
+function activeSeasons(promotion) {
+  if (Array.isArray(config.tsdb.seasons) && config.tsdb.seasons.length > 0) {
+    const floorYear = Number(String((promotion && promotion.metadataStartDate) || '').slice(0, 4));
+    return floorYear
+      ? config.tsdb.seasons.filter((season) => Number(String(season).slice(-4)) >= floorYear)
+      : config.tsdb.seasons;
+  }
   // Earliest = max(today - EVENT_WINDOW_DAYS_BACK, EVENT_WINDOW_START_DATE).
   // 0.31.1: the daysBack window alone misses everything before
   // (today - daysBack) even when EVENT_WINDOW_START_DATE is older — which
@@ -95,6 +103,10 @@ function activeSeasons() {
     const startDate = new Date(windowStart + 'T00:00:00Z');
     if (startDate < earliest) earliest = startDate;
   }
+  if (promotion && promotion.metadataStartDate) {
+    const floor = new Date(promotion.metadataStartDate + 'T00:00:00Z');
+    earliest = floor;
+  }
   const latest = new Date(today); latest.setDate(latest.getDate() + ahead);
   const years = new Set();
   for (let y = earliest.getUTCFullYear(); y <= latest.getUTCFullYear(); y++) years.add(String(y));
@@ -109,15 +121,23 @@ function isoDaysFromToday(days) {
   return d.toISOString().slice(0, 10);
 }
 
+function sourceStartDate(promotion, dateFrom) {
+  return promotion && promotion.metadataStartDate || dateFrom;
+}
+
 async function refreshPromotion(promotion, log, opts) {
   opts = opts || {};
   log('==> refreshing ' + promotion.id + ' (' + promotion.name + ')');
   let raw = [];
 
   if (promotion.source.type === 'thesportsdb') {
-    const seasons = activeSeasons();
+    const seasons = activeSeasons(promotion);
     log('  TSDB seasons: ' + seasons.join(', '));
-    raw = await tsdb.fetchAll({
+    const knownEvents = promotion.weeklyShow ? []
+      : ((promotion.source.knownEvents && promotion.source.knownEvents.length)
+        ? promotion.source.knownEvents
+        : tsdbKnownEvents.knownEventsFor(promotion.source.leagueId));
+    const fetchOptions = {
       leagueId: promotion.source.leagueId,
       seasons,
       // Recurring card names for leagues whose schedule is mostly weekly TV.
@@ -126,9 +146,9 @@ async function refreshPromotion(promotion, log, opts) {
       // fallback, the system metadata-source registry, or a user-created entry
       // — and only the league id is common to all three. See
       // lib/tsdb-known-events.js for why the list endpoints cannot reach these.
-      knownEvents: (promotion.source.knownEvents && promotion.source.knownEvents.length)
-        ? promotion.source.knownEvents
-        : tsdbKnownEvents.knownEventsFor(promotion.source.leagueId),
+      knownEvents,
+      startDate: promotion.metadataStartDate,
+      dateOrderedRounds: ['4444', '4563'].includes(String(promotion.source.leagueId)),
       // A preview is interactive and has a 60s deadline. Both of these are
       // one rate-limited request at a time and either can spend all of it:
       // named lookups are one per card name, and the per-round walk is one
@@ -138,7 +158,17 @@ async function refreshPromotion(promotion, log, opts) {
       skipRoundWalk: opts.skipRoundWalk === true,
       deadlineMs: Number(opts.deadlineMs) > 0 ? Number(opts.deadlineMs) : 0,
       log,
-    });
+    };
+    const cacheKey = JSON.stringify({ leagueId: fetchOptions.leagueId, seasons,
+      knownEvents, startDate: fetchOptions.startDate, dateOrderedRounds: fetchOptions.dateOrderedRounds,
+      skipNamedLookups: fetchOptions.skipNamedLookups, skipRoundWalk: fetchOptions.skipRoundWalk });
+    if (opts.sourceCache && opts.sourceCache.has(cacheKey)) {
+      raw = opts.sourceCache.get(cacheKey);
+      log('  reused TSDB league results for this refresh');
+    } else {
+      raw = await tsdb.fetchAll(fetchOptions);
+      if (opts.sourceCache) opts.sourceCache.set(cacheKey, raw);
+    }
   } else if (promotion.source.type === 'wikipedia') {
     if (!wiki) { log('  wikipedia source unavailable — skipping'); return { ok: true }; }
     raw = await wiki.fetchAll({ pattern: promotion.source.yearPagePattern, promotion, log });
@@ -156,7 +186,7 @@ async function refreshPromotion(promotion, log, opts) {
     const today = new Date(); today.setUTCHours(0, 0, 0, 0);
     const from = new Date(today); from.setUTCDate(from.getUTCDate() - Math.max(0, config.eventWindowDaysBack | 0));
     const to = new Date(today); to.setUTCDate(to.getUTCDate() + Math.max(0, config.eventWindowDaysAhead | 0));
-    raw = await mlb.fetchAll({ dateFrom: from.toISOString().slice(0, 10), dateTo: to.toISOString().slice(0, 10), log });
+    raw = await mlb.fetchAll({ dateFrom: sourceStartDate(promotion, from.toISOString().slice(0, 10)), dateTo: to.toISOString().slice(0, 10), log });
   } else if (promotion.source.type === 'espn') {
     if (!espn) { log('  espn source unavailable — skipping'); return { ok: true }; }
     const today = new Date(); today.setUTCHours(0, 0, 0, 0);
@@ -164,7 +194,7 @@ async function refreshPromotion(promotion, log, opts) {
     const to = new Date(today); to.setUTCDate(to.getUTCDate() + Math.max(0, config.eventWindowDaysAhead | 0));
     raw = await espn.fetchAll({
       league: promotion.source.league,
-      dateFrom: from.toISOString().slice(0, 10),
+      dateFrom: sourceStartDate(promotion, from.toISOString().slice(0, 10)),
       dateTo: to.toISOString().slice(0, 10),
       log,
     });
@@ -192,6 +222,9 @@ async function refreshPromotion(promotion, log, opts) {
       const yearStart = new Date().getUTCFullYear() + '-01-01';
       eventStartIso = yearStart;
     }
+    if (promotion.metadataStartDate) {
+      eventStartIso = promotion.metadataStartDate;
+    }
     raw = await wikiList.fetchAll({
       pageTitle: promotion.source.pageTitle,
       promotion,
@@ -213,7 +246,7 @@ async function refreshPromotion(promotion, log, opts) {
       const today = new Date(); today.setUTCHours(0, 0, 0, 0);
       const from = new Date(today); from.setUTCDate(from.getUTCDate() - Math.max(0, config.eventWindowDaysBack | 0));
       const to = new Date(today); to.setUTCDate(to.getUTCDate() + Math.max(0, config.eventWindowDaysAhead | 0));
-      const dateFrom = from.toISOString().slice(0, 10);
+      const dateFrom = sourceStartDate(promotion, from.toISOString().slice(0, 10));
       const dateTo = to.toISOString().slice(0, 10);
       log('  football-data team: ' + promotion.source.teamId + ' range: ' + dateFrom + ' to ' + dateTo);
       raw = await footballData.fetchTeamMatches({
@@ -224,7 +257,7 @@ async function refreshPromotion(promotion, log, opts) {
         log,
       });
     } else {
-      const seasons = activeSeasons();
+      const seasons = activeSeasons(promotion);
       log('  football-data competition: ' + promotion.source.competitionId + ' seasons: ' + seasons.join(', '));
       raw = await footballData.fetchAll({
         competitionId: promotion.source.competitionId,
@@ -244,7 +277,7 @@ async function refreshPromotion(promotion, log, opts) {
     const today = new Date(); today.setUTCHours(0, 0, 0, 0);
     const from = new Date(today); from.setUTCDate(from.getUTCDate() - Math.max(0, config.eventWindowDaysBack | 0));
     const to = new Date(today); to.setUTCDate(to.getUTCDate() + Math.max(0, config.eventWindowDaysAhead | 0));
-    const dateFrom = from.toISOString().slice(0, 10);
+    const dateFrom = sourceStartDate(promotion, from.toISOString().slice(0, 10));
     const dateTo = to.toISOString().slice(0, 10);
     const seasons = apiFootball.seasonsForRange(dateFrom, dateTo);
     log('  api-football competition: ' + promotion.source.leagueId + ' seasons: ' + seasons.join(', ')
@@ -262,7 +295,7 @@ async function refreshPromotion(promotion, log, opts) {
     const today = new Date(); today.setUTCHours(0, 0, 0, 0);
     const from = new Date(today); from.setUTCDate(from.getUTCDate() - Math.max(0, config.eventWindowDaysBack | 0));
     const to = new Date(today); to.setUTCDate(to.getUTCDate() + Math.max(0, config.eventWindowDaysAhead | 0));
-    const dateFrom = from.toISOString().slice(0, 10);
+    const dateFrom = sourceStartDate(promotion, from.toISOString().slice(0, 10));
     const dateTo = to.toISOString().slice(0, 10);
     const seasons = uefa.seasonsForRange(dateFrom, dateTo);
     log('  uefa official competition: ' + promotion.source.competitionId + ' seasons: ' + seasons.join(', ')
@@ -293,6 +326,12 @@ async function refreshPromotion(promotion, log, opts) {
     const sourceRange = typeof promotion.sourceDateRange === 'function'
       ? promotion.sourceDateRange()
       : {};
+    if (promotion.metadataStartDate) {
+      sourceRange.dateFrom = sourceRange.dateFrom
+        ? (promotion.metadataStartDate > sourceRange.dateFrom
+          ? promotion.metadataStartDate : sourceRange.dateFrom)
+        : promotion.metadataStartDate;
+    }
     if (sourceRange.dateFrom || sourceRange.dateTo) {
       log('  tmdb episode range: ' + (sourceRange.dateFrom || 'open') + ' to ' + (sourceRange.dateTo || 'open'));
     }
@@ -470,10 +509,11 @@ async function runRefresh(options) {
 
   let totalAdded = 0, totalUpdated = 0, totalSkipped = 0;
   const failures = [];
+  const sourceCache = opts.sourceCache || new Map();
   for (const p of toFetch) {
     let raw;
     try {
-      raw = await refreshPromotion(p, log);
+      raw = await refreshPromotion(p, log, { sourceCache });
     } catch (err) {
       log('  ' + p.id + ' FATAL: ' + err.message);
       failures.push({ promotion: p.id, error: err.message });
