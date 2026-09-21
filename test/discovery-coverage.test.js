@@ -13,7 +13,7 @@ test('coverage counts usable identities once and leaves title-only matches missi
     indexTitles:[{eventId:'mlb:2',title:'Usable title',usable:1},{eventId:'mlb:4',title:'Metadata only',usable:0}]},now);
   assert.equal(result.total,4);assert.equal(result.matched,2);assert.equal(result.missing,2);assert.equal(result.titleOnly,2);
   assert.equal(result.promotions[0].matched,2);
-  assert.match(result.rows.find(e=>e.id==='mlb:3').reason,/not prepared/);
+  assert.match(result.rows.find(e=>e.id==='mlb:3').reason,/torrent hash not retained/);
 });
 test('database candidates must pass relevance before contributing to coverage',()=>{
   assert.equal(coverage({...base,indexTitles:[{eventId:'mlb:1',title:'Wrong game',usable:1}],relevant:()=>false},now).matched,0);
@@ -23,10 +23,13 @@ test('removed and disabled promotions cannot inflate coverage totals, matches or
   const retired=[...require('../lib/sources/release-ingest').RETIRED_PROMOTIONS];
   const stale=[...retired,'deleted-custom'].map(id=>({id:id+':old',name:'Stored old event',date:'2026-09-12'}));
   const current=[...events,{id:'custom:1',date:'2026-09-12'},{id:'disabled:1',date:'2026-09-12'},
+    {id:'mlb-nym:1',date:'2026-09-12'},
     {id:'discovered-football:1',date:'2026-09-12'}];
   const promotions=[...base.promotions,{id:'custom'},{id:'disabled',enabled:false},
+    {id:'mlb-nym',enabled:true,autoTeam:true},
     {id:'discovered-football',enabled:true,releaseDerived:true}];
-  const excluded=[...stale,...current.filter(e=>e.id.startsWith('disabled:') || e.id.startsWith('discovered-'))];
+  const excluded=[...stale,...current.filter(e=>e.id.startsWith('disabled:')
+    || e.id.startsWith('discovered-') || e.id.startsWith('mlb-nym:'))];
   const result=coverage({...base,events:[...current,...stale],promotions,
     releases:[{infoHash:'a'.repeat(40),matches:excluded.map(e=>({eventId:e.id}))}],
     queue:{...base.queue,eventStates:excluded.map(e=>({id:e.id,matched:true,seeded:true})),
@@ -35,7 +38,8 @@ test('removed and disabled promotions cannot inflate coverage totals, matches or
   assert.equal(result.total,5);assert.equal(result.matched,0);assert.equal(result.missing,5);
   assert.equal(result.titleOnly,0);
   assert.deepEqual(result.promotions.map(p=>p.id),['custom','mlb']);
-  assert.deepEqual(result.rows.map(e=>e.id),current.filter(e=>!e.id.startsWith('disabled:') && !e.id.startsWith('discovered-')).map(e=>e.id));
+  assert.deepEqual(result.rows.map(e=>e.id),current.filter(e=>!e.id.startsWith('disabled:')
+    && !e.id.startsWith('discovered-') && !e.id.startsWith('mlb-nym:')).map(e=>e.id));
   assert.deepEqual(recentEvents([...current,...stale],now,promotions).map(e=>e.id),result.rows.map(e=>e.id));
 });
 

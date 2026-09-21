@@ -264,6 +264,37 @@ test('research retains unmatched titles without treating them as playback matche
   try {await queue.run();assert.equal(queue.candidates(fixtures[0]).length,0);const rows=queue.researchCandidates(fixtures[0]);assert.equal(rows.length,1);assert.equal(rows[0].title,'Unknown baseball release 1080p');assert.doesNotMatch(JSON.stringify(rows),/secret|downloadUrl|guid/);}
   finally {queue.close();}
 });
+test('manual resource matching saves an event-specific override without exposing source URLs',async()=>{
+  const unrelated={title:'Uploader shorthand release',infoHash:'f'.repeat(40),seeders:3,indexer:'Manual Indexer',downloadUrl:'http://private/?apikey=secret'};
+  const {deps}=setup({
+    provider:()=>({enabled:false}),
+    bitmagnet:()=>({url:'http://bitmagnet:3333',enabled:true}),
+    bitmagnetSearch:async()=>({ok:true,results:[unrelated]}),
+    manualProwlarrSearch:async()=>{throw new Error('disabled Prowlarr must not be searched');},
+  });
+  const queue=discovery.createQueue(':memory:',deps);
+  try {
+    const searched=await queue.manualSearch(fixtures[0],'Uploader shorthand');
+    assert.deepEqual(searched.providers.map(row=>row.name),['Bitmagnet']);
+    assert.equal(searched.candidates.length,1);
+    assert.equal(searched.candidates[0].automatic,false);
+    assert.doesNotMatch(JSON.stringify(queue.researchCandidates(fixtures[0])),/apikey|downloadUrl|private/);
+    assert.deepEqual(queue.confirmManual(fixtures[0],unrelated.infoHash),{saved:1});
+    assert.equal(queue.candidates(fixtures[0])[0].manualConfirmedEvent,fixtures[0].id);
+    assert.equal(queue.status().eventStates.find(row=>row.id===fixtures[0].id).matched,true);
+  } finally {queue.close();}
+});
+
+test('manual matching page offers event search and explicit database confirmation',()=>{
+  const html=require('../lib/admin-prowlarr-discovery').renderManual({events:fixtures,event:fixtures[0],candidates:[
+    {title:'Unsafe <title>',infoHash:'a'.repeat(40),indexer:'RuTracker',seeders:2,automatic:false},
+  ]});
+  assert.match(html,/Manual resource matching/);
+  assert.match(html,/action="\/admin\/discovery\/manual\/search"/);
+  assert.match(html,/action="\/admin\/discovery\/manual\/save"/);
+  assert.match(html,/Manual confirmation needed/);
+  assert.match(html,/Unsafe &lt;title&gt;/);
+});
 test('Prowlarr source reuses recovered hashes without requesting metadata again',async()=>{
   const settings=require('../lib/settings'),source=require('../lib/sources/prowlarr'),{Response}=require('node-fetch');
   const original=settings.getProwlarr;

@@ -1262,7 +1262,7 @@ function createApp() {
       const ui=require('./lib/admin-discovery');
       const tab=Object.hasOwn(ui.tabs,req.query.tab)?req.query.tab:'overview';
       const data={tab,flash:req.query.flash,promotion:String(req.query.promotion || ''),
-        promotions:promotions.all.map(p=>({id:p.id,name:p.name,enabled:p.enabled,
+        promotions:promotions.all.map(p=>({id:p.id,name:p.name,enabled:p.enabled,autoTeam:p.autoTeam,
           releaseDerived:p.source?.type==='sport-video' && p.id.startsWith('discovered-')})),
         events:store.getEvents(),queue:require('./lib/prowlarr-discovery').getDefault().status(),
         releases:sportVideo.load().releases || []};
@@ -1291,6 +1291,39 @@ function createApp() {
     } catch(error) {res.status(503).send('Discovery unavailable: '+security.safeErrorMessage(error));}
   });
   app.post('/admin/discovery/promotions',requireAdmin,(_req,res)=>res.status(410).send('Use the promotion selection on each source tab.'));
+  function manualDiscoveryEvents() {
+    const coverage=require('./lib/discovery-coverage');
+    const promotionRows=promotions.all.map(p=>({id:p.id,enabled:p.enabled,autoTeam:p.autoTeam,
+      releaseDerived:p.source?.type==='sport-video' && p.id.startsWith('discovered-')}));
+    return coverage.recentEvents(store.getEvents(),Date.now(),promotionRows)
+      .sort((a,b)=>String(b.date).localeCompare(String(a.date)) || String(a.name).localeCompare(String(b.name)));
+  }
+  app.get('/admin/discovery/manual',requireAdmin,(req,res)=>{
+    const events=manualDiscoveryEvents();
+    const event=events.find(row=>row.id===String(req.query.eventId||'')) || events[0] || null;
+    const queue=require('./lib/prowlarr-discovery').getDefault();
+    const body=require('./lib/admin-prowlarr-discovery').renderManual({events,event,
+      candidates:event?queue.manualCandidates(event):[],flash:req.query.flash,query:req.query.query});
+    res.set('Cache-Control','no-store');
+    res.send(tablerChrome.tablerPage('Manual resource matching',body,{user:req.user,currentSection:'discovery'}));
+  });
+  app.post('/admin/discovery/manual/search',requireAdmin,async(req,res)=>{
+    const event=store.getEvent(String(req.body.eventId||''));
+    if(!event) return res.status(404).send('Event not found');
+    try {
+      const result=await require('./lib/prowlarr-discovery').getDefault().manualSearch(event,req.body.query);
+      const summary=result.providers.map(p=>p.name+': '+(p.ok?(p.count||0)+' results':p.error)).join(' · ');
+      res.redirect(303,'/admin/discovery/manual?eventId='+encodeURIComponent(event.id)+'&query='+encodeURIComponent(String(req.body.query||''))+'&flash='+encodeURIComponent(result.stored+' hashed candidates retained. '+summary));
+    } catch(error) {res.redirect(303,'/admin/discovery/manual?eventId='+encodeURIComponent(event.id)+'&flash='+encodeURIComponent('Search failed: '+security.safeErrorMessage(error)));}
+  });
+  app.post('/admin/discovery/manual/save',requireAdmin,(req,res)=>{
+    const event=store.getEvent(String(req.body.eventId||''));
+    if(!event) return res.status(404).send('Event not found');
+    try {
+      const result=require('./lib/prowlarr-discovery').getDefault().confirmManual(event,req.body.hashes);
+      res.redirect(303,'/admin/discovery/manual?eventId='+encodeURIComponent(event.id)+'&flash='+encodeURIComponent(result.saved+' torrent result(s) added to the discovery database.'));
+    } catch(error) {res.redirect(303,'/admin/discovery/manual?eventId='+encodeURIComponent(event.id)+'&flash='+encodeURIComponent('Save failed: '+security.safeErrorMessage(error)));}
+  });
   app.post('/admin/discovery/:source/promotions',requireAdmin,(req,res)=>{
     try {
       settings.setSourceDiscoveryPromotions(req.params.source,req.body.promotions);
