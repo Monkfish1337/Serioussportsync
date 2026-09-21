@@ -137,6 +137,9 @@ async function refreshPromotion(promotion, log, opts) {
       : ((promotion.source.knownEvents && promotion.source.knownEvents.length)
         ? promotion.source.knownEvents
         : tsdbKnownEvents.knownEventsFor(promotion.source.leagueId));
+    const weeklySeries = String(promotion.source.leagueId) === '4563'
+      ? ['Dynamite', 'Collision']
+      : (String(promotion.source.leagueId) === '4444' ? ['RAW', 'SmackDown', 'NXT'] : []);
     const fetchOptions = {
       leagueId: promotion.source.leagueId,
       seasons,
@@ -147,6 +150,7 @@ async function refreshPromotion(promotion, log, opts) {
       // — and only the league id is common to all three. See
       // lib/tsdb-known-events.js for why the list endpoints cannot reach these.
       knownEvents,
+      weeklySeries,
       startDate: promotion.metadataStartDate,
       dateOrderedRounds: ['4444', '4563'].includes(String(promotion.source.leagueId)),
       // A preview is interactive and has a 60s deadline. Both of these are
@@ -160,7 +164,8 @@ async function refreshPromotion(promotion, log, opts) {
       log,
     };
     const cacheKey = JSON.stringify({ leagueId: fetchOptions.leagueId, seasons,
-      knownEvents, startDate: fetchOptions.startDate, dateOrderedRounds: fetchOptions.dateOrderedRounds,
+      knownEvents, weeklySeries, startDate: fetchOptions.startDate,
+      dateOrderedRounds: fetchOptions.dateOrderedRounds,
       skipNamedLookups: fetchOptions.skipNamedLookups, skipRoundWalk: fetchOptions.skipRoundWalk });
     if (opts.sourceCache && opts.sourceCache.has(cacheKey)) {
       raw = opts.sourceCache.get(cacheKey);

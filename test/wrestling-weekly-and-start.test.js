@@ -200,7 +200,35 @@ test('one refresh reuses TSDB league results for sibling weekly promotions', asy
   } finally { tsdb.fetchAll = original; }
   assert.equal(calls, 1);
   assert.equal(requested.startDate, new Date().getUTCFullYear() + '-01-01');
+  assert.deepEqual(requested.weeklySeries, ['RAW', 'SmackDown', 'NXT']);
   assert.ok(requested.seasons.every((season) => Number(String(season).slice(-4)) >= new Date().getUTCFullYear()));
+});
+
+test('weekly TSDB gap recovery asks only for missing recent episode numbers', () => {
+  const fetched = [
+    { strEvent: 'Dynamite #357' },
+    { strEvent: 'Dynamite #358' },
+    { strEvent: 'Dynamite #360' },
+    { strEvent: 'AEW Dynamite #364' },
+    { strEvent: 'Collision #158' },
+    { strEvent: 'Collision #159' },
+    { strEvent: 'Collision #162' },
+  ];
+  assert.deepEqual(tsdb.weeklyEpisodeNamesNeedingLookup(
+    fetched, ['Dynamite', 'Collision'], 8), [
+    'Dynamite #359', 'Dynamite #361', 'Dynamite #362', 'Dynamite #363',
+    'Collision #155', 'Collision #156', 'Collision #157', 'Collision #160', 'Collision #161',
+  ]);
+});
+
+test('weekly TSDB gap recovery ignores unrelated titles and complete tails', () => {
+  assert.deepEqual(tsdb.weeklyEpisodeNamesNeedingLookup([
+    { strEvent: 'Dynamite #10' },
+    { strEvent: 'Dynamite #11 Special' },
+    { strEvent: 'WWE RAW #99' },
+    { strEvent: 'WWE RAW #100' },
+  ], ['Dynamite', 'RAW'], 2), []);
+  assert.deepEqual(tsdb.weeklyEpisodeNamesNeedingLookup([], ['Dynamite'], 8), []);
 });
 
 test('date-aware round seek skips old TSDB episodes with bounded probes', async () => {
