@@ -45,6 +45,19 @@ test('coverage title lookup distinguishes usable identities from metadata and ex
   } finally {temp.close();}
 });
 
+test('coverage title lookup can be restricted to torrent discovery',()=>{
+  const temp=temporaryIndex();
+  try {
+    temp.index.recordEventCandidates({eventId:'wwe-smackdown:test',provider:'torrent',scope:'torrent-scope',results:[
+      {title:'WWE SmackDown torrent',infoHash:'b'.repeat(40)}]});
+    temp.index.recordEventCandidates({eventId:'wwe-smackdown:test',provider:'uu',scope:'usenet-scope',results:[
+      {title:'WWE SmackDown Usenet',nzbUrl:'https://private.example/file.nzb'}]});
+    const rows=temp.index.eventReleaseTitles(['wwe-smackdown:test'],{providers:['torrent']});
+    assert.deepEqual(rows.map(row=>row.title),['WWE SmackDown torrent']);
+    assert.equal(rows[0].usable,1);
+  } finally {temp.close();}
+});
+
 test('stores encrypted reusable searches and isolates provider scopes', () => {
   const fixture = temporaryIndex();
   try {

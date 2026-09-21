@@ -104,7 +104,7 @@ function listen(app) {
       const response=await fetch(base+'/admin/discovery?tab='+tab,{headers:{Cookie:cookie}});
       assert.strictEqual(response.status,200);
       const html=await response.text();
-      if(tab==='overview') assert.ok(html.includes('Coverage by promotion') && html.includes('Missing usable identities'));
+      if(tab==='overview') assert.ok(html.includes('Coverage by promotion') && html.includes('Missing torrent identities'));
     }
     assert.strictEqual((await fetch(base+'/admin/discovery',{headers:{Cookie:regularCookie}})).status,403);
     assert.strictEqual((await fetch(base+'/assets/discovery-controls.js')).status,200);

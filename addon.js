@@ -1271,7 +1271,11 @@ function createApp() {
         const now=Date.now();
         data.background={bitmagnet:{enabled:settings.getAvailabilityWarm().enabled && settings.getAvailabilityWarm().prepareTorrent && settings.getBitmagnet().enabled && Boolean(settings.getBitmagnet().url),selected:settings.getSourceDiscoveryPromotions('bitmagnet')},
           sportVideo:{enabled:settings.getSportVideo().enabled && settings.getSportVideo().autoScan,selected:settings.getSourceDiscoveryPromotions('sport-video')}};
-        try {data.indexTitles=availabilityStore.getDefault().eventReleaseTitles(coverage.recentEvents(data.events,now,data.promotions).map(e=>e.id));}
+        // Discovery is retained torrent coverage. Live Usenet and Easynews
+        // identities must not make an event look prepared here.
+        try {data.indexTitles=availabilityStore.getDefault().eventReleaseTitles(
+          coverage.recentEvents(data.events,now,data.promotions).map(e=>e.id),
+          {providers:['torrent'],identityKinds:['torrent']});}
         catch(error) {data.coverageError=security.safeErrorMessage(error);}
         data.relevant=(title,event)=>promotions.getByEventId(event.id)?.isRelevantStreamTitle(title,event).ok===true;
         data.coverage=coverage.coverage(data,now);
