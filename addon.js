@@ -57,7 +57,7 @@ const { cleanOrder, orderByIds } = require('./lib/catalog-order');
 // apart on sight while the migration runs.
 const configurePage = require('./lib/configure-page');
 const STEP_IDS = configurePage.STEPS.map((step) => step.id);
-const { effectiveCatalogSelection, CURRENT_DEFAULTS_VERSION } = require('./lib/catalog-selection');
+const { effectiveCatalogSelection, promotionSelectedForUser, CURRENT_DEFAULTS_VERSION } = require('./lib/catalog-selection');
 const { buildNuvioCollections } = require('./lib/nuvio-collections');
 const APP_VERSION = require('./package.json').version || '?';
 
@@ -373,7 +373,8 @@ function createApp() {
     const cfg = req.user.config || {};
     const origin = publicOriginFromReq(req);
     const effective = effectiveCatalogSelection(cfg);
-    const ordered = orderByIds(promotions.enabled, cfg.promotionOrder, (p) => p.id);
+    const ordered = orderByIds(promotions.enabled.filter((p) => promotionSelectedForUser(cfg, p)),
+      cfg.promotionOrder, (p) => p.id);
 
     // Which folder each promotion sits in, so a catalog row can say so —
     // the point being that folder membership does NOT hide the row.
@@ -388,8 +389,9 @@ function createApp() {
     // in lib/custom-promotions.
     const teamKeys = new Set(teamPicker.CHOOSERS.map((c) => c.key));
     const teamPromotions = promotions.all
-      .filter((p) => p.isCustom && teamKeys.has(String(p.id).split('-')[0]))
-      .map((p) => ({ id: p.id, name: p.name, enabled: !!p.enabled, chooser: String(p.id).split('-')[0] }));
+      .filter((p) => p.autoTeam && teamKeys.has(String(p.id).split('-')[0]))
+      .map((p) => ({ id: p.id, name: p.name,
+        enabled: promotionSelectedForUser(cfg, p), chooser: String(p.id).split('-')[0] }));
 
     res.send(configurePage.render({
       user: req.user,
@@ -427,28 +429,33 @@ function createApp() {
     res.send(renderAccountPage(req.user, { flash: req.query.flash || null, origin: publicOriginFromReq(req) }));
   });
 
-  // Deselecting a team. NOT a delete: the promotion is switched off, which
-  // takes its catalogs out of every manifest while leaving the promotion and
-  // its stored fixtures in place, so re-picking the team costs no provider
-  // calls — and scripts/refresh will not treat those events as orphans,
-  // because it prunes against promotions.all rather than the enabled list.
+  // Team promotions are shared inventory. Each account chooses which ones its
+  // manifest serves; no user can switch a promotion off for everyone else.
   app.post('/account/teams/remove', requireLogin, (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     const fail = (status, error) => res.status(status).send(JSON.stringify({ ok: false, error }));
-    if (!req.user || req.user.role !== 'admin') {
-      return fail(403, 'A team catalog is shared by everyone on this server, so an admin has to change it.');
-    }
     const body = req.body || {};
     const key = String(body.chooser || '').trim();
     const teamId = String(body.teamId || '').trim();
     // The same rule the picker uses to draw a team as selected — shared so the
     // two cannot disagree about what "this team" means.
-    const spec = customPromotions.list().find((item) => teamPicker.matchesTeam(item, key, teamId));
+    const spec = customPromotions.list().find((item) => item.autoTeam
+      && teamPicker.matchesTeam(item, key, teamId));
     if (!spec) return fail(404, 'No catalog for that team');
     try {
-      customPromotions.update(spec.id, Object.assign({}, spec, { enabled: false }));
-      promotions.reload();
+      const cfg = req.user.config || {};
+      const selected = (Array.isArray(cfg.teamPromotions) ? cfg.teamPromotions : [])
+        .filter((id) => id !== spec.id);
+      const chosenCatalogs = effectiveCatalogSelection(cfg);
+      const patch = { teamPromotions: selected };
+      if (chosenCatalogs) {
+        chosenCatalogs.delete(spec.id + '-upcoming');
+        chosenCatalogs.delete(spec.id + '-recent');
+        patch.catalogs = Array.from(chosenCatalogs);
+        patch.catalogsNone = chosenCatalogs.size === 0;
+      }
+      users.updateUserConfig(req.user.id, patch);
       return res.send(JSON.stringify({ ok: true, id: spec.id, retained: true }));
     } catch (err) {
       return fail(422, security.safeErrorMessage(err));
@@ -491,17 +498,15 @@ function createApp() {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     const key = String(req.params.key || '');
     const out = await teamPicker.teamsFor(key, { log: () => {} });
-    // Which of these teams the user already has.
-    //
-    // The client has always read `data.selected` to decide whether to draw a
-    // team as picked, and this endpoint never sent the field. Two reported
-    // bugs, one cause: every team rendered aria-pressed="false", so nothing was
-    // highlighted even while the count chip said "2 selected"; and the click
-    // handler reads that same attribute to choose between create and remove, so
-    // un-ticking a team POSTed to /account/teams and re-created it instead of
-    // removing it. The catalog stayed, which is exactly what was reported.
     if (out && out.ok) {
-      out.selected = teamPicker.selectedTeamIds(key, customPromotions.list(), out.teams);
+      try { teamPicker.prepareRoster(key, out.teams); }
+      catch (error) { return res.status(422).send(JSON.stringify({ ok: false, error: security.safeErrorMessage(error) })); }
+    }
+    if (out && out.ok) {
+      const fresh = users.findById(req.user.id);
+      const selected = new Set((fresh && fresh.config && fresh.config.teamPromotions) || []);
+      out.selected = out.teams.filter((team) => selected.has(teamPicker.promotionIdFor(key, team)))
+        .map((team) => String(team.id));
     }
     res.status(out.ok ? 200 : 422).send(JSON.stringify(out));
   });
@@ -510,31 +515,39 @@ function createApp() {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     const fail = (status, error) => res.status(status).send(JSON.stringify({ ok: false, error }));
-    if (!req.user || req.user.role !== 'admin') {
-      return fail(403, 'A team catalog is shared by everyone on this server, so an admin has to create it.');
-    }
     const body = req.body || {};
     const key = String(body.chooser || '').trim();
     const teamId = String(body.teamId || '').trim();
     try {
       const listed = await teamPicker.teamsFor(key, { log: () => {} });
       if (!listed.ok) return fail(422, listed.error || 'Team list unavailable');
+      teamPicker.prepareRoster(key, listed.teams);
       const team = listed.teams.find((entry) => String(entry.id) === teamId);
       if (!team) return fail(422, 'That team is not in the current list');
 
-      const spec = teamPicker.specFor(key, team);
-      // Choosing again replaces rather than duplicates.
-      const existing = customPromotions.findById(spec.id);
-      if (existing) customPromotions.update(spec.id, spec);
-      else customPromotions.add(spec);
-      promotions.reload();
+      const spec = customPromotions.findById(teamPicker.promotionIdFor(key, team));
+      if (!spec || !spec.autoTeam) return fail(422, 'Team catalog is unavailable');
+      const cfg = (users.findById(req.user.id) || req.user).config || {};
+      const selected = new Set(Array.isArray(cfg.teamPromotions) ? cfg.teamPromotions : []);
+      selected.add(spec.id);
+      const chosenCatalogs = effectiveCatalogSelection(cfg);
+      const patch = { teamPromotions: Array.from(selected) };
+      if (chosenCatalogs) {
+        chosenCatalogs.add(spec.id + '-upcoming');
+        chosenCatalogs.add(spec.id + '-recent');
+        patch.catalogs = Array.from(chosenCatalogs);
+        patch.catalogsNone = false;
+      }
+      users.updateUserConfig(req.user.id, patch);
 
       // Fetch straight away: a catalog that appears empty because nothing has
       // refreshed yet is indistinguishable from one that does not work.
-      let events = 0;
+      let events = (store.loadFromDisk().events || []).filter((event) => event.promotion === spec.id).length;
       try {
-        const result = await runEventsRefresh({ promotionId: spec.id, log: () => {} });
-        events = Number(result && result.added) || 0;
+        if (!events) {
+          await runEventsRefresh({ promotionId: spec.id, log: () => {} });
+          events = (store.loadFromDisk().events || []).filter((event) => event.promotion === spec.id).length;
+        }
       } catch (error) {
         return res.status(200).send(JSON.stringify({
           ok: true, name: spec.name, events: 0,
@@ -602,7 +615,8 @@ function createApp() {
     const cats = Array.isArray(b.catalogs) ? b.catalogs : (b.catalogs ? [b.catalogs] : []);
     const allCatalogIds = new Set();
     const allPromotionIds = new Set();
-    for (const p of promotions.enabled) {
+    for (const p of promotions.enabled.filter((promotion) =>
+      promotionSelectedForUser(req.user.config || {}, promotion))) {
       allPromotionIds.add(p.id);
       for (const c of p.catalogs) allCatalogIds.add(c.id);
     }
@@ -782,12 +796,12 @@ function createApp() {
     }
 
     r.get('/catalog/:type/:id.json', (req, res) => {
-      sendCatalog(res, handleCatalog({ type: req.params.type, id: req.params.id, extra: {} }));
+      sendCatalog(res, handleCatalog({ type: req.params.type, id: req.params.id, extra: {} }, { user: req.userAccount }));
     });
     r.get('/catalog/:type/:id/:extra.json', (req, res) => {
       sendCatalog(res, handleCatalog({
         type: req.params.type, id: req.params.id, extra: parseExtra(req.params.extra),
-      }));
+      }, { user: req.userAccount }));
     });
 
     r.get('/meta/:type/:id.json', (req, res) => {
@@ -2728,7 +2742,8 @@ function renderAccountPage(user, opts) {
   const effectiveSelection = effectiveCatalogSelection(cfg);
   const selected = effectiveSelection || new Set();
   const selectAll = effectiveSelection === null;
-  const orderedPromotions = orderByIds(promotions.enabled, cfg.promotionOrder, (p) => p.id);
+  const orderedPromotions = orderByIds(promotions.enabled.filter((p) =>
+    promotionSelectedForUser(cfg, p)), cfg.promotionOrder, (p) => p.id);
 
   // Per-promotion catalog tickboxes. Both levels follow the user's saved
   // manifest order; registry additions that are not saved yet append safely.

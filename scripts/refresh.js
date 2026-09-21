@@ -192,12 +192,18 @@ async function refreshPromotion(promotion, log, opts) {
     const today = new Date(); today.setUTCHours(0, 0, 0, 0);
     const from = new Date(today); from.setUTCDate(from.getUTCDate() - Math.max(0, config.eventWindowDaysBack | 0));
     const to = new Date(today); to.setUTCDate(to.getUTCDate() + Math.max(0, config.eventWindowDaysAhead | 0));
-    raw = await espn.fetchAll({
+    const fetchOptions = {
       league: promotion.source.league,
       dateFrom: sourceStartDate(promotion, from.toISOString().slice(0, 10)),
       dateTo: to.toISOString().slice(0, 10),
       log,
-    });
+    };
+    const cacheKey = 'espn:' + fetchOptions.league + ':' + fetchOptions.dateFrom + ':' + fetchOptions.dateTo;
+    if (opts.sourceCache && opts.sourceCache.has(cacheKey)) raw = opts.sourceCache.get(cacheKey);
+    else {
+      raw = await espn.fetchAll(fetchOptions);
+      if (opts.sourceCache) opts.sourceCache.set(cacheKey, raw);
+    }
   } else if (promotion.source.type === 'sport-video') {
     // Release-first ingestion. No network call: this reads SSS's own record of
     // what Sport-Video published and no fixture feed claimed.
@@ -498,7 +504,10 @@ async function runRefresh(options) {
   // 0.41.0 — filter the fetch loop to the target promotion (if any). Missing
   // ID or disabled promotion is a soft-fail: we bail early rather than write
   // out a store that could clobber other promotions' data with nothing.
-  let toFetch = promotions.enabled;
+  const selectedTeamIds = new Set(require('../lib/users').listUsers()
+    .flatMap((user) => Array.isArray(user.config && user.config.teamPromotions)
+      ? user.config.teamPromotions : []));
+  let toFetch = promotions.enabled.filter((p) => !p.autoTeam || selectedTeamIds.has(p.id));
   if (targetPromotionId) {
     toFetch = promotions.enabled.filter((p) => p.id === targetPromotionId);
     if (toFetch.length === 0) {

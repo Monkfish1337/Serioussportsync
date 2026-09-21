@@ -264,12 +264,9 @@ test('a conditional request is answered 304 without a body', async () => {
   assert.ok(third.body.length > 0);
 });
 
-// The team wizard lives on the Configure page because picking a team is a
-// choice a user makes. Creating the promotion is not: it changes the registry
-// every account shares, so that action stays admin-only. Getting this wrong
-// would let any invited user add catalogs for everyone.
-test('a signed-in user can browse teams but not create a promotion', async () => {
+test('a signed-in user can select and remove a team without changing another account', async () => {
   const user = await makeUser('teampicker');
+  const other = await makeUser('otherteampicker');
   const login = await get('/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -280,15 +277,39 @@ test('a signed-in user can browse teams but not create a promotion', async () =>
   assert.ok(cookie, 'expected a session cookie');
   assert.ok(user.id);
 
-  const create = await get('/account/teams', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', cookie },
-    body: new URLSearchParams({ chooser: 'nfl', teamId: '6' }).toString(),
-  });
-  assert.equal(create.status, 403);
-  const body = await create.json();
-  assert.equal(body.ok, false);
-  assert.match(body.error, /admin/i);
+  const picker = require('../lib/team-picker');
+  const store = require('../lib/store');
+  const original = picker.teamsFor;
+  picker.teamsFor = async () => ({ ok: true, teams: [{
+    id: '6', name: 'Dallas Cowboys', abbreviation: 'DAL', names: ['Dallas Cowboys'],
+  }] });
+  store.saveToDisk({ updatedAt: new Date().toISOString(), events: [{
+    id: 'nfl-dal:fixture', promotion: 'nfl-dal', name: 'Dallas Cowboys vs New York Giants',
+    date: '2026-09-20', source: { type: 'espn' },
+  }] });
+  try {
+    const create = await get('/account/teams', {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', cookie },
+      body: new URLSearchParams({ chooser: 'nfl', teamId: '6' }).toString(),
+    });
+    assert.equal(create.status, 200);
+    assert.equal((await create.json()).ok, true);
+    const catalogId = 'nfl-dal-recent';
+    const manifest = async (account) => (await (await get('/u/' + account.id + '/'
+      + account.apiToken + '/manifest.json')).json()).catalogs.map((catalog) => catalog.id);
+    assert.ok((await manifest(user)).includes(catalogId));
+    assert.ok(!(await manifest(other)).includes(catalogId));
+
+    const remove = await get('/account/teams/remove', {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', cookie },
+      body: new URLSearchParams({ chooser: 'nfl', teamId: '6' }).toString(),
+    });
+    assert.equal(remove.status, 200);
+    assert.ok(!(await manifest(user)).includes(catalogId));
+  } finally {
+    picker.teamsFor = original;
+    store.saveToDisk({ updatedAt: new Date().toISOString(), events: [] });
+  }
 });
 
 test('the wizard endpoints refuse anonymous callers', async () => {

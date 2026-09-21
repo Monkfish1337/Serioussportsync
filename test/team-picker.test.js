@@ -207,8 +207,8 @@ test('nothing selected, nothing matched, and bad input are all empty', () => {
 test('the endpoint sends selected, and the picker draws and toggles from it', () => {
   const fs = require('fs'); const path = require('path');
   const addonSource = fs.readFileSync(path.join(__dirname, '..', 'addon.js'), 'utf8');
-  assert.match(addonSource, /out\.selected = teamPicker\.selectedTeamIds\(/,
-    'the field the client has always read must actually be sent');
+  assert.match(addonSource, /out\.selected = out\.teams\.filter\(/,
+    'the field the client reads must reflect this account’s selected teams');
   // The remove route shares the rule rather than keeping its own copy, so the
   // highlight and the removal cannot disagree about what "this team" means.
   assert.match(addonSource, /teamPicker\.matchesTeam\(item, key, teamId\)/);
