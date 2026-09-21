@@ -59,10 +59,101 @@ test('weekly wrestling shows recompute the US Eastern air date instead of TSDB\'
 test('weekly release matching requires the right show and date', () => {
   const promotion = byId('wwe-raw');
   const event = { name: 'WWE Raw #1739', date: '2026-09-21' };
+  assert.equal(promotion.searchTitles(event)[0], 'WWE Raw 2026 09 21');
   assert.equal(promotion.isRelevantStreamTitle('WWE.RAW.2026.09.21.1080p', event).ok, true);
   assert.equal(promotion.isRelevantStreamTitle('WWE.NXT.2026.09.21.1080p', event).ok, false);
   assert.equal(promotion.isRelevantStreamTitle('WWE.RAW.2026.09.14.1080p', event).ok, false);
   assert.equal(promotion.isRelevantStreamTitle('WWE.RAW.1080p', event).ok, false);
+  const smackdown = byId('wwe-smackdown');
+  assert.equal(smackdown.searchTitles({name:'WWE SmackDown #1413',date:'2026-09-18'})[0],
+    'WWE SmackDown 2026 09 18');
+  assert.equal(smackdown.isRelevantStreamTitle(
+    'WWE.Friday.Night.Smackdown.2026.09.18.1080p.WEB.h264-TRB',
+    {name:'WWE SmackDown #1413',date:'2026-09-19'}).ok, true);
+  assert.equal(smackdown.isRelevantStreamTitle('WWE.RAW.2026.09.18.1080p',
+    {name:'WWE SmackDown #1413',date:'2026-09-18'}).ok, false);
+});
+
+test('weekly matching lab keeps date strict and permits a targeted research search', async () => {
+  const html = admin.renderMatchingLab('wwe-smackdown');
+  assert.match(html, /id="lab-date"[^>]*checked/);
+  assert.match(html, /id="lab-query"/);
+  assert.match(html, /body\.append\('query',document\.getElementById\('lab-query'\)\.value\)/);
+  const settings = require('../lib/settings');
+  const original = {bm:settings.getBitmagnet, pw:settings.getProwlarr};
+  settings.getBitmagnet = () => ({enabled:false});
+  settings.getProwlarr = () => ({url:'http://prowlarr:9696',apiKey:'test-key',enabled:true,liveSearchEnabled:false});
+  try {
+    const result = await admin.researchAliases({}, {
+      promotionId:'wwe-smackdown',name:'WWE SmackDown',eventName:'WWE SmackDown #1413',
+      eventDate:'2026-09-19',query:'WWE Friday Night SmackDown 2026 09 18',
+    }, {
+      companionConfig:{},
+      prowlarrSearch:async (queries) => {
+        assert.equal(queries[0], 'WWE Friday Night SmackDown 2026 09 18');
+        return {ok:true,results:[
+          {title:'WWE.Friday.Night.Smackdown.2026.09.18.1080p.WEB.h264-TRB'},
+          {title:'WWE.Friday.Night.Smackdown.2026.08.18.1080p.WEB.h264-TRB'},
+          {title:'WWE.Friday.Night.Smackdown.2026.09.18.German.1080p.WEB.h264-SPORTY'},
+        ]};
+      },
+    });
+    assert.equal(result.counts.matched, 1);
+    assert.equal(result.counts.possible, 1);
+    assert.equal(result.groups.possible[0].reason, 'wrong-date');
+    assert.equal(result.counts.rejected, 1);
+    assert.equal(result.groups.rejected[0].reason, 'foreign-language');
+  } finally {
+    settings.getBitmagnet = original.bm;
+    settings.getProwlarr = original.pw;
+  }
+});
+
+test('matching lab samples the displayed local date from older weekly records', () => {
+  const store = require('../lib/store');
+  const original = store.getEvents;
+  store.getEvents = () => [{ id:'wwe-raw:2579121', promotion:'wwe-raw',
+    name:'WWE Raw #1736', date:'2026-09-01', dateLocal:'2026-08-31' }];
+  try {
+    const html = admin.renderMatchingLab('wwe-raw');
+    assert.match(html, /data-date="2026-08-31">2026-08-31 · WWE Raw #1736/);
+  } finally {
+    store.getEvents = original;
+  }
+});
+
+test('a saved weekly rule cannot weaken the show and date identity checks', () => {
+  const overrides = require('../lib/promotion-overrides');
+  const original = overrides.find;
+  overrides.find = (id) => id === 'wwe-raw' ? {
+    promotionId:id,promotionAliases:['WWE Raw','WWE NXT','WR','WWE Monday Night Raw S34E36'],
+    relevanceKeywords:['wwe','WR','WWE Monday Night Raw S34E36'],searchTitleTemplates:['{name}'],
+    exclusionKeywords:[],requireDateInTitle:false,
+  } : null;
+  try {
+    promotions.reload();
+    const promotion = byId('wwe-raw');
+    const event = {name:'WWE Raw #1739',date:'2026-09-21'};
+    assert.equal(promotion.isRelevantStreamTitle('WWE.RAW.2026.09.21.1080p',event).ok,true);
+    assert.equal(promotion.isRelevantStreamTitle('WWE.RAW.1080p',event).ok,false);
+    assert.equal(promotion.isRelevantStreamTitle('WWE.NXT.2026.09.21.1080p',event).ok,false);
+    assert.equal(promotion.searchTitles(event).some((title) => /\bWR\b|S34E36/i.test(title)), false);
+  } finally {
+    overrides.find = original;
+    promotions.reload();
+  }
+});
+
+test('weekly saved rules discard one-episode aliases before saving', () => {
+  const overrides = require('../lib/promotion-overrides');
+  const cleaned = overrides.sanitizeWeekly({
+    promotionAliases:'WWE Raw\nWR\nWWE Monday Night Raw S34E36',
+    relevanceKeywords:'wwe raw, WR, wwe monday night raw s34e36',
+    searchTitleTemplates:'{name}\nWWE Raw S34E36 {date_spaced}',
+  });
+  assert.deepEqual(cleaned.promotionAliases, ['WWE Raw', 'WWE Monday Night Raw']);
+  assert.deepEqual(cleaned.relevanceKeywords, ['wwe raw', 'wwe monday night raw']);
+  assert.equal(cleaned.searchTitleTemplates.some((value) => /S34E36/i.test(value)), false);
 });
 
 test('the promotion page exposes each metadata start date, including WWE default', () => {

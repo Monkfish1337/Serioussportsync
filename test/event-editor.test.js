@@ -16,8 +16,9 @@ test('date overrides are composed over refresh-owned source events', () => {
   config.contentStudioFile = path.join(dir, 'content-studio.json');
   try {
     contentStore.setOverride('ufc:100', { date: '2026-10-10' });
-    const event = contentStore.compose([{ id: 'ufc:100', name: 'Fight Night', date: '2026-10-09' }])[0];
+    const event = contentStore.compose([{ id: 'ufc:100', name: 'Fight Night', date: '2026-10-09', dateLocal: '2026-10-09' }])[0];
     assert.equal(event.date, '2026-10-10');
+    assert.equal(event.dateLocal, '2026-10-10');
   } finally {
     config.contentStudioFile = original;
     fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
@@ -35,4 +36,14 @@ test('event editor shows source and overridden dates and is in the sidebar', () 
   assert.match(html, /Use source date/);
   const ids = shell.destinations(true).map((item) => item.id);
   assert.equal(ids[ids.indexOf('promotions') + 1], 'events');
+});
+
+test('event editor shows the local catalog date on older TSDB episodes', () => {
+  const html = editor.renderBody({
+    events: [{ id: 'wwe-raw:2579121', promotion: 'wwe-raw', name: 'WWE Raw #1736',
+      date: '2026-09-01', dateLocal: '2026-08-31' }],
+  });
+  assert.match(html, /Source date<\/span><strong>2026-09-01<\/strong>/);
+  assert.match(html, /Catalog date<\/span><strong>2026-08-31<\/strong>/);
+  assert.match(html, /name="date" required value="2026-08-31"/);
 });
