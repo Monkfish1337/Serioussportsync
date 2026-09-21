@@ -35,6 +35,27 @@ test('weekly wrestling programs have separate promotions and no premium-card ove
   assert.equal(byId('wwe').includeEvent({ name: 'NXT Heatwave' }), true);
 });
 
+test('weekly wrestling shows recompute the US Eastern air date instead of TSDB\'s UTC date', () => {
+  const cases = [
+    ['wwe-raw', 'RAW #1736', '2026-09-01', '00:00:00', '2026-08-31'],
+    ['wwe-smackdown', 'SmackDown #1400', '2026-09-05', '00:00:00', '2026-09-04'],
+    ['wwe-nxt', 'NXT #825', '2026-09-10', '01:00:00', '2026-09-09'],
+    ['aew-dynamite', 'Dynamite #340', '2026-09-11', '00:00:00', '2026-09-10'],
+    ['aew-collision', 'Collision #130', '2026-09-14', '00:00:00', '2026-09-13'],
+  ];
+  for (const [id, rawName, dateEvent, strTime, expectedDate] of cases) {
+    const promotion = byId(id);
+    const event = transform.fromTsdb({ idEvent: '1', strEvent: rawName, dateEvent, strTime }, promotion);
+    assert.equal(event.date, expectedDate, id);
+    assert.equal(event.dateLocal, expectedDate, id);
+  }
+  // The bare (name, date) call made by the cached-event repair sweep in
+  // scripts/refresh.js carries no raw record — must no-op rather than
+  // re-deriving (and potentially re-shifting) an already-corrected date.
+  const raw = byId('wwe-raw');
+  assert.equal(raw.correctDate('RAW #1736', '2026-08-31'), '2026-08-31');
+});
+
 test('weekly release matching requires the right show and date', () => {
   const promotion = byId('wwe-raw');
   const event = { name: 'WWE Raw #1739', date: '2026-09-21' };
