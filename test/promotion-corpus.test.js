@@ -107,6 +107,15 @@ test('existing WWE, AEW and Match of the Day rules remain locked', () => {
     { name: 'Match of the Day 02 09 2026', date: '2026-09-02' }).length > 0);
 });
 
+test('Match of the Day accepts only the selected episode date', () => {
+  const motd = promotion('motd');
+  const event = { id: 'motd:tv224-s63e10', name: 'Match of the Day 20 09 2026', date: '2026-09-20' };
+  assert.equal(motd.isRelevantStreamTitle(
+    'Match.Of.The.Day.2026.09.20.1080p.HDTV.H264-FTP', event).ok, true);
+  assert.equal(motd.isRelevantStreamTitle(
+    'Match.Of.The.Day.2026.09.19.1080p.HDTV.H264-FTP', event).reason, 'wrong-date');
+});
+
 test('Champions League leads with its three focused queries and keeps the rest', () => {
   // The three are right and were measured: UCL releases genuinely are named
   // "UEFA.Champions.League.<date>.<matchup>", the same fixture also appears
