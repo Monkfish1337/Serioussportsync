@@ -206,21 +206,24 @@ function listen(app) {
       assert.ok(!html.includes(removed), 'account page omits ' + removed);
     }
 
-    // Configure has the quick Built-in Usenet switch; the dedicated page also
-    // owns it and contains every detailed search and playback setting.
+    // Configure owns the one Built-in Usenet switch. The dedicated page only
+    // edits connection details and diagnostics.
     const usenet = await fetch(base + '/account/usenet', { headers: { Cookie: cookie } });
     assert.strictEqual(usenet.status, 200, 'Built-in Usenet page is available');
     const usenetHtml = await usenet.text();
     for (const expected of [
-      '1. Discover', '2. Match', '3. Play',
       'Search and candidate discovery', 'Native NNTP playback',
-      'name="diyUsenetEnabled"', 'Overall', 'Discovery',
-      'name="diyNativeSearchEnabled"',
+      'Change pipeline setting', 'Discovery', 'DIY playback on your LAN',
+      'Advanced playback tuning',
       'name="diySearchKind"', 'name="diySearchUrl"', 'name="diySearchApiKey"',
-      'Test native search', 'name="nativeNntpEnabled"',
+      'Test native search',
       'name="nntpHost"', 'name="nntpPassword"',
       'action="/account/usenet/save"',
     ]) assert.ok(usenetHtml.includes(expected), 'Built-in Usenet page includes ' + expected);
+    for (const removed of ['name="diyUsenetEnabled"', 'name="diyNativeSearchEnabled"',
+      'name="nativeNntpEnabled"', 'pipeline-map']) {
+      assert.ok(!usenetHtml.includes(removed), 'Built-in Usenet page omits ' + removed);
+    }
 
     const database = await fetch(base + '/admin/database', { headers: { Cookie: cookie } });
     assert.strictEqual(database.status, 200, 'Database page is available to admins');
@@ -340,13 +343,10 @@ function listen(app) {
       method: 'POST', redirect: 'manual',
       headers: { Cookie: cookie, Origin: 'null', 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        diyUsenetEnabled: 'on',
-        diyNativeSearchEnabled: 'on',
         diySearchKind: 'newznab',
         diySearchName: 'Test Hydra',
         diySearchUrl: 'https://hydra.example',
         diySearchApiKey: 'test-search-api-secret',
-        nativeNntpEnabled: 'on',
         nntpHost: 'news.example',
         nntpPort: '563',
         nntpTls: 'on',
@@ -368,11 +368,10 @@ function listen(app) {
     assert.strictEqual(saved.uuManifestUrl, 'https://uu.example/private/manifest.json');
     assert.strictEqual(saved.uuEnabled, true);
     assert.strictEqual(saved.diyUsenetEnabled, true);
-    assert.strictEqual(saved.diyNativeSearchEnabled, true);
     assert.strictEqual(saved.diySearchKind, 'newznab');
     assert.strictEqual(saved.diySearchUrl, 'https://hydra.example');
     assert.strictEqual(saved.diySearchApiKey, 'test-search-api-secret');
-    assert.strictEqual(saved.nativeNntpEnabled, true);
+    assert.strictEqual(require('../lib/diy-usenet-status').status(saved).ready, true);
     assert.strictEqual(saved.nntpHost, 'news.example');
     assert.strictEqual(saved.nntpTls, true);
     assert.strictEqual(saved.nntpUsername, 'nntp-user');
@@ -419,31 +418,24 @@ function listen(app) {
     assert.strictEqual(isolated.uuEnabled, false);
     assert.strictEqual(isolated.easynewsEnabled, false);
     assert.strictEqual(isolated.diyUsenetEnabled, true);
-    // Configure no longer owns this switch, so a Configure save must leave it
-    // exactly as the DIY page last set it.
-    assert.strictEqual(isolated.nativeNntpEnabled, true,
-      'Configure does not touch settings that moved to the DIY Usenet page');
+    assert.strictEqual(require('../lib/diy-usenet-status').status(isolated).ready, true,
+      'Configure preserves the configured DIY connections');
     assert.strictEqual(isolated.torboxApiKey, 'test-torbox-key', 'disabling preserves TorBox credentials');
     assert.strictEqual(isolated.easynewsPassword, 'test-easynews-password', 'disabling preserves Easynews credentials');
     assert.strictEqual(isolated.uuManifestUrl, 'https://uu.example/private/manifest.json', 'disabling preserves UU configuration');
     assert.strictEqual(isolated.nntpPassword, 'test-nntp-secret', 'disabling preserves NNTP credentials');
 
-    // Turning NNTP off happens on its own page now, and must keep the password.
-    const nntpOff = await fetch(base + '/account/usenet/save', {
+    // The wizard is the only off switch and must retain the saved credentials.
+    const diyOff = await fetch(base + '/account/save', {
       method: 'POST', redirect: 'manual',
       headers: { Cookie: cookie, Origin: 'null', 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        diyUsenetEnabled: 'on',
-        diySearchKind: 'newznab', diySearchName: 'Test Hydra',
-        diySearchUrl: 'https://hydra.example', diySearchApiKey: 'test-search-api-secret',
-        nntpHost: 'news.example', nntpPort: '563', nntpUsername: 'nntp-user',
-        nntpPassword: 'test-nntp-secret', nntpConnections: '12',
-      }).toString(),
+      body: new URLSearchParams({ torboxApiKey: 'test-torbox-key' }).toString(),
     });
-    assert.strictEqual(nntpOff.status, 302);
-    const afterNntpOff = users.findById(user.id).config;
-    assert.strictEqual(afterNntpOff.nativeNntpEnabled, false, 'the DIY page turns NNTP off');
-    assert.strictEqual(afterNntpOff.nntpPassword, 'test-nntp-secret', 'disabling preserves NNTP credentials');
+    assert.strictEqual(diyOff.status, 302);
+    const afterDiyOff = users.findById(user.id).config;
+    assert.strictEqual(afterDiyOff.diyUsenetEnabled, false, 'Configure turns the one DIY switch off');
+    assert.strictEqual(require('../lib/diy-usenet-status').status(afterDiyOff).ready, false);
+    assert.strictEqual(afterDiyOff.nntpPassword, 'test-nntp-secret', 'disabling preserves NNTP credentials');
 
     const removedProbe = await fetch(base + '/account/torbox-unified-probe', {
       method: 'POST',
