@@ -4,42 +4,29 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { status } = require('../lib/diy-usenet-status');
 
-test('native indexer and native NNTP form a complete DIY pipeline', () => {
+test('native indexer and native NNTP form a complete Built-in Usenet pipeline', () => {
   const result = status({
     diyUsenetEnabled: true,
     diyNativeSearchEnabled: true,
     diySearchKind: 'prowlarr',
     diySearchUrl: 'http://prowlarr:9696',
     diySearchApiKey: 'secret',
-    diyUuSearchEnabled: false,
     nativeNntpEnabled: true,
     nntpHost: 'news.example.com',
     nntpPort: 563,
   });
-  assert.equal(result.nativeSearch, true);
-  assert.equal(result.nntp, true);
-  assert.equal(result.nzbdav, false);
-  assert.equal(result.ready, true);
-});
-
-test('Usenet Ultimate discovery and NZB DAV form a complete DIY pipeline', () => {
-  const result = status({
-    diyUuSearchEnabled: true,
-    uuManifestUrl: 'https://uu.example/private/manifest.json',
-    diyUsenetEnabled: true,
-    nzbdavUrl: 'http://nzbdav:3000',
-    nzbdavApiKey: 'secret',
-    nzbdavWebdavUrl: 'http://nzbdav:3000',
-  });
-  assert.equal(result.uuSearch, true);
-  assert.equal(result.nzbdav, true);
+  assert.equal(result.discovery, true);
+  assert.equal(result.playback, true);
   assert.equal(result.ready, true);
 });
 
 test('discovery without playback is not reported ready', () => {
   const result = status({
-    diyUuSearchEnabled: true,
-    uuManifestUrl: 'https://uu.example/private/manifest.json',
+    diyUsenetEnabled: true,
+    diyNativeSearchEnabled: true,
+    diySearchKind: 'prowlarr',
+    diySearchUrl: 'http://prowlarr:9696',
+    diySearchApiKey: 'secret',
   });
   assert.equal(result.discovery, true);
   assert.equal(result.playback, false);
@@ -49,7 +36,6 @@ test('discovery without playback is not reported ready', () => {
 test('playback without discovery is not reported ready', () => {
   const result = status({
     diyUsenetEnabled: true,
-    diyUuSearchEnabled: false,
     nativeNntpEnabled: true,
     nntpHost: 'news.example.com',
   });
@@ -68,7 +54,7 @@ test('configured backends remain visible while the master switch is off', () => 
     nntpHost: 'news.example.com',
   });
   assert.equal(result.discovery, true);
-  assert.equal(result.nntp, true);
+  assert.equal(result.playback, true);
   assert.equal(result.enabled, false);
   assert.equal(result.ready, false);
 });

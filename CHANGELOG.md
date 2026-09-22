@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — one built-in Usenet path
+
+- Removed the Usenet Ultimate and NZB DAV choices from account configuration
+  and stream generation. Built-in Usenet now owns discovery and playback end to
+  end through the configured Newznab/NZBHydra/Prowlarr indexer and NNTP provider.
+- Deleted `lib/sources/usenet-ultimate.js`, `lib/sources/nzbdav.js`,
+  `lib/sources/nzbdav-playback.js`, `lib/sources/nzbdav-webdav.js` and
+  `lib/webdav-proxy.js`, along with their `uuManifestUrl`/`uuEnabled`/
+  `diyUuSearchEnabled`/`nzbdav*` account fields, admin form sections, and
+  `/resolve/nzbdav`, `/account/test-nzbdav` routes. No helper container is
+  needed for Usenet playback anymore — just an indexer connection and an NNTP
+  provider connection.
+- Updated account labels and operator documentation (README, Configuration,
+  Installation, Security) around the native path.
+
 ## 1.0.0 — 2026-09-22
 
 - Discovery's live seven-day baseline is 127/132 events with saved torrent

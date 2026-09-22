@@ -376,7 +376,7 @@ test('DIY connection tests return to the dedicated settings page', async () => {
   const cookie = (login.headers.getSetCookie ? login.headers.getSetCookie() : [])
     .map((value) => value.split(';')[0]).join('; ');
   assert.ok(cookie && user.id);
-  for (const pathname of ['/account/test-diy-search', '/account/test-nzbdav', '/account/test-nntp']) {
+  for (const pathname of ['/account/test-diy-search', '/account/test-nntp']) {
     const response = await get(pathname, {
       method: 'POST',
       headers: { cookie, 'Content-Type': 'application/x-www-form-urlencoded' },
