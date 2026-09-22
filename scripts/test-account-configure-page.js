@@ -177,6 +177,8 @@ function listen(app) {
       'name="easynewsUsername"',
       'name="easynewsEnabled"',
       'name="easynewsPassword"',
+      'name="uuManifestUrl"',
+      'name="uuEnabled"',
       'name="diyUsenetEnabled"',
       'name="maxStreams"',
       'name="showWarmRows"',
@@ -320,6 +322,8 @@ function listen(app) {
         easynewsEnabled: 'on',
         easynewsUsername: 'test-easynews-user',
         easynewsPassword: 'test-easynews-password',
+        uuEnabled: 'on',
+        uuManifestUrl: 'https://uu.example/private/manifest.json',
         diyUsenetEnabled: 'on',
         catalogs: firstCatalog,
         catalogOrder: firstCatalog,
@@ -361,6 +365,8 @@ function listen(app) {
     assert.strictEqual(saved.easynewsEnabled, true);
     assert.strictEqual(saved.easynewsUsername, 'test-easynews-user');
     assert.strictEqual(saved.easynewsPassword, 'test-easynews-password');
+    assert.strictEqual(saved.uuManifestUrl, 'https://uu.example/private/manifest.json');
+    assert.strictEqual(saved.uuEnabled, true);
     assert.strictEqual(saved.diyUsenetEnabled, true);
     assert.strictEqual(saved.diyNativeSearchEnabled, true);
     assert.strictEqual(saved.diySearchKind, 'newznab');
@@ -378,6 +384,7 @@ function listen(app) {
       'encrypted-at-rest install token still authenticates');
     assert.ok(!usersOnDisk.includes('test-search-api-secret'));
     assert.ok(!usersOnDisk.includes('test-nntp-secret'));
+    assert.ok(!usersOnDisk.includes('https://uu.example/private/manifest.json'));
     assert.ok(!usersOnDisk.includes('test-easynews-user'));
     assert.ok(!usersOnDisk.includes('nntp-user'));
     assert.deepStrictEqual(saved.catalogs, [firstCatalog]);
@@ -396,6 +403,7 @@ function listen(app) {
         torboxApiKey: 'test-torbox-key',
         easynewsUsername: 'test-easynews-user',
         easynewsPassword: 'test-easynews-password',
+        uuManifestUrl: 'https://uu.example/private/manifest.json',
         diyUsenetEnabled: 'on',
         nntpHost: 'news.example',
         nntpPort: '563',
@@ -408,6 +416,7 @@ function listen(app) {
     assert.strictEqual(disableLegacy.status, 302);
     const isolated = users.findById(user.id).config;
     assert.strictEqual(isolated.torboxEnabled, false);
+    assert.strictEqual(isolated.uuEnabled, false);
     assert.strictEqual(isolated.easynewsEnabled, false);
     assert.strictEqual(isolated.diyUsenetEnabled, true);
     // Configure no longer owns this switch, so a Configure save must leave it
@@ -416,6 +425,7 @@ function listen(app) {
       'Configure does not touch settings that moved to the DIY Usenet page');
     assert.strictEqual(isolated.torboxApiKey, 'test-torbox-key', 'disabling preserves TorBox credentials');
     assert.strictEqual(isolated.easynewsPassword, 'test-easynews-password', 'disabling preserves Easynews credentials');
+    assert.strictEqual(isolated.uuManifestUrl, 'https://uu.example/private/manifest.json', 'disabling preserves UU configuration');
     assert.strictEqual(isolated.nntpPassword, 'test-nntp-secret', 'disabling preserves NNTP credentials');
 
     // Turning NNTP off happens on its own page now, and must keep the password.

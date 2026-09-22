@@ -63,9 +63,11 @@ should normally be managed from **Metadata**, **Promotions**, and
 | `LOG_REJECTION_SAMPLE_LIMIT` | `4` | Rejected titles retained per exclusion reason when full detail is off. |
 | `LOG_BUFFER_MAX_BYTES` | `5242880` | Maximum memory used by the live structured log buffer before its oldest entries are discarded. |
 
-TorBox, Easynews, and built-in Usenet settings are account-scoped and belong on
-the signed-in **Account** page. Built-in Usenet uses a native indexer connection
-and a direct NNTP provider connection; it does not require a helper container.
+TorBox, Usenet Ultimate, Easynews, and built-in Usenet settings are account-scoped
+and belong on the signed-in **Account** page. Usenet Ultimate is its own
+standalone pipeline (a per-user manifest URL to your own UU instance). Built-in
+Usenet is a separate pipeline that uses a native indexer connection and a direct
+NNTP provider connection; it does not require a helper container.
 
 ## Smart Availability
 

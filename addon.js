@@ -656,7 +656,7 @@ function createApp() {
     const maxStreamsRaw = parseInt(String(b.maxStreams || '0'), 10);
     const maxStreams = (Number.isFinite(maxStreamsRaw) && maxStreamsRaw >= 0 && maxStreamsRaw <= 20) ? maxStreamsRaw : 0;
     try {
-      // 0.33.0: active backend field is torboxApiKey.
+      // 0.33.0: active backend fields are uuManifestUrl + torboxApiKey.
       // 0.34.0: Easynews creds drive Pipeline C (direct Easynews search).
       // 0.36.0: dropped the rd / tb / pm / autoCache* hidden-input passthrough.
       // Old values (if any) stay in users.json — updateUserConfig only patches
@@ -666,8 +666,13 @@ function createApp() {
       users.updateUserConfig(req.user.id, {
         torboxEnabled: b.torboxEnabled === 'on'
           || b.torboxEnabled === '1' || b.torboxEnabled === 'true',
+        uuEnabled: b.uuEnabled === 'on'
+          || b.uuEnabled === '1' || b.uuEnabled === 'true',
         easynewsEnabled: b.easynewsEnabled === 'on'
           || b.easynewsEnabled === '1' || b.easynewsEnabled === 'true',
+        uuManifestUrl: security.cleanHttpUrl(b.uuManifestUrl, {
+          label: 'Usenet Ultimate manifest URL', allowSensitiveQuery: true,
+        }),
         torboxApiKey: String(b.torboxApiKey || '').trim(),
         easynewsUsername: String(b.easynewsUsername || '').trim(),
         easynewsPassword: String(b.easynewsPassword || ''),
@@ -2887,6 +2892,7 @@ function renderAccountPage(user, opts) {
     +       '<div class="wide"><label class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" name="easynewsEnabled" value="on"' + (cfg.easynewsEnabled !== false ? ' checked' : '') + '><span class="form-check-label"><strong>Enable Easynews pipeline</strong></span></label><p class="text-secondary small mb-2">Turning it off preserves both credentials.</p></div>'
     +       '<div><label class="form-label" for="en-user">Easynews username</label><input class="form-control" type="text" id="en-user" name="easynewsUsername" value="' + escapeHtml(cfg.easynewsUsername || '') + '" autocomplete="off"></div>'
     +       '<div>' + secretField('Easynews password', 'easynewsPassword', cfg.easynewsPassword, 'your Easynews password') + '</div>'
+    +       '<div class="wide"><label class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" name="uuEnabled" value="on"' + (cfg.uuEnabled !== false ? ' checked' : '') + '><span class="form-check-label"><strong>Enable Usenet Ultimate stream rows</strong></span></label><p class="text-secondary small mb-2">Usenet Ultimate is its own independent pipeline alongside TorBox and Easynews.</p><label class="form-label" for="uu-url">Usenet Ultimate manifest URL</label><input class="form-control text-mono" type="url" id="uu-url" name="uuManifestUrl" value="' + escapeHtml(cfg.uuManifestUrl || '') + '" placeholder="https://your-uu.example/stremio/&lt;config&gt;/manifest.json"></div>'
     +     '</div>'
     +   '</div></section>'
     +   (isAdmin ? '<details class="config-fold"><summary>Built-in Usenet <span class="badge ms-2 ' + (diyStatus.ready ? 'bg-green-lt' : 'bg-secondary-lt') + '">' + (diyStatus.ready ? 'Ready' : 'Setup needed') + '</span></summary><div class="config-fold-body">'

@@ -138,8 +138,10 @@ assert.ok(
 const allLegacyPlaybackDisabled = buildManifest({
   user: { config: {
     torboxEnabled: false,
+    uuEnabled: false,
     easynewsEnabled: false,
     diyUsenetEnabled: false,
+    uuManifestUrl: 'https://uu.example/private/manifest.json',
     easynewsUsername: 'user',
     easynewsPassword: 'password',
   } },
@@ -147,6 +149,19 @@ const allLegacyPlaybackDisabled = buildManifest({
 assert.ok(
   !allLegacyPlaybackDisabled.resources.some((resource) => resource.name === 'stream'),
   'disabled account pipelines are not advertised in the private manifest',
+);
+const uuOnlyManifest = buildManifest({
+  user: { config: {
+    torboxEnabled: false,
+    easynewsEnabled: false,
+    diyUsenetEnabled: false,
+    uuEnabled: true,
+    uuManifestUrl: 'https://uu.example/private/manifest.json',
+  } },
+});
+assert.ok(
+  uuOnlyManifest.resources.some((resource) => resource.name === 'stream'),
+  'Usenet Ultimate remains its own standalone pipeline and advertises streams alone',
 );
 const nativeDiyOnlyManifest = buildManifest({
   user: { config: {
