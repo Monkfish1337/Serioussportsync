@@ -6,6 +6,7 @@ const { status } = require('../lib/diy-usenet-status');
 
 test('native indexer and native NNTP form a complete DIY pipeline', () => {
   const result = status({
+    diyUsenetEnabled: true,
     diyNativeSearchEnabled: true,
     diySearchKind: 'prowlarr',
     diySearchUrl: 'http://prowlarr:9696',
@@ -47,11 +48,27 @@ test('discovery without playback is not reported ready', () => {
 
 test('playback without discovery is not reported ready', () => {
   const result = status({
+    diyUsenetEnabled: true,
     diyUuSearchEnabled: false,
     nativeNntpEnabled: true,
     nntpHost: 'news.example.com',
   });
   assert.equal(result.discovery, false);
   assert.equal(result.playback, true);
+  assert.equal(result.ready, false);
+});
+
+test('configured backends remain visible while the master switch is off', () => {
+  const result = status({
+    diyUsenetEnabled: false,
+    diyNativeSearchEnabled: true,
+    diySearchUrl: 'http://prowlarr:9696',
+    diySearchApiKey: 'secret',
+    nativeNntpEnabled: true,
+    nntpHost: 'news.example.com',
+  });
+  assert.equal(result.discovery, true);
+  assert.equal(result.nntp, true);
+  assert.equal(result.enabled, false);
   assert.equal(result.ready, false);
 });

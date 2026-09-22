@@ -179,6 +179,7 @@ function listen(app) {
       'name="easynewsPassword"',
       'name="uuManifestUrl"',
       'name="uuEnabled"',
+      'name="diyUsenetEnabled"',
       'name="maxStreams"',
       'name="showWarmRows"',
       'name="promotionOrder"',
@@ -205,15 +206,15 @@ function listen(app) {
       assert.ok(!html.includes(removed), 'account page omits ' + removed);
     }
 
-    // The DIY Usenet pipeline owns all of its switches and settings on one
-    // page. Configure only reports readiness and links to it.
+    // Configure has the quick NZB DAV switch; the dedicated page also owns it
+    // and contains every detailed search and playback setting.
     const usenet = await fetch(base + '/account/usenet', { headers: { Cookie: cookie } });
     assert.strictEqual(usenet.status, 200, 'DIY Usenet page is available');
     const usenetHtml = await usenet.text();
     for (const expected of [
       '1. Discover', '2. Match', '3. Play',
       'Search and candidate discovery', 'Playback backends',
-      'name="diyUsenetEnabled"', 'Overall', 'Discovery',
+      'name="diyUsenetEnabled"', 'name="nzbdavEnabled"', 'Overall', 'Discovery',
       'name="diyNativeSearchEnabled"', 'name="diyUuSearchEnabled"',
       'name="diySearchKind"', 'name="diySearchUrl"', 'name="diySearchApiKey"',
       'Test native search', 'name="nzbdavUrl"', 'name="nzbdavApiKey"',
@@ -341,6 +342,7 @@ function listen(app) {
       headers: { Cookie: cookie, Origin: 'null', 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         diyUsenetEnabled: 'on',
+        nzbdavEnabled: 'on',
         diyNativeSearchEnabled: 'on',
         diyUuSearchEnabled: 'on',
         diySearchKind: 'newznab',
@@ -374,6 +376,7 @@ function listen(app) {
     assert.strictEqual(saved.uuManifestUrl, 'https://uu.example/private/manifest.json');
     assert.strictEqual(saved.uuEnabled, true);
     assert.strictEqual(saved.diyUsenetEnabled, true);
+    assert.strictEqual(saved.nzbdavEnabled, true);
     assert.strictEqual(saved.diyNativeSearchEnabled, true);
     assert.strictEqual(saved.diyUuSearchEnabled, true);
     assert.strictEqual(saved.diySearchKind, 'newznab');
@@ -453,6 +456,7 @@ function listen(app) {
       headers: { Cookie: cookie, Origin: 'null', 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         diyUsenetEnabled: 'on',
+        nzbdavEnabled: 'on',
         diySearchKind: 'newznab', diySearchName: 'Test Hydra',
         diySearchUrl: 'https://hydra.example', diySearchApiKey: 'test-search-api-secret',
         nntpHost: 'news.example', nntpPort: '563', nntpUsername: 'nntp-user',
