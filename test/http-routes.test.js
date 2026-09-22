@@ -345,6 +345,7 @@ test('saving Configure does not blank the settings that moved off it', async () 
   });
 
   await post('/account/usenet/save', {
+    diyUsenetEnabled: 'on',
     diySearchKind: 'prowlarr', diySearchName: 'My Prowlarr',
     diySearchUrl: 'http://prowlarr:9696', diySearchApiKey: 'secret-key',
     nntpHost: 'news.example.com', nntpPort: '563', nntpConnections: '20',
@@ -352,12 +353,33 @@ test('saving Configure does not blank the settings that moved off it', async () 
   assert.equal(users.findById(user.id).config.diySearchName, 'My Prowlarr');
 
   // A Configure save carrying none of those fields.
-  await post('/account/save', { torboxEnabled: 'on', diyUsenetEnabled: 'on', maxStreams: '10' });
+  await post('/account/save', { torboxEnabled: 'on', maxStreams: '10' });
   const config = users.findById(user.id).config;
   assert.equal(config.diySearchName, 'My Prowlarr', 'Configure save must not blank DIY settings');
   assert.equal(config.diySearchApiKey, 'secret-key');
   assert.equal(config.nntpHost, 'news.example.com');
-  assert.equal(config.diyUsenetEnabled, true, 'the switch that stayed on Configure still saves');
+  assert.equal(config.diyUsenetEnabled, true, 'Configure leaves the dedicated NZB DAV switch unchanged');
+});
+
+test('DIY connection tests return to the dedicated settings page', async () => {
+  const user = await makeUser('diytestroutes', 'admin');
+  const login = await get('/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ username: 'diytestroutes', password: 'correct-horse-battery-staple' }).toString(),
+  });
+  const cookie = (login.headers.getSetCookie ? login.headers.getSetCookie() : [])
+    .map((value) => value.split(';')[0]).join('; ');
+  assert.ok(cookie && user.id);
+  for (const pathname of ['/account/test-diy-search', '/account/test-nzbdav', '/account/test-nntp']) {
+    const response = await get(pathname, {
+      method: 'POST',
+      headers: { cookie, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: '',
+    });
+    assert.equal(response.status, 302);
+    assert.match(response.headers.get('location') || '', /^\/account\/usenet\?flash=/);
+  }
 });
 
 test('the Save button on Configure belongs to the account form', async () => {

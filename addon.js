@@ -24,6 +24,7 @@ const customPromotions = require('./lib/custom-promotions');
 const teamPicker = require('./lib/team-picker');
 const accountTeamWizard = require('./lib/account-team-wizard');
 const accountUsenetPage = require('./lib/account-usenet-page');
+const diyUsenetStatus = require('./lib/diy-usenet-status');
 const { runRefresh: runEventsRefresh } = require('./scripts/refresh');
 const promotions = require('./lib/promotions');
 const users = require('./lib/users');
@@ -579,6 +580,8 @@ function createApp() {
     const b = req.body || {};
     try {
       users.updateUserConfig(req.user.id, {
+        diyUsenetEnabled: b.diyUsenetEnabled === 'on'
+          || b.diyUsenetEnabled === '1' || b.diyUsenetEnabled === 'true',
         diyNativeSearchEnabled: b.diyNativeSearchEnabled === 'on'
           || b.diyNativeSearchEnabled === '1' || b.diyNativeSearchEnabled === 'true',
         diyUuSearchEnabled: b.diyUuSearchEnabled === 'on'
@@ -656,12 +659,6 @@ function createApp() {
         torboxApiKey: String(b.torboxApiKey || '').trim(),
         easynewsUsername: String(b.easynewsUsername || '').trim(),
         easynewsPassword: String(b.easynewsPassword || ''),
-        // Only the switch lives on Configure now. Every other DIY / NZB DAV /
-        // NNTP field is saved by /account/usenet/save — including them here
-        // would blank the lot on any Configure save, because the inputs are
-        // simply not in this form any more.
-        diyUsenetEnabled: req.user.role === 'admin' && (b.diyUsenetEnabled === 'on'
-          || b.diyUsenetEnabled === '1' || b.diyUsenetEnabled === 'true'),
         catalogs: finalCats,
         catalogsNone,
         // Served and shown are different choices, so they are stored
@@ -701,9 +698,9 @@ function createApp() {
         username: String(b.nzbdavWebdavUsername || ''),
         password: String(b.nzbdavWebdavPassword || ''),
       }, '/');
-      res.redirect('/account?flash=' + encodeURIComponent('NZB DAV API and WebDAV connected'));
+      res.redirect('/account/usenet?flash=' + encodeURIComponent('NZB DAV API and WebDAV connected'));
     } catch (error) {
-      res.redirect('/account?flash=' + encodeURIComponent('NZB DAV connection failed: ' + security.safeErrorMessage(error)));
+      res.redirect('/account/usenet?flash=' + encodeURIComponent('NZB DAV connection failed: ' + security.safeErrorMessage(error)));
     }
   });
 
@@ -719,10 +716,10 @@ function createApp() {
         apiKey: String(b.diySearchApiKey || ''),
       });
       if (!result.ok) throw new Error(result.error || 'search failed');
-      res.redirect('/account?flash=' + encodeURIComponent(
+      res.redirect('/account/usenet?flash=' + encodeURIComponent(
         'Native Usenet search connected: ' + result.results.length + ' result(s) for "' + query + '"'));
     } catch (error) {
-      res.redirect('/account?flash=' + encodeURIComponent(
+      res.redirect('/account/usenet?flash=' + encodeURIComponent(
         'Native Usenet search failed: ' + security.safeErrorMessage(error)));
     }
   });
@@ -737,10 +734,10 @@ function createApp() {
         username: String(b.nntpUsername || '').trim(),
         password: String(b.nntpPassword || ''),
       });
-      res.redirect('/account?flash=' + encodeURIComponent(
+      res.redirect('/account/usenet?flash=' + encodeURIComponent(
         'Native NNTP connected and authenticated' + (result.proxied ? ' through the outbound proxy' : '')));
     } catch (error) {
-      res.redirect('/account?flash=' + encodeURIComponent(
+      res.redirect('/account/usenet?flash=' + encodeURIComponent(
         'Native NNTP connection failed: ' + security.safeErrorMessage(error)));
     }
   });
@@ -2771,6 +2768,7 @@ function secretField(label, name, value, placeholder) {
 function renderAccountPage(user, opts) {
   opts = opts || {};
   const cfg = user.config || {};
+  const diyStatus = diyUsenetStatus.status(cfg);
   const apiToken = user.apiToken || '';
   const installPath = '/u/' + user.id + '/' + apiToken + '/manifest.json';
   const installUrl = (opts.origin || '') + installPath;
@@ -2897,10 +2895,9 @@ function renderAccountPage(user, opts) {
     +       '<div class="wide"><label class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" name="uuEnabled" value="on"' + (cfg.uuEnabled !== false ? ' checked' : '') + '><span class="form-check-label"><strong>Enable Usenet Ultimate stream rows</strong></span></label><p class="text-secondary small mb-2">When disabled, the DIY pipeline may still use UU for text search, but UU’s own playback rows are hidden.</p><label class="form-label" for="uu-url">Usenet Ultimate manifest URL</label><input class="form-control text-mono" type="url" id="uu-url" name="uuManifestUrl" value="' + escapeHtml(cfg.uuManifestUrl || '') + '" placeholder="https://your-uu.example/stremio/&lt;config&gt;/manifest.json"></div>'
     +     '</div>'
     +   '</div></section>'
-    +   (isAdmin ? '<details class="config-fold"><summary>DIY Usenet pipeline</summary><div class="config-fold-body">'
-    +     '<p class="text-secondary small mb-3">Your own indexer and playback backend, for events the shared pipelines miss. '
-    +       'The switch below turns it on; its thirty-odd settings live on their own page so they do not bury the rest of this one.</p>'
-    +     '<label class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" name="diyUsenetEnabled" value="on"' + (cfg.diyUsenetEnabled === true ? ' checked' : '') + '><span class="form-check-label"><strong>Enable the DIY Usenet pipeline</strong></span></label>'
+    +   (isAdmin ? '<details class="config-fold"><summary>DIY Usenet <span class="badge ms-2 ' + (diyStatus.ready ? 'bg-green-lt' : 'bg-secondary-lt') + '">' + (diyStatus.ready ? 'Ready' : 'Setup needed') + '</span></summary><div class="config-fold-body">'
+    +     '<p class="text-secondary small mb-3">Your own Usenet search and playback backends for events the shared pipelines miss. Enable, test, and manage each part on its dedicated page.</p>'
+    +     '<div class="d-flex flex-wrap gap-2 mb-3"><span class="badge ' + (diyStatus.discovery ? 'bg-green-lt' : 'bg-secondary-lt') + '">Discovery ' + (diyStatus.discovery ? 'ready' : 'not ready') + '</span><span class="badge ' + (diyStatus.nzbdav ? 'bg-green-lt' : 'bg-secondary-lt') + '">NZB DAV ' + (diyStatus.nzbdav ? 'ready' : 'off') + '</span><span class="badge ' + (diyStatus.nntp ? 'bg-green-lt' : 'bg-secondary-lt') + '">Native NNTP ' + (diyStatus.nntp ? 'ready' : 'off') + '</span></div>'
     +     '<a class="btn btn-outline-primary" href="/account/usenet">Open DIY Usenet settings</a>'
     +   '</div></details>' : '')
     +   '<details class="config-fold"><summary>Catalogs and display order</summary>' + catalogsPanel + '</details>'

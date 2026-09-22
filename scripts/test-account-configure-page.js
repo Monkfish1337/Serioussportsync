@@ -179,7 +179,6 @@ function listen(app) {
       'name="easynewsPassword"',
       'name="uuManifestUrl"',
       'name="uuEnabled"',
-      'name="diyUsenetEnabled"',
       'name="maxStreams"',
       'name="showWarmRows"',
       'name="promotionOrder"',
@@ -206,14 +205,15 @@ function listen(app) {
       assert.ok(!html.includes(removed), 'account page omits ' + removed);
     }
 
-    // The DIY Usenet pipeline moved to its own page in 0.89.1; Configure keeps
-    // only the switch. Everything that moved is asserted where it now lives.
+    // The DIY Usenet pipeline owns all of its switches and settings on one
+    // page. Configure only reports readiness and links to it.
     const usenet = await fetch(base + '/account/usenet', { headers: { Cookie: cookie } });
     assert.strictEqual(usenet.status, 200, 'DIY Usenet page is available');
     const usenetHtml = await usenet.text();
     for (const expected of [
       '1. Discover', '2. Match', '3. Play',
       'Search and candidate discovery', 'Playback backends',
+      'name="diyUsenetEnabled"', 'Overall', 'Discovery',
       'name="diyNativeSearchEnabled"', 'name="diyUuSearchEnabled"',
       'name="diySearchKind"', 'name="diySearchUrl"', 'name="diySearchApiKey"',
       'Test native search', 'name="nzbdavUrl"', 'name="nzbdavApiKey"',
@@ -340,6 +340,7 @@ function listen(app) {
       method: 'POST', redirect: 'manual',
       headers: { Cookie: cookie, Origin: 'null', 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
+        diyUsenetEnabled: 'on',
         diyNativeSearchEnabled: 'on',
         diyUuSearchEnabled: 'on',
         diySearchKind: 'newznab',
@@ -451,6 +452,7 @@ function listen(app) {
       method: 'POST', redirect: 'manual',
       headers: { Cookie: cookie, Origin: 'null', 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
+        diyUsenetEnabled: 'on',
         diySearchKind: 'newznab', diySearchName: 'Test Hydra',
         diySearchUrl: 'https://hydra.example', diySearchApiKey: 'test-search-api-secret',
         nntpHost: 'news.example', nntpPort: '563', nntpUsername: 'nntp-user',
