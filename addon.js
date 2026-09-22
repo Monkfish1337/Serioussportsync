@@ -566,6 +566,7 @@ function createApp() {
     const body = accountUsenetPage.renderBody({
       cfg: req.user.config || {},
       engine: settings.getUsenetEngine(),
+      diyPlaybackOrigin: settings.getDiyPlaybackOrigin(),
       runtime: nntpPlayback.telemetry.snapshot(),
       pools: nntpPool.snapshot(),
       flash: req.query.flash || null,
@@ -618,6 +619,15 @@ function createApp() {
       settings.setUsenetEngine(String(input.profile || '') !== current.profile
         ? { profile: input.profile } : input);
       res.redirect('/admin/usenet?flash=' + encodeURIComponent('Native engine settings saved. New streams use them immediately.'));
+    } catch (error) {
+      res.redirect('/admin/usenet?flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(error)));
+    }
+  });
+
+  app.post('/admin/usenet/playback-origin', requireAdmin, (req, res) => {
+    try {
+      settings.setDiyPlaybackOrigin((req.body || {}).diyPlaybackOrigin);
+      res.redirect('/admin/usenet?flash=' + encodeURIComponent('DIY playback address saved. New stream links use it immediately.'));
     } catch (error) {
       res.redirect('/admin/usenet?flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(error)));
     }

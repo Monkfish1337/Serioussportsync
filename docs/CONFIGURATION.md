@@ -69,6 +69,13 @@ standalone pipeline (a per-user manifest URL to your own UU instance). Built-in
 Usenet is a separate pipeline that uses a native indexer connection and a direct
 NNTP provider connection; it does not require a helper container.
 
+For a Cloudflare-installed addon used on the same Wi-Fi as the server, set
+**Built-in Usenet → DIY playback on your LAN** to the LAN address of SSS
+(for example `http://192.168.1.16:7000`). Native NNTP stream rows then use
+that address regardless of where the addon manifest was installed. These rows
+are LAN-only; away from home, choose an Easynews or torrent result instead.
+Leave the field blank to use the manifest's address for native playback.
+
 ## Smart Availability
 
 The **Database** page provides live status and lets an administrator choose
