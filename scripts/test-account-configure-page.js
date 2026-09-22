@@ -51,13 +51,13 @@ function listen(app) {
     const regular = await users.createUser({username:'restricted-test',password,role:'user'});
     const regularLogin = await fetch(base+'/login',{method:'POST',redirect:'manual',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({username:regular.username,password}).toString()});
     const regularCookie = regularLogin.headers.get('set-cookie').split(';',1)[0];
-    for (const route of ['/account/usenet','/account/usenet/save','/account/test-diy-search','/account/test-nntp','/account/test-nzbdav']) {
+    for (const route of ['/account/usenet','/account/usenet/save','/account/test-diy-search','/account/test-nntp']) {
       const response = await fetch(base+route,{method:route==='/account/usenet'?'GET':'POST',headers:{Cookie:regularCookie}});
       assert.strictEqual(response.status,403,'regular users cannot access '+route);
     }
     const restrictedPage = await fetch(base+'/account',{headers:{Cookie:regularCookie}});
     const restrictedHtml = await restrictedPage.text();
-    assert.ok(restrictedHtml.includes('DIY Usenet is admin only'));
+    assert.ok(restrictedHtml.includes('Built-in Usenet is admin only'));
     assert.ok(!restrictedHtml.includes('href="/account/usenet"'));
     const forgedSave = await fetch(base+'/account/save',{method:'POST',redirect:'manual',headers:{Cookie:regularCookie,'Content-Type':'application/x-www-form-urlencoded'},body:'diyUsenetEnabled=on'});
     assert.strictEqual(forgedSave.status,302);
@@ -177,13 +177,11 @@ function listen(app) {
       'name="easynewsUsername"',
       'name="easynewsEnabled"',
       'name="easynewsPassword"',
-      'name="uuManifestUrl"',
-      'name="uuEnabled"',
       'name="diyUsenetEnabled"',
       'name="maxStreams"',
       'name="showWarmRows"',
       'name="promotionOrder"',
-      'Open DIY Usenet settings',
+      'Open Built-in Usenet settings',
       'Your teams',
       'Catalogs',
       'Install',
@@ -206,22 +204,21 @@ function listen(app) {
       assert.ok(!html.includes(removed), 'account page omits ' + removed);
     }
 
-    // Configure has the quick NZB DAV switch; the dedicated page also owns it
-    // and contains every detailed search and playback setting.
+    // Configure has the quick Built-in Usenet switch; the dedicated page also
+    // owns it and contains every detailed search and playback setting.
     const usenet = await fetch(base + '/account/usenet', { headers: { Cookie: cookie } });
-    assert.strictEqual(usenet.status, 200, 'DIY Usenet page is available');
+    assert.strictEqual(usenet.status, 200, 'Built-in Usenet page is available');
     const usenetHtml = await usenet.text();
     for (const expected of [
       '1. Discover', '2. Match', '3. Play',
-      'Search and candidate discovery', 'Playback backends',
-      'name="diyUsenetEnabled"', 'name="nzbdavEnabled"', 'Overall', 'Discovery',
-      'name="diyNativeSearchEnabled"', 'name="diyUuSearchEnabled"',
+      'Search and candidate discovery', 'Native NNTP playback',
+      'name="diyUsenetEnabled"', 'Overall', 'Discovery',
+      'name="diyNativeSearchEnabled"',
       'name="diySearchKind"', 'name="diySearchUrl"', 'name="diySearchApiKey"',
-      'Test native search', 'name="nzbdavUrl"', 'name="nzbdavApiKey"',
-      'name="nzbdavWebdavUrl"', 'name="nativeNntpEnabled"',
+      'Test native search', 'name="nativeNntpEnabled"',
       'name="nntpHost"', 'name="nntpPassword"',
       'action="/account/usenet/save"',
-    ]) assert.ok(usenetHtml.includes(expected), 'DIY Usenet page includes ' + expected);
+    ]) assert.ok(usenetHtml.includes(expected), 'Built-in Usenet page includes ' + expected);
 
     const database = await fetch(base + '/admin/database', { headers: { Cookie: cookie } });
     assert.strictEqual(database.status, 200, 'Database page is available to admins');
@@ -323,8 +320,6 @@ function listen(app) {
         easynewsEnabled: 'on',
         easynewsUsername: 'test-easynews-user',
         easynewsPassword: 'test-easynews-password',
-        uuEnabled: 'on',
-        uuManifestUrl: 'https://uu.example/private/manifest.json',
         diyUsenetEnabled: 'on',
         catalogs: firstCatalog,
         catalogOrder: firstCatalog,
@@ -342,18 +337,11 @@ function listen(app) {
       headers: { Cookie: cookie, Origin: 'null', 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         diyUsenetEnabled: 'on',
-        nzbdavEnabled: 'on',
         diyNativeSearchEnabled: 'on',
-        diyUuSearchEnabled: 'on',
         diySearchKind: 'newznab',
         diySearchName: 'Test Hydra',
         diySearchUrl: 'https://hydra.example',
         diySearchApiKey: 'test-search-api-secret',
-        nzbdavUrl: 'https://dav.example',
-        nzbdavApiKey: 'test-nzbdav-api-secret',
-        nzbdavWebdavUrl: 'https://dav.example',
-        nzbdavWebdavUsername: 'dav-user',
-        nzbdavWebdavPassword: 'test-webdav-secret',
         nativeNntpEnabled: 'on',
         nntpHost: 'news.example',
         nntpPort: '563',
@@ -363,7 +351,7 @@ function listen(app) {
         nntpConnections: '12',
       }).toString(),
     });
-    assert.strictEqual(usenetSave.status, 302, 'DIY Usenet settings save');
+    assert.strictEqual(usenetSave.status, 302, 'Built-in Usenet settings save');
 
     assert.strictEqual(save.status, 302, 'installed-app null-origin form saves successfully');
     assert.strictEqual(save.headers.get('location'), '/account?flash=saved&step=0');
@@ -373,19 +361,11 @@ function listen(app) {
     assert.strictEqual(saved.easynewsEnabled, true);
     assert.strictEqual(saved.easynewsUsername, 'test-easynews-user');
     assert.strictEqual(saved.easynewsPassword, 'test-easynews-password');
-    assert.strictEqual(saved.uuManifestUrl, 'https://uu.example/private/manifest.json');
-    assert.strictEqual(saved.uuEnabled, true);
     assert.strictEqual(saved.diyUsenetEnabled, true);
-    assert.strictEqual(saved.nzbdavEnabled, true);
     assert.strictEqual(saved.diyNativeSearchEnabled, true);
-    assert.strictEqual(saved.diyUuSearchEnabled, true);
     assert.strictEqual(saved.diySearchKind, 'newznab');
     assert.strictEqual(saved.diySearchUrl, 'https://hydra.example');
     assert.strictEqual(saved.diySearchApiKey, 'test-search-api-secret');
-    assert.strictEqual(saved.nzbdavUrl, 'https://dav.example');
-    assert.strictEqual(saved.nzbdavApiKey, 'test-nzbdav-api-secret');
-    assert.strictEqual(saved.nzbdavWebdavUsername, 'dav-user');
-    assert.strictEqual(saved.nzbdavWebdavPassword, 'test-webdav-secret');
     assert.strictEqual(saved.nativeNntpEnabled, true);
     assert.strictEqual(saved.nntpHost, 'news.example');
     assert.strictEqual(saved.nntpTls, true);
@@ -396,13 +376,9 @@ function listen(app) {
     assert.ok(!usersOnDisk.includes(user.apiToken), 'install/API token is encrypted at rest');
     assert.strictEqual(users.findByApiToken(user.id, user.apiToken).id, user.id,
       'encrypted-at-rest install token still authenticates');
-    assert.ok(!usersOnDisk.includes('test-nzbdav-api-secret'));
-    assert.ok(!usersOnDisk.includes('test-webdav-secret'));
     assert.ok(!usersOnDisk.includes('test-search-api-secret'));
     assert.ok(!usersOnDisk.includes('test-nntp-secret'));
-    assert.ok(!usersOnDisk.includes('https://uu.example/private/manifest.json'));
     assert.ok(!usersOnDisk.includes('test-easynews-user'));
-    assert.ok(!usersOnDisk.includes('dav-user'));
     assert.ok(!usersOnDisk.includes('nntp-user'));
     assert.deepStrictEqual(saved.catalogs, [firstCatalog]);
     assert.strictEqual(saved.maxStreams, 7);
@@ -420,13 +396,7 @@ function listen(app) {
         torboxApiKey: 'test-torbox-key',
         easynewsUsername: 'test-easynews-user',
         easynewsPassword: 'test-easynews-password',
-        uuManifestUrl: 'https://uu.example/private/manifest.json',
         diyUsenetEnabled: 'on',
-        nzbdavUrl: 'https://dav.example',
-        nzbdavApiKey: 'test-nzbdav-api-secret',
-        nzbdavWebdavUrl: 'https://dav.example',
-        nzbdavWebdavUsername: 'dav-user',
-        nzbdavWebdavPassword: 'test-webdav-secret',
         nntpHost: 'news.example',
         nntpPort: '563',
         nntpTls: 'on',
@@ -438,7 +408,6 @@ function listen(app) {
     assert.strictEqual(disableLegacy.status, 302);
     const isolated = users.findById(user.id).config;
     assert.strictEqual(isolated.torboxEnabled, false);
-    assert.strictEqual(isolated.uuEnabled, false);
     assert.strictEqual(isolated.easynewsEnabled, false);
     assert.strictEqual(isolated.diyUsenetEnabled, true);
     // Configure no longer owns this switch, so a Configure save must leave it
@@ -447,7 +416,6 @@ function listen(app) {
       'Configure does not touch settings that moved to the DIY Usenet page');
     assert.strictEqual(isolated.torboxApiKey, 'test-torbox-key', 'disabling preserves TorBox credentials');
     assert.strictEqual(isolated.easynewsPassword, 'test-easynews-password', 'disabling preserves Easynews credentials');
-    assert.strictEqual(isolated.uuManifestUrl, 'https://uu.example/private/manifest.json', 'disabling preserves UU configuration');
     assert.strictEqual(isolated.nntpPassword, 'test-nntp-secret', 'disabling preserves NNTP credentials');
 
     // Turning NNTP off happens on its own page now, and must keep the password.
@@ -456,7 +424,6 @@ function listen(app) {
       headers: { Cookie: cookie, Origin: 'null', 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         diyUsenetEnabled: 'on',
-        nzbdavEnabled: 'on',
         diySearchKind: 'newznab', diySearchName: 'Test Hydra',
         diySearchUrl: 'https://hydra.example', diySearchApiKey: 'test-search-api-secret',
         nntpHost: 'news.example', nntpPort: '563', nntpUsername: 'nntp-user',
