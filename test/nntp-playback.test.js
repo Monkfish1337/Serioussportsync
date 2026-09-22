@@ -148,6 +148,44 @@ test('serves an exact HTTP byte range assembled from yEnc articles', async () =>
   } finally { await close(server); }
 });
 
+test('writes the first article while later read-ahead articles are still downloading', async () => {
+  const { EventEmitter } = require('events');
+  const descriptor = {
+    id: 'rolling', filename: 'main.mkv', size: 12, chunkSize: 4,
+    segments: [{ messageId: 'one' }, { messageId: 'two' }, { messageId: 'three' }],
+    firstPart: { data: Buffer.from('ABCD'), begin: 0, endExclusive: 4, totalSize: 12 },
+  };
+  const releases = {};
+  const started = [];
+  const response = new EventEmitter();
+  response.headers = {};
+  response.setHeader = (key, value) => { response.headers[key] = value; };
+  response.write = (chunk) => { response.writes.push(chunk.toString()); return true; };
+  response.end = () => { response.writableEnded = true; };
+  response.writes = [];
+  const served = playback.serve({ method: 'GET', headers: {} }, response, descriptor, {
+    enabled: true, host: 'news.example', port: 563, maxConnections: 2,
+    startupSegments: 1, prefetchSegments: 2, timeoutMs: 5000,
+  }, {
+    connect: async () => ({
+      body: async (id) => {
+        started.push(id);
+        return new Promise((resolve) => { releases[id] = resolve; });
+      },
+      close() {}, destroy() {},
+    }),
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(response.writes, ['ABCD']);
+  assert.deepEqual(started.sort(), ['three', 'two']);
+  releases.two(encodedPart(Buffer.from('EFGH'), 4, 12, 'main.mkv'));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(response.writes, ['ABCD', 'EFGH']);
+  releases.three(encodedPart(Buffer.from('IJKL'), 8, 12, 'main.mkv'));
+  await served;
+  assert.deepEqual(response.writes, ['ABCD', 'EFGH', 'IJKL']);
+});
+
 test('rejects archive-only NZBs with an explicit NZB DAV fallback message', async () => {
   const xml = Buffer.from('<nzb><file subject="&quot;release.part01.rar&quot; yEnc"><segments>'
     + '<segment bytes="100" number="1">one@id</segment></segments></file></nzb>');

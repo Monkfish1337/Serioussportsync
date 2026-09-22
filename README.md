@@ -155,15 +155,17 @@ is submitted only when a user selects **Warm to TorBox**.
 
 Native DIY search and UU search can be enabled independently or merged, and UU
 is no longer required for DIY playback when native search is configured. The
-**DIY Usenet** page presents this as two stages: search and candidate
-discovery, then playback backends. It owns every detailed setting and shows
-separate readiness for discovery, NZB DAV and native NNTP; the main Configure
-page provides the master pipeline switch. A usable pipeline requires at least one ready
+admin **Usenet** page presents this as two stages: search and candidate
+discovery, then playback backends. It owns the provider credentials, migration
+fallbacks, native performance profiles, connection state, first-byte timing,
+throughput, retries and recent playback results; Configure keeps the master
+pipeline switch. A usable pipeline requires at least one ready
 discovery source and one ready playback backend. New NNTP configurations default to 20
-connections, pre-authenticate their pool after resolution, and pipeline bounded
-read windows to reduce startup and seek latency; set a lower limit when the
-provider requires one. Compressed or encrypted RAR files and 7z releases
-continue through the NZB DAV row.
+connections, pre-authenticate their pool after resolution, fetch one segment for
+startup and then pipeline a bounded read-ahead window. The page offers Balanced,
+Low latency and Resilient profiles plus bounded advanced controls. Compressed or
+encrypted RAR files and 7z releases continue through the NZB DAV row during the
+native-engine migration.
 
 > **Usenet Ultimate compatibility:** direct sports-title search requires the
 > endpoint proposed in [Usenet Ultimate PR #46](https://github.com/DSmart33/Usenet-Ultimate/pull/46).

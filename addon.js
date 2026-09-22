@@ -35,6 +35,7 @@ const nzbdavWebdav = require('./lib/sources/nzbdav-webdav');
 const usenetIndexer = require('./lib/sources/usenet-indexer');
 const nntpClient = require('./lib/sources/nntp-client');
 const nntpPlayback = require('./lib/sources/nntp-playback');
+const nntpPool = require('./lib/sources/nntp-pool');
 const availabilityStore = require('./lib/availability-index');
 const availabilityWarmer = require('./lib/availability-warmer');
 const availabilityScheduler = require('./lib/availability-scheduler');
@@ -562,21 +563,26 @@ function createApp() {
   });
 
   // --- DIY Usenet, on its own page -----------------------------------
-  app.get('/account/usenet', requireAdmin, (req, res) => {
+  const renderUsenetPage = (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
     const body = accountUsenetPage.renderBody({
       cfg: req.user.config || {},
+      engine: settings.getUsenetEngine(),
+      runtime: nntpPlayback.telemetry.snapshot(),
+      pools: nntpPool.snapshot(),
       flash: req.query.flash || null,
       escapeHtml,
       secretField,
     });
-    res.send(tablerChrome.tablerPage('DIY Usenet', body, {
+    res.send(tablerChrome.tablerPage('Usenet', body, {
       user: req.user, currentSection: 'usenet',
     }));
-  });
+  };
+  app.get('/account/usenet', requireAdmin, renderUsenetPage);
+  app.get('/admin/usenet', requireAdmin, renderUsenetPage);
 
-  app.post('/account/usenet/save', requireAdmin, (req, res) => {
+  const saveUsenetPage = (req, res) => {
     const b = req.body || {};
     try {
       users.updateUserConfig(req.user.id, {
@@ -588,6 +594,14 @@ function createApp() {
           || b.diyNativeSearchEnabled === '1' || b.diyNativeSearchEnabled === 'true',
         diyUuSearchEnabled: b.diyUuSearchEnabled === 'on'
           || b.diyUuSearchEnabled === '1' || b.diyUuSearchEnabled === 'true',
+        uuEnabled: b.uuEnabled === undefined
+          ? req.user.config.uuEnabled !== false
+          : (b.uuEnabled === 'on' || b.uuEnabled === '1' || b.uuEnabled === 'true'),
+        uuManifestUrl: b.uuManifestUrl === undefined
+          ? String(req.user.config.uuManifestUrl || '')
+          : security.cleanHttpUrl(b.uuManifestUrl, {
+            label: 'Usenet Ultimate manifest URL', allowSensitiveQuery: true,
+          }),
         diySearchKind: String(b.diySearchKind || '') === 'prowlarr' ? 'prowlarr' : 'newznab',
         diySearchName: String(b.diySearchName || '').trim().slice(0, 80),
         diySearchUrl: security.cleanHttpUrl(b.diySearchUrl, { label: 'Search URL' }),
@@ -607,10 +621,31 @@ function createApp() {
         nntpConnections: Math.min(50, Math.max(1,
           parseInt(String(b.nntpConnections || '20'), 10) || 20)),
       });
-      res.redirect('/account/usenet?flash=' + encodeURIComponent('DIY Usenet settings saved.'));
+      res.redirect('/admin/usenet?flash=' + encodeURIComponent('Usenet settings saved.'));
     } catch (err) {
-      res.redirect('/account/usenet?flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(err)));
+      res.redirect('/admin/usenet?flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(err)));
     }
+  };
+  app.post('/account/usenet/save', requireAdmin, saveUsenetPage);
+  app.post('/admin/usenet/save', requireAdmin, saveUsenetPage);
+
+  app.post('/admin/usenet/engine', requireAdmin, (req, res) => {
+    try {
+      const input = req.body || {};
+      const current = settings.getUsenetEngine();
+      // Choosing another named profile applies that profile's complete safe
+      // defaults. A second save can then tune individual advanced fields.
+      settings.setUsenetEngine(String(input.profile || '') !== current.profile
+        ? { profile: input.profile } : input);
+      res.redirect('/admin/usenet?flash=' + encodeURIComponent('Native engine settings saved. New streams use them immediately.'));
+    } catch (error) {
+      res.redirect('/admin/usenet?flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(error)));
+    }
+  });
+
+  app.post('/admin/usenet/stats/reset', requireAdmin, (req, res) => {
+    nntpPlayback.telemetry.reset();
+    res.redirect('/admin/usenet?flash=' + encodeURIComponent('Usenet runtime statistics reset.'));
   });
 
   app.post('/account/save', requireLogin, (req, res) => {
@@ -867,6 +902,7 @@ function createApp() {
           .send('Resolve link ' + v.reason + '. Close and re-open the event in your client.');
       }
       try {
+        const resolveStartedAt = Date.now();
         const out = await resolvePlay({
           providerCode: provider,
           eventId,
@@ -887,6 +923,9 @@ function createApp() {
             + req.method + range);
           return await nntpPlayback.serve(req, res,
             out.nativeNntp.descriptor, out.nativeNntp.config, {
+              user: req.userAccount.username,
+              eventId,
+              startedAt: resolveStartedAt,
               log: (message) => console.log('[resolve ' + req.userAccount.username + '] ' + message),
             });
         }

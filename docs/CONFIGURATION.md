@@ -101,9 +101,17 @@ should normally be managed from **Metadata**, **Promotions**, and
 | `LOG_REJECTION_SAMPLE_LIMIT` | `4` | Rejected titles retained per exclusion reason when full detail is off. |
 | `LOG_BUFFER_MAX_BYTES` | `5242880` | Maximum memory used by the live structured log buffer before its oldest entries are discarded. |
 
-TorBox, Easynews and Usenet Ultimate settings are account-scoped and belong on
-the signed-in **Account** page. Administrator-only native indexer, NZB DAV and
-NNTP settings live on **Account → DIY Usenet**.
+TorBox and Easynews settings are account-scoped and belong on the signed-in
+**Account** page. The administrator-only **Usenet** page contains native
+Newznab/Prowlarr search, native NNTP, the NZB DAV migration fallback, the legacy
+Usenet Ultimate manifest, live connection state and native engine tuning.
+
+The Balanced native profile starts playback after one article and reads 24
+articles ahead once data is flowing. Low latency uses a smaller read-ahead;
+Resilient waits for two startup articles and uses a larger buffer with more
+retries. Keep the provider connection limit at or below the allowance on the
+NNTP plan. Recent playback rows show end-to-end first-byte time, including NZB
+download and archive inspection, so changes can be compared rather than guessed.
 
 ## Smart Availability
 
