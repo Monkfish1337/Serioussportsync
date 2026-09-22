@@ -29,9 +29,6 @@ const { runRefresh: runEventsRefresh } = require('./scripts/refresh');
 const promotions = require('./lib/promotions');
 const users = require('./lib/users');
 const sessions = require('./lib/sessions');
-const { proxyWebdav } = require('./lib/webdav-proxy');
-const nzbdavClient = require('./lib/sources/nzbdav');
-const nzbdavWebdav = require('./lib/sources/nzbdav-webdav');
 const usenetIndexer = require('./lib/sources/usenet-indexer');
 const nntpClient = require('./lib/sources/nntp-client');
 const nntpPlayback = require('./lib/sources/nntp-playback');
@@ -588,29 +585,12 @@ function createApp() {
       users.updateUserConfig(req.user.id, {
         diyUsenetEnabled: b.diyUsenetEnabled === 'on'
           || b.diyUsenetEnabled === '1' || b.diyUsenetEnabled === 'true',
-        nzbdavEnabled: b.nzbdavEnabled === 'on'
-          || b.nzbdavEnabled === '1' || b.nzbdavEnabled === 'true',
         diyNativeSearchEnabled: b.diyNativeSearchEnabled === 'on'
           || b.diyNativeSearchEnabled === '1' || b.diyNativeSearchEnabled === 'true',
-        diyUuSearchEnabled: b.diyUuSearchEnabled === 'on'
-          || b.diyUuSearchEnabled === '1' || b.diyUuSearchEnabled === 'true',
-        uuEnabled: b.uuEnabled === undefined
-          ? req.user.config.uuEnabled !== false
-          : (b.uuEnabled === 'on' || b.uuEnabled === '1' || b.uuEnabled === 'true'),
-        uuManifestUrl: b.uuManifestUrl === undefined
-          ? String(req.user.config.uuManifestUrl || '')
-          : security.cleanHttpUrl(b.uuManifestUrl, {
-            label: 'Usenet Ultimate manifest URL', allowSensitiveQuery: true,
-          }),
         diySearchKind: String(b.diySearchKind || '') === 'prowlarr' ? 'prowlarr' : 'newznab',
         diySearchName: String(b.diySearchName || '').trim().slice(0, 80),
         diySearchUrl: security.cleanHttpUrl(b.diySearchUrl, { label: 'Search URL' }),
         diySearchApiKey: String(b.diySearchApiKey || ''),
-        nzbdavUrl: security.cleanHttpUrl(b.nzbdavUrl, { label: 'NZB DAV API URL' }),
-        nzbdavApiKey: String(b.nzbdavApiKey || ''),
-        nzbdavWebdavUrl: security.cleanHttpUrl(b.nzbdavWebdavUrl, { label: 'NZB DAV WebDAV URL' }),
-        nzbdavWebdavUsername: String(b.nzbdavWebdavUsername || '').trim(),
-        nzbdavWebdavPassword: String(b.nzbdavWebdavPassword || ''),
         nativeNntpEnabled: b.nativeNntpEnabled === 'on'
           || b.nativeNntpEnabled === '1' || b.nativeNntpEnabled === 'true',
         nntpHost: String(b.nntpHost || '').trim(),
@@ -676,7 +656,7 @@ function createApp() {
     const maxStreamsRaw = parseInt(String(b.maxStreams || '0'), 10);
     const maxStreams = (Number.isFinite(maxStreamsRaw) && maxStreamsRaw >= 0 && maxStreamsRaw <= 20) ? maxStreamsRaw : 0;
     try {
-      // 0.33.0: active backend fields are uuManifestUrl + torboxApiKey.
+      // 0.33.0: active backend field is torboxApiKey.
       // 0.34.0: Easynews creds drive Pipeline C (direct Easynews search).
       // 0.36.0: dropped the rd / tb / pm / autoCache* hidden-input passthrough.
       // Old values (if any) stay in users.json — updateUserConfig only patches
@@ -686,13 +666,8 @@ function createApp() {
       users.updateUserConfig(req.user.id, {
         torboxEnabled: b.torboxEnabled === 'on'
           || b.torboxEnabled === '1' || b.torboxEnabled === 'true',
-        uuEnabled: b.uuEnabled === 'on'
-          || b.uuEnabled === '1' || b.uuEnabled === 'true',
         easynewsEnabled: b.easynewsEnabled === 'on'
           || b.easynewsEnabled === '1' || b.easynewsEnabled === 'true',
-        uuManifestUrl: security.cleanHttpUrl(b.uuManifestUrl, {
-          label: 'Usenet Ultimate manifest URL', allowSensitiveQuery: true,
-        }),
         torboxApiKey: String(b.torboxApiKey || '').trim(),
         easynewsUsername: String(b.easynewsUsername || '').trim(),
         easynewsPassword: String(b.easynewsPassword || ''),
@@ -723,25 +698,6 @@ function createApp() {
       res.redirect('/account?flash=saved&step=' + step);
     } catch (err) {
       res.redirect('/account?flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(err)));
-    }
-  });
-
-  app.post('/account/test-nzbdav', requireAdmin, async (req, res) => {
-    const b = req.body || {};
-    try {
-      const api = await nzbdavClient.testConnection({
-        url: String(b.nzbdavUrl || '').trim(),
-        apiKey: String(b.nzbdavApiKey || ''),
-      });
-      if (!api.ok) throw new Error('API check failed: ' + api.error);
-      await nzbdavWebdav.list({
-        url: String(b.nzbdavWebdavUrl || b.nzbdavUrl || '').trim(),
-        username: String(b.nzbdavWebdavUsername || ''),
-        password: String(b.nzbdavWebdavPassword || ''),
-      }, '/');
-      res.redirect('/account/usenet?flash=' + encodeURIComponent('NZB DAV API and WebDAV connected'));
-    } catch (error) {
-      res.redirect('/account/usenet?flash=' + encodeURIComponent('NZB DAV connection failed: ' + security.safeErrorMessage(error)));
     }
   });
 
@@ -888,7 +844,7 @@ function createApp() {
     const urlSign = require('./lib/url-sign');
     r.get('/resolve/:provider/:eventId/:infoHash', async (req, res) => {
       const { provider, eventId, infoHash } = req.params;
-      if (['nzbdav','nntp'].includes(provider) && req.userAccount.role !== 'admin') return res.status(403).send('DIY Usenet is available to administrators only.');
+      if (provider === 'nntp' && req.userAccount.role !== 'admin') return res.status(403).send('Built-in Usenet is available to administrators only.');
       const v = urlSign.verifyResolve({
         userId: req.params.userId,
         provider, eventId, infoHash,
@@ -911,12 +867,6 @@ function createApp() {
           username: req.userAccount.username,
           userId: req.params.userId,
         });
-        if (out && out.upstream) {
-          const range = req.headers.range ? ' ' + String(req.headers.range) : '';
-          console.log('[resolve ' + req.userAccount.username + '] webdav proxy '
-            + req.method + range);
-          return await proxyWebdav(req, res, out.upstream);
-        }
         if (out && out.nativeNntp) {
           const range = req.headers.range ? ' ' + String(req.headers.range) : '';
           console.log('[resolve ' + req.userAccount.username + '] native nntp '
@@ -2937,14 +2887,13 @@ function renderAccountPage(user, opts) {
     +       '<div class="wide"><label class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" name="easynewsEnabled" value="on"' + (cfg.easynewsEnabled !== false ? ' checked' : '') + '><span class="form-check-label"><strong>Enable Easynews pipeline</strong></span></label><p class="text-secondary small mb-2">Turning it off preserves both credentials.</p></div>'
     +       '<div><label class="form-label" for="en-user">Easynews username</label><input class="form-control" type="text" id="en-user" name="easynewsUsername" value="' + escapeHtml(cfg.easynewsUsername || '') + '" autocomplete="off"></div>'
     +       '<div>' + secretField('Easynews password', 'easynewsPassword', cfg.easynewsPassword, 'your Easynews password') + '</div>'
-    +       '<div class="wide"><label class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" name="uuEnabled" value="on"' + (cfg.uuEnabled !== false ? ' checked' : '') + '><span class="form-check-label"><strong>Enable Usenet Ultimate stream rows</strong></span></label><p class="text-secondary small mb-2">When disabled, the DIY pipeline may still use UU for text search, but UU’s own playback rows are hidden.</p><label class="form-label" for="uu-url">Usenet Ultimate manifest URL</label><input class="form-control text-mono" type="url" id="uu-url" name="uuManifestUrl" value="' + escapeHtml(cfg.uuManifestUrl || '') + '" placeholder="https://your-uu.example/stremio/&lt;config&gt;/manifest.json"></div>'
     +     '</div>'
     +   '</div></section>'
-    +   (isAdmin ? '<details class="config-fold"><summary>DIY Usenet <span class="badge ms-2 ' + (diyStatus.ready ? 'bg-green-lt' : 'bg-secondary-lt') + '">' + (diyStatus.ready ? 'Ready' : 'Setup needed') + '</span></summary><div class="config-fold-body">'
-    +     '<p class="text-secondary small mb-3">Your own Usenet search and playback backends for events the shared pipelines miss. Enable, test, and manage each part on its dedicated page.</p>'
-    +     '<div class="d-flex flex-wrap gap-2 mb-3"><span class="badge ' + (diyStatus.discovery ? 'bg-green-lt' : 'bg-secondary-lt') + '">Discovery ' + (diyStatus.discovery ? 'ready' : 'not ready') + '</span><span class="badge ' + (diyStatus.nzbdav ? 'bg-green-lt' : 'bg-secondary-lt') + '">NZB DAV ' + (diyStatus.nzbdav ? 'ready' : 'off') + '</span><span class="badge ' + (diyStatus.nntp ? 'bg-green-lt' : 'bg-secondary-lt') + '">Native NNTP ' + (diyStatus.nntp ? 'ready' : 'off') + '</span></div>'
-    +     '<label class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" name="diyUsenetEnabled" value="on"' + (cfg.diyUsenetEnabled === true ? ' checked' : '') + '><span class="form-check-label"><strong>Enable the DIY Usenet pipeline</strong></span></label>'
-    +     '<a class="btn btn-outline-primary" href="/account/usenet">Open DIY Usenet settings</a>'
+    +   (isAdmin ? '<details class="config-fold"><summary>Built-in Usenet <span class="badge ms-2 ' + (diyStatus.ready ? 'bg-green-lt' : 'bg-secondary-lt') + '">' + (diyStatus.ready ? 'Ready' : 'Setup needed') + '</span></summary><div class="config-fold-body">'
+    +     '<p class="text-secondary small mb-3">Your own native indexer and NNTP provider for events the shared pipelines miss — no helper container required. Enable, test, and manage both parts on the dedicated page.</p>'
+    +     '<div class="d-flex flex-wrap gap-2 mb-3"><span class="badge ' + (diyStatus.discovery ? 'bg-green-lt' : 'bg-secondary-lt') + '">Discovery ' + (diyStatus.discovery ? 'ready' : 'not ready') + '</span><span class="badge ' + (diyStatus.playback ? 'bg-green-lt' : 'bg-secondary-lt') + '">Native NNTP ' + (diyStatus.playback ? 'ready' : 'off') + '</span></div>'
+    +     '<label class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" name="diyUsenetEnabled" value="on"' + (cfg.diyUsenetEnabled === true ? ' checked' : '') + '><span class="form-check-label"><strong>Enable the Built-in Usenet pipeline</strong></span></label>'
+    +     '<a class="btn btn-outline-primary" href="/account/usenet">Open Built-in Usenet settings</a>'
     +   '</div></details>' : '')
     +   '<details class="config-fold"><summary>Catalogs and display order</summary>' + catalogsPanel + '</details>'
     +   '<details class="config-fold"><summary>Advanced playback settings</summary><div class="config-fold-body">'

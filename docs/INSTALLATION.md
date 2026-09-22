@@ -103,9 +103,9 @@ missing/short secret, occupied port, or unwritable data mount.
 8. Use **Database** to inspect Smart Availability and choose which services
    should prepare selected recent events automatically.
 
-Metadata catalogs work without TorBox, Prowlarr, Easynews, Usenet Ultimate,
-NZB DAV, or NNTP. Add one playback path at a time and test it before enabling
-another; this makes configuration failures much easier to identify.
+Metadata catalogs work without TorBox, Prowlarr, Easynews, or built-in Usenet.
+Add one playback path at a time and test it before enabling another; this
+makes configuration failures much easier to identify.
 
 ## Reverse proxy or tunnel
 

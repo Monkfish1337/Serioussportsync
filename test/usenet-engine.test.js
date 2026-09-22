@@ -42,7 +42,7 @@ test('Usenet operations page exposes tuning, migration settings and playback dia
   assert.match(html, /Playback performance/);
   assert.match(html, /Startup segments/);
   assert.match(html, /Recent native playback/);
-  assert.match(html, /Legacy Usenet Ultimate manifest URL/);
+  assert.match(html, /Built-in Usenet/);
   assert.match(html, /&lt;release&gt;\.mkv/);
   assert.doesNotMatch(html, /<release>\.mkv/);
 });

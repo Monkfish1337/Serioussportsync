@@ -147,40 +147,30 @@ is submitted only when a user selects **Warm to TorBox**.
 
 | Source | Playback | How it works |
 | --- | --- | --- |
-| Usenet Ultimate | Usenet Ultimate / NzbDAV | Sends event title variants to the user's UU instance; UU searches its configured indexers and handles playback |
-| Usenet Ultimate search | DIY Usenet pipeline | Optional additive discovery path shared by the NZB DAV and native NNTP backends |
-| Native Newznab, NZBHydra, or Prowlarr | DIY Usenet pipeline | SSS searches the endpoint directly, filters candidates once, and exposes independently toggled playback rows |
-| Native Newznab, NZBHydra, or Prowlarr | Native NNTP preview | Serves direct videos and stored, unencrypted RAR4/RAR5 videos with HTTP byte ranges; unsupported archives keep an adjacent NZB DAV fallback row |
+| Native Newznab, NZBHydra, or Prowlarr | Built-in Usenet (native NNTP) | SSS searches the indexer directly, filters candidates once, and streams the matched release straight from your NNTP provider — no helper container |
 | Easynews | Easynews | Searches and plays with credentials stored on the user's account |
 
-Native DIY search and UU search can be enabled independently or merged, and UU
-is no longer required for DIY playback when native search is configured. The
-admin **Usenet** page presents this as two stages: search and candidate
-discovery, then playback backends. It owns the provider credentials, migration
-fallbacks, native performance profiles, connection state, first-byte timing,
-throughput, retries and recent playback results; Configure keeps the master
-pipeline switch. A usable pipeline requires at least one ready
-discovery source and one ready playback backend. New NNTP configurations default to 20
-connections, pre-authenticate their pool after resolution, fetch one segment for
-startup and then pipeline a bounded read-ahead window. The page offers Balanced,
-Low latency and Resilient profiles plus bounded advanced controls. Compressed or
-encrypted RAR files and 7z releases continue through the NZB DAV row during the
-native-engine migration.
-
-> **Usenet Ultimate compatibility:** direct sports-title search requires the
-> endpoint proposed in [Usenet Ultimate PR #46](https://github.com/DSmart33/Usenet-Ultimate/pull/46).
-> Until it is included upstream, use
-> `ghcr.io/monkfish1337/usenet-ultimate:sss-direct` for the UU service. The
-> normal UU configuration, manifest URL, indexers, and NzbDAV setup are unchanged.
+Built-in Usenet is one pipeline: a native indexer connection for discovery and
+a direct NNTP provider connection for playback. The admin **Usenet** page
+presents this as two stages — search and candidate discovery, then native NNTP
+playback. It owns the indexer and NNTP credentials, native performance
+profiles, connection state, first-byte timing, throughput, retries and recent
+playback results; Configure keeps the master pipeline switch. A usable
+pipeline requires a ready indexer and a ready NNTP provider. New NNTP
+configurations default to 20 connections, pre-authenticate their pool after
+resolution, fetch one segment for startup and then pipeline a bounded
+read-ahead window. The page offers Balanced, Low latency and Resilient
+profiles plus bounded advanced controls. Native NNTP serves direct videos and
+stored, unencrypted RAR4/RAR5 videos with HTTP byte ranges.
 
 ### The availability index
 
 The local Smart Availability Index stores encrypted, normalized discoveries in
-SQLite. Fresh torrent, UU, native indexer, and Easynews searches are reused;
+SQLite. Fresh torrent, native indexer, and Easynews searches are reused;
 TorBox cache observations stay isolated by account credentials. The bounded
 general preparation job is Bitmagnet-only. Prowlarr has its measured queue and
-Sport-Video has its own sequential preparation worker. Usenet Ultimate, native
-Usenet and Easynews remain fast live responders and create no background indexer
+Sport-Video has its own sequential preparation worker. Built-in Usenet and
+Easynews remain fast live responders and create no background indexer
 traffic.
 
 ### Credentials
@@ -188,7 +178,7 @@ traffic.
 Provider credentials, admin source keys, and private install tokens are
 encrypted at rest and are never included in the stream list returned to the
 client; existing plaintext settings are migrated automatically. TorBox,
-Easynews, and DIY NZB DAV use signed, short-lived resolve URLs. A private
+Easynews, and Built-in Usenet use signed, short-lived resolve URLs. A private
 manifest URL grants use, not editing access, and can be rotated.
 
 ## Updating
@@ -232,7 +222,7 @@ discovery sources need to be combined behind one endpoint.
 single form — nothing is saved until the whole form is saved, and a returning
 user can jump straight to any step.
 
-1. **Services** — TorBox, Usenet Ultimate, Easynews, and DIY Usenet, plus the
+1. **Services** — TorBox, Easynews, and Built-in Usenet, plus the
    maximum number of streams per fixture and whether warm-to-cache rows appear.
 2. **Your teams** — pick a Premier League club, NFL, NBA, or MLB team to follow.
    An administrator can create a promotion straight from a pick.
@@ -257,7 +247,7 @@ JSON or application code. Changes take effect without rebuilding the image.
 - **Promotions:** a five-step wizard asks for the name, saved event provider,
   real release examples, and optional artwork, then shows a plain-language
   review. SSS can research a selected event through the companion's TorBox
-  discovery sources, configured DIY indexers, Usenet Ultimate, and Easynews,
+  discovery sources, the configured native Usenet indexer, and Easynews,
   explain every match or rejection, and apply confirmed examples without
   exposing credentials or download links. Detailed filters, pipeline controls,
   and source tools stay under **Advanced**. Conflicting reject words are

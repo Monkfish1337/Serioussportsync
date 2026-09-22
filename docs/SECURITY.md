@@ -40,8 +40,8 @@ can manage only their own playback providers and catalog preferences.
 - Configurable HTTP endpoints reject URL credentials, cloud metadata addresses,
   unsafe protocols, and secret query parameters where a separate credential
   field exists. Local Docker/private-network service names remain supported.
-- Outbound provider calls use timeouts. Indexer, companion, Prowlarr, NZB DAV,
-  NZB, WebDAV, NNTP, and archive processing paths enforce bounded responses or
+- Outbound provider calls use timeouts. Indexer, companion, Prowlarr, NZB,
+  NNTP, and archive processing paths enforce bounded responses or
   traversal/resource limits.
 
 ## Reporting

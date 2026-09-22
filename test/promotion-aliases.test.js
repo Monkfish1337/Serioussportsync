@@ -338,7 +338,6 @@ test('alias research combines configured sources, explains decisions, and strips
   const result = await adminPromotions.researchAliases({
     diySearchKind: 'prowlarr', diySearchName: 'Prowlarr',
     diySearchUrl: 'http://prowlarr:9696', diySearchApiKey: 'native-secret',
-    uuManifestUrl: 'http://usenet-ultimate:1337/stremio/private-config/manifest.json',
     easynewsUsername: 'alice', easynewsPassword: 'easynews-secret',
   }, {
     name: 'UEFA Champions League', eventName: 'LASK vs Celtic FC', eventDate: '2026-08-25',
@@ -359,10 +358,6 @@ test('alias research combines configured sources, explains decisions, and strips
         indexer: 'NZBGeek', size: 8 * 1024 ** 3, nzbUrl: 'https://secret/native.nzb',
       }] };
     },
-    uuSearch: async () => ({ ok: true, results: [{
-      title: 'UEFA.Champions.League.2026.08.25.LASK.vs.Celts.720p',
-      indexer: 'DrunkenSlug', nzbUrl: 'https://secret/uu.nzb',
-    }] }),
     easynewsSearch: async (_queries, options) => {
       assert.equal(options.password, 'easynews-secret');
       return { ok: false, error: 'network timeout at https://members.easynews.com/private?token=secret', results: [] };
@@ -387,11 +382,9 @@ test('alias research combines configured sources, explains decisions, and strips
   // 0.87.0 moved "UCL.2026.08.25.LASK.vs.Celtic.1080p" from possible to
   // matched. The club is "Celtic FC" and the release says "Celtic"; team
   // matching now strips the legal affixes one feed carries and releases omit,
-  // so that is a match rather than a maybe. "…vs.Celts.720p" is still only
-  // possible — a nickname is a curated alias, not a mechanical transformation.
-  assert.deepEqual(result.counts, { discovered: 4, matched: 3, possible: 1, rejected: 0 });
+  // so that is a match rather than a maybe.
+  assert.deepEqual(result.counts, { discovered: 3, matched: 3, possible: 0, rejected: 0 });
   assert.equal(result.groups.matched[0].reason, 'matched');
-  assert.match(result.groups.possible[0].reason, /away-team/);
   assert.equal(result.providers.find((provider) => provider.id === 'easynews').error, 'Timed out or unavailable');
   assert.ok(result.suggested.aliases.length > 0);
   assert.match(result.report, /SeriousSportSync alias research/);

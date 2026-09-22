@@ -5,14 +5,14 @@ playback services and operational settings can then be managed in the web
 interface. Environment variables are useful for deployment-wide defaults,
 file locations, and advanced troubleshooting.
 
-Copy [`.env.example`](../.env.example) to `.env` for a new Docker Compose
+Copy `.env.example` to `.env` for a new Docker Compose
 installation. Do not copy this entire reference into `.env`: unspecified
 values use the maintained application defaults.
 
 ## Required and common settings
 
 | Variable | Default | Purpose |
-| --- | --- | --- |
+|---|---|---|
 | `SESSION_SECRET` | required | Signs sessions and encrypts stored credentials. Use at least 32 random characters and preserve it across updates and migrations. |
 | `ADMIN_USER` | none | Username promoted to administrator when it signs up. The password is created in the browser. |
 | `SSS_BIND_ADDRESS` | `127.0.0.1` | Host address published by the supplied Compose file. Use the server's LAN IP for trusted LAN access. This is a Compose setting, not an application setting. |
@@ -26,49 +26,13 @@ development only. It must never be used for a real deployment.
 
 ## Metadata
 
-The **Metadata** page holds football-data.org, API-Football and TMDB credentials.
-Use **Force Metadata Refresh** there to update enabled promotions immediately.
-Saving discovery pipelines on **Server** does not change metadata credentials.
-
-**User Management** contains users, account creation, invitations and access requests.
-Applicants choose a username and password from **Request access** on the login page;
-they cannot sign in until an administrator approves them as a regular user.
-Requests can be closed without blocking review of existing requests. Pending requests
-expire after 14 days by default (configurable from 1 to 90 days), removing their password
-hashes on the next review or request. The latest 500 approval/decline decisions record
-the administrator and time. Restarting SSS resets the public request rate limiter.
-
-DIY Usenet is restricted to administrators, including saved configurations and
-background preparation. Its settings remain accessible through **Configure** for
-administrators; it is no longer a sidebar destination. Configure links to the
-dedicated page, reports readiness, and provides the master pipeline switch.
-The dedicated page owns every detailed setting and can also change the master.
-DIY is
-ready only when at least one discovery source and one playback backend are both
-enabled and fully configured.
-
-**Prowlarr discovery** shows first-pass progress, saved match coverage and retry
-reasons for the promotions selected on its Discovery tab. MLB, NFL and NBA are
-the upgrade-safe defaults; weekly wrestling and other promotions can be added
-without enabling live playback searches. Estimates start after three event
-attempts over at least one hour. They cover the untouched backlog, not completion
-of retries or guaranteed playback. **Database → Recent searches** distinguishes
-discovered candidates, matching releases and ready links for the searched account.
-
-Untouched games receive their first queue search ahead of ordinary retries;
-explicitly prioritised games still take precedence. Torrent metadata recovery
-focuses on fixtures without a saved seeded match. The retry table shows missing
-games in the current window, rather than old completed jobs. “Matching titles
-found — no usable torrent saved” means discovery has recognised a release title
-but has not saved playable torrent metadata; it is not confirmed playback coverage.
-
 | Variable | Default | Purpose |
-| --- | --- | --- |
+|---|---|---|
 | `TSDB_API_KEY` | `123` | TheSportsDB API key. Replace with your own key when available. |
-| `TSDB_SEASONS` | `auto` | Derive relevant seasons from the event window, or use a comma-separated list. |
-| `FOOTBALL_DATA_API_KEY` | none | football-data.org key. Required by the shipped Premier League promotion and assigned football-data.org sources. It can also be saved on Metadata. |
-| `API_FOOTBALL_API_KEY` | none | API-Football key for assigned API-Football sources. It can also be saved in Admin. The shipped UEFA Champions League promotion does not use it -- that reads UEFA's own public feed and needs no key. |
-| `TMDB_API_KEY` | none | TMDB key. Required by Match of the Day and assigned television-style metadata sources. It can also be saved on Metadata. |
+| `TSDB_SEASONS` | auto | Derive relevant seasons from the event window, or use a comma-separated list. |
+| `FOOTBALL_DATA_API_KEY` | none | Optional football-data.org key for assigned metadata sources. |
+| `API_FOOTBALL_API_KEY` | none | API-Football key used by the shipped UEFA Champions League promotion and assigned API-Football sources. It can also be saved in Admin. |
+| `TMDB_API_KEY` | none | Optional TMDB key for assigned television-style metadata sources. |
 | `EVENT_WINDOW_DAYS_BACK` | `30` | Number of previous days retained in the catalog. |
 | `EVENT_WINDOW_DAYS_AHEAD` | `90` | Number of future days retained in the catalog. |
 | `EVENT_WINDOW_START_DATE` | `2025-01-01` | Hard lower date boundary used by built-in refresh logic. |
@@ -83,15 +47,13 @@ should normally be managed from **Metadata**, **Promotions**, and
 ## Discovery and playback
 
 | Variable | Default | Purpose |
-| --- | --- | --- |
+|---|---|---|
 | `COMPANION_URL` | none | Optional SeriousSportSync Companion endpoint. |
 | `COMPANION_AUTH_TOKEN` | none | Shared authentication token for the companion. |
 | `COMPANION_TIMEOUT_MS` | `30000` | Hard client timeout for companion requests. The smaller per-request discovery budget still applies. |
 | `COMPANION_RESEARCH_TIMEOUT_MS` | `60000` | Hard client timeout for explicit Promotion Wizard research only; it does not affect playback. |
 | `PROMOTION_OVERRIDES_FILE` | `data/promotion-overrides.json` | Optional path for upgrade-safe matching overlays applied to shipped promotions. |
 | `PROWLARR_URL` / `PROWLARR_API_KEY` | none | Optional direct Prowlarr discovery bootstrap. These can be saved in Admin instead. |
-| `BITMAGNET_URL` | none | Optional direct Bitmagnet discovery bootstrap — the base URL of your own instance; `/graphql` is appended. Can be saved in Admin instead. |
-| `BITMAGNET_LIMIT` | `300` | Results per query variant. Ordered by seeders server-side, so a lower value drops the tail rather than an arbitrary slice. |
 | `ZILEAN_URL` | none | Optional direct Zilean endpoint for legacy/bootstrap discovery. |
 | `STREAM_MAX_ROWS` | `20` | Maximum rows returned for an event. |
 | `STREAM_PIPELINE_TIMEOUT_MS` | `8000` | Maximum duration of each interactive playback pipeline. |
@@ -101,33 +63,25 @@ should normally be managed from **Metadata**, **Promotions**, and
 | `LOG_REJECTION_SAMPLE_LIMIT` | `4` | Rejected titles retained per exclusion reason when full detail is off. |
 | `LOG_BUFFER_MAX_BYTES` | `5242880` | Maximum memory used by the live structured log buffer before its oldest entries are discarded. |
 
-TorBox and Easynews settings are account-scoped and belong on the signed-in
-**Account** page. The administrator-only **Usenet** page contains native
-Newznab/Prowlarr search, native NNTP, the NZB DAV migration fallback, the legacy
-Usenet Ultimate manifest, live connection state and native engine tuning.
-
-The Balanced native profile starts playback after one article and reads 24
-articles ahead once data is flowing. Low latency uses a smaller read-ahead;
-Resilient waits for two startup articles and uses a larger buffer with more
-retries. Keep the provider connection limit at or below the allowance on the
-NNTP plan. Recent playback rows show end-to-end first-byte time, including NZB
-download and archive inspection, so changes can be compared rather than guessed.
+TorBox, Easynews, and built-in Usenet settings are account-scoped and belong on
+the signed-in **Account** page. Built-in Usenet uses a native indexer connection
+and a direct NNTP provider connection; it does not require a helper container.
 
 ## Smart Availability
 
-The **Database** page provides live status for the local availability index.
-Automatic preparation is Bitmagnet torrent discovery plus account-scoped TorBox
-checks for selected recent events. Usenet Ultimate, native Usenet and Easynews
-retain normal on-demand database caching and never create background traffic.
+The **Database** page provides live status and lets an administrator choose
+which services prepare recent events without recreating the container. Torrent
+and TorBox preparation is enabled by default; Usenet and Easynews retain normal
+on-demand database caching without background traffic unless opted in.
 
 | Variable | Default | Purpose |
-| --- | --- | --- |
+|---|---|---|
 | `AVAILABILITY_DB_FILE` | `./data/availability.sqlite` | SQLite knowledge store. |
 | `AVAILABILITY_WARM_ENABLED` | `true` | Warm recently aired events in the background. |
 | `AVAILABILITY_SERVE_CONFIRMED` | `true` | Serve fresh confirmed results without repeating discovery. |
 | `AVAILABILITY_PREPARE_TORRENT` | `true` | Prepare torrent discovery and account-scoped TorBox cache checks automatically. |
-| `AVAILABILITY_PREPARE_USENET` | ignored | Legacy setting retained for compatibility; background Usenet preparation is disabled. |
-| `AVAILABILITY_PREPARE_EASYNEWS` | ignored | Legacy setting retained for compatibility; background Easynews preparation is disabled. |
+| `AVAILABILITY_PREPARE_USENET` | `false` | Opt native indexer searches into automatic preparation. This never submits or downloads an NZB. |
+| `AVAILABILITY_PREPARE_EASYNEWS` | `false` | Opt account-scoped Easynews searches into automatic preparation. |
 | `AVAILABILITY_WARM_WINDOW_DAYS` | `3` | Recently aired event window considered for automatic preparation. |
 | `AVAILABILITY_WARM_INTERVAL_HOURS` | `6` | Time between warmer runs. |
 | `AVAILABILITY_WARM_MAX_EVENTS_PER_RUN` | `25` | Rotating event batch size. |
@@ -152,53 +106,8 @@ Other advanced controls include:
 
 - `LOGIN_MAX_FAILS`, `LOGIN_WINDOW_MS`, and `LOGIN_LOCKOUT_MS` for login rate limits.
 - `RESOLVE_URL_TTL_MINUTES` for signed playback URL lifetime (default 240; minimum 5).
-- `NZBDAV_HEADER_TIMEOUT_MS` for NZB DAV header probes (default 15000).
 - `HTTPS_PROXY`, `HTTP_PROXY`, and `NO_PROXY` for outbound routing, including native NNTP over HTTP CONNECT.
 - `RD_BLOCKED_KEYWORDS` and provider denylist TTL variables for provider-specific suppression.
 
-See [Security](SECURITY.md) before changing proxy trust, bind addresses, or
+See [Security](./SECURITY.md) before changing proxy trust, bind addresses, or
 direct Internet exposure.
-# Unified Discovery
-
-Prowlarr's live-search switch controls playback searches. Explicit admin
-Improve Matching research still searches configured, enabled Prowlarr directly,
-including promotions using the measured queue. Research requests are bounded
-and title-only, so they do not fetch torrent metadata or start downloads.
-
-The admin sidebar now has a Discovery page with Overview, Events, Prowlarr,
-Sport-Video and Bitmagnet tabs. Prowlarr has its own promotion selection, defaulting
-to MLB, NFL and NBA; other promotions can opt into the measured queue.
-Each source has an independent promotion selection. Overview is the default tab
-and shows deduplicated past events in a rolling seven-day window, usable release
-coverage per promotion, and missing events with recorded source states and retry
-times. It makes no provider searches. Metadata-only titles and unprepared
-Sport-Video matches do not count toward torrent-identity coverage. A saved
-Prowlarr or Bitmagnet hash and a prepared Sport-Video hash do count; actual
-playability still depends on the account's TorBox access. Events without a start time enter the count
-after their dated day ends in UTC; cancelled and postponed fixtures are excluded.
-The former Overview filter is migrated into each source's effective selection
-without expanding background work; saving a source changes only that source.
-The Bitmagnet tab prepares only Bitmagnet torrent results and their TorBox
-availability. UU and Easynews remain live responders; legacy preparation
-settings and the old all-torrent-sources override cannot enable them here.
-Sport-Video selection controls automatic torrent preparation and warming;
-Bitmagnet selection controls automatic availability preparation.
-Existing source switches, supported
-promotions, categories, team filters and account catalog selections still apply.
-Before a selection is saved, existing coverage is preserved. Selecting no
-promotions pauses automatic event work without deleting saved results.
-Sport-Video listing collection and manual actions are unaffected.
-Settings and long histories can be expanded as needed. Tables show 15 rows per
-page and can be filtered without hiding matches on later pages. Bitmagnet saves
-and manual preparation return to its source tab.
-
-Data table headings throughout the GUI sort their rows when clicked. Click
-again to reverse the order; arrows show the current direction. Numeric counts,
-dates, file sizes and latency values use their underlying order. Empty values
-remain last. Sorting is local to the displayed table and preserves row actions,
-filters and Discovery pagination; it does not change saved configuration.
-
-The Events tab combines saved Prowlarr and Sport-Video evidence by event and
-preserves source names. It does not combine account-specific playable counts.
-Existing source pages and form endpoints remain compatible. This first phase
-unifies controls; source storage and workers remain separate.
