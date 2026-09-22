@@ -43,7 +43,9 @@ background preparation. Its settings remain accessible through **Configure** for
 administrators; it is no longer a sidebar destination.
 
 **Prowlarr discovery** shows first-pass progress, saved match coverage and retry
-reasons for eligible MLB, NFL and NBA events. Estimates start after three event
+reasons for the promotions selected on its Discovery tab. MLB, NFL and NBA are
+the upgrade-safe defaults; weekly wrestling and other promotions can be added
+without enabling live playback searches. Estimates start after three event
 attempts over at least one hour. They cover the untouched backlog, not completion
 of retries or guaranteed playback. **Database → Recent searches** distinguishes
 discovered candidates, matching releases and ready links for the searched account.
@@ -59,9 +61,9 @@ but has not saved playable torrent metadata; it is not confirmed playback covera
 | --- | --- | --- |
 | `TSDB_API_KEY` | `123` | TheSportsDB API key. Replace with your own key when available. |
 | `TSDB_SEASONS` | `auto` | Derive relevant seasons from the event window, or use a comma-separated list. |
-| `FOOTBALL_DATA_API_KEY` | none | football-data.org key. Required by the eight shipped domestic league promotions and by assigned football-data.org sources. It can also be saved in Admin. |
+| `FOOTBALL_DATA_API_KEY` | none | football-data.org key. Required by the shipped Premier League promotion and assigned football-data.org sources. It can also be saved on Metadata. |
 | `API_FOOTBALL_API_KEY` | none | API-Football key for assigned API-Football sources. It can also be saved in Admin. The shipped UEFA Champions League promotion does not use it -- that reads UEFA's own public feed and needs no key. |
-| `TMDB_API_KEY` | none | TMDB key. Required by the shipped Match of the Day promotion and by assigned television-style metadata sources. There is no field for it in Admin. |
+| `TMDB_API_KEY` | none | TMDB key. Required by Match of the Day and assigned television-style metadata sources. It can also be saved on Metadata. |
 | `EVENT_WINDOW_DAYS_BACK` | `30` | Number of previous days retained in the catalog. |
 | `EVENT_WINDOW_DAYS_AHEAD` | `90` | Number of future days retained in the catalog. |
 | `EVENT_WINDOW_START_DATE` | `2025-01-01` | Hard lower date boundary used by built-in refresh logic. |
@@ -99,10 +101,10 @@ are account-scoped and belong on the signed-in **Account** page.
 
 ## Smart Availability
 
-The **Database** page provides live status and lets an administrator choose
-which services prepare recent events without recreating the container. Torrent
-and TorBox preparation is enabled by default; Usenet and Easynews retain normal
-on-demand database caching without background traffic unless opted in.
+The **Database** page provides live status for the local availability index.
+Automatic preparation is Bitmagnet torrent discovery plus account-scoped TorBox
+checks for selected recent events. Usenet Ultimate, native Usenet and Easynews
+retain normal on-demand database caching and never create background traffic.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -110,8 +112,8 @@ on-demand database caching without background traffic unless opted in.
 | `AVAILABILITY_WARM_ENABLED` | `true` | Warm recently aired events in the background. |
 | `AVAILABILITY_SERVE_CONFIRMED` | `true` | Serve fresh confirmed results without repeating discovery. |
 | `AVAILABILITY_PREPARE_TORRENT` | `true` | Prepare torrent discovery and account-scoped TorBox cache checks automatically. |
-| `AVAILABILITY_PREPARE_USENET` | `false` | Opt UU and native indexer searches into automatic preparation. This never submits or downloads an NZB. |
-| `AVAILABILITY_PREPARE_EASYNEWS` | `false` | Opt account-scoped Easynews searches into automatic preparation. |
+| `AVAILABILITY_PREPARE_USENET` | ignored | Legacy setting retained for compatibility; background Usenet preparation is disabled. |
+| `AVAILABILITY_PREPARE_EASYNEWS` | ignored | Legacy setting retained for compatibility; background Easynews preparation is disabled. |
 | `AVAILABILITY_WARM_WINDOW_DAYS` | `3` | Recently aired event window considered for automatic preparation. |
 | `AVAILABILITY_WARM_INTERVAL_HOURS` | `6` | Time between warmer runs. |
 | `AVAILABILITY_WARM_MAX_EVENTS_PER_RUN` | `25` | Rotating event batch size. |
@@ -156,9 +158,9 @@ Each source has an independent promotion selection. Overview is the default tab
 and shows deduplicated past events in a rolling seven-day window, usable release
 coverage per promotion, and missing events with recorded source states and retry
 times. It makes no provider searches. Metadata-only titles and unprepared
-Sport-Video matches do not count toward usable coverage. Database candidates
-must still pass event relevance; a usable identity requires account credentials
-and a playback availability check. Events without a start time enter the count
+Sport-Video matches do not count toward torrent-identity coverage. A saved
+Prowlarr or Bitmagnet hash and a prepared Sport-Video hash do count; actual
+playability still depends on the account's TorBox access. Events without a start time enter the count
 after their dated day ends in UTC; cancelled and postponed fixtures are excluded.
 The former Overview filter is migrated into each source's effective selection
 without expanding background work; saving a source changes only that source.

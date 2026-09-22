@@ -128,3 +128,36 @@ found, so counting them as scheduled-event coverage inflates the rate. The
 catalogs remain available, and Sport-Video's discovered/matched/prepared counts
 continue to show their source output. Record a fresh Overview baseline after
 this correction; earlier totals are not comparable.
+
+## Candidate observation on 22 September 2026
+
+- Live Discovery Overview reported 132 eligible events in the corrected
+  seven-day window, 127 with saved torrent identities and five missing: 96.2%
+  identity coverage. NFL was 16/16; MLB was 83/87. Usenet and Easynews are
+  excluded from these figures, as are disabled, account-specific and
+  Sport-Video-derived promotions.
+- The measured Prowlarr queue reported 277 eligible events, 260 searched, 233
+  with saved matches, 44 still without a seeded match and no untouched missing
+  event awaiting its first search. RuTracker and 720pier had zero consecutive
+  failures. One secondary indexer had one failure and an ordinary short retry.
+- Bitmagnet held 34,664 known releases and 81,766 event matches in a 158.5 MB
+  SQLite database. Its latest preparation run completed 47 of 229 eligible
+  events with no error; the scheduler had completed all 97 queued preparations.
+- Sport-Video's latest scan completed without a scan error: 2,298 releases,
+  2,260 matched, 916 prepared and 87 currently ready for the admin account. One
+  retained detail page had no torrent, which is a recoverable source warning.
+  The review also found impossible November-dated releases in September. The
+  candidate now rejects dates beyond tomorrow and removes previously retained
+  future rows on the next scan.
+- Cached real stream requests completed in 71 ms and 408 ms while combining
+  torrent/TorBox, Usenet Ultimate and Easynews rows. The retained log buffer had
+  zero errors and one recoverable Sport-Video warning.
+- Promotions remained operational but the materialized My Teams roster made the
+  page hundreds of rows long. The candidate hides those generated rows from the
+  promotion workspace and directs their management to Configure → Your Teams.
+- The final candidate passed all 648 automated tests, the account configuration
+  check, Nuvio collection contract check, backup/recovery check and a production
+  dependency audit with zero known vulnerabilities. The published-container
+  workflow is checked again after the candidate commit reaches `main`.
+- Representative playback and an isolated restore of actual production data
+  remain the two manual v1 release gates.

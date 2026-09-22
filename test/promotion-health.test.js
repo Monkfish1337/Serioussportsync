@@ -104,6 +104,13 @@ test('the table carries an Events column', () => {
   assert.match(html, /No events/);
 });
 
+test('materialized My Teams catalogs stay out of the promotion workspace', () => {
+  const html = adminPromotions.renderBody({ events: [] });
+  assert.match(html, /Team catalogs are managed in Configure/);
+  assert.doesNotMatch(html, /id=nfl-ari/);
+  assert.match(html, /id=nfl/);
+});
+
 test('the table opts out of middle alignment, and the rule it opts into exists', () => {
   // A table cell inherits vertical-align: middle from the table, so dropping
   // Tabler's .table-vcenter changes nothing on its own — the replacement has to

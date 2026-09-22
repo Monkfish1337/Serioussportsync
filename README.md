@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.95.0-blue.svg" alt="Version 0.95.0"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-0.98.1-blue.svg" alt="Version 0.98.1"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -53,8 +53,9 @@ choices. Advanced overrides are kept in the [configuration reference](docs/CONFI
 
 ## Supported sports
 
-Twenty-nine promotions ship built in. Most need no API key; the three
-exceptions are noted in the tables below.
+Twenty-five promotions ship built in. Most need no API key; the exceptions are
+noted below. Each account can also add team catalogs from **Your teams** without
+exposing every available club as a normal catalog.
 
 **Combat sports and entertainment**
 
@@ -63,7 +64,9 @@ exceptions are noted in the tables below.
 | UFC | PPVs, Fight Nights, UFC on ABC/ESPN, DWCS |
 | ONE Championship | Numbered events, Fight Night, Friday Fights |
 | WWE | PLEs, named NXT events, Saturday Night's Main Event |
-| AEW | PPVs and special events; weekly TV is excluded |
+| WWE Raw, SmackDown and NXT | Weekly television episodes with exact local air dates |
+| AEW | PPVs and special events from the official AEW schedule |
+| AEW Dynamite and Collision | Weekly television episodes, including targeted recovery for gaps in TheSportsDB's free feeds |
 | Boxing | Cards from major promoters |
 
 **Motorsport**
@@ -79,19 +82,12 @@ exceptions are noted in the tables below.
 | --- | --- | --- |
 | UEFA Champions League | Official UEFA feed | Fixtures with full club identities and release-aware searches |
 | Premier League | football-data.org | Fixtures, club alias table, three-letter code matching |
-| EFL Championship | football-data.org | Fixtures and club alias table |
-| La Liga | football-data.org | Fixtures |
-| Serie A | football-data.org | Fixtures |
-| Bundesliga | football-data.org | Fixtures |
-| Ligue 1 | football-data.org | Fixtures |
-| Eredivisie | football-data.org | Fixtures |
-| Brasileirão | football-data.org | Fixtures |
 | Match of the Day | TMDB | Episodes; needs a free TMDB key |
 
-The eight football-data.org promotions need a free API key and Match of the Day
-needs a TMDB one; both are set in **Server**, and a key saved there overrides
-the matching environment variable. A football-data key without access to a given
-competition fails only that promotion's refresh and leaves the rest working.
+Premier League needs a free football-data.org key and Match of the Day needs a
+TMDB key. Both are set on **Metadata**, where a saved key overrides the matching
+environment variable. A provider failure affects only assigned promotions and
+leaves the rest working.
 
 **North American sport**
 
@@ -99,8 +95,6 @@ competition fails only that promotion's refresh and leaves the rest working.
 | --- | --- | --- |
 | NFL | ESPN | Fixtures, `Away at Home` naming |
 | NBA | ESPN | Fixtures |
-| WNBA | ESPN | Fixtures |
-| College Football | ESPN | Fixtures |
 | MLB | Official MLB schedule | Regular-season date and `Away @ Home` searches |
 
 **Discovered sports**
@@ -135,16 +129,15 @@ string is.
 | Source | How it works |
 | --- | --- |
 | Direct Bitmagnet | Queries a self-hosted [Bitmagnet](https://bitmagnet.io) index over GraphQL. One local database rather than a fan-out to remote trackers, so a query costs tens of milliseconds; results are ordered by seeders server-side, and info hashes arrive directly with no hydration pass |
-| Direct Prowlarr | Searches the configured Prowlarr instance when an event is opened |
+| Direct Prowlarr | A measured background queue searches selected promotions slowly, saves seeded matches locally, tracks per-indexer budgets and cooldowns, and serves the saved database during playback. Live playback search has a separate switch; Improve Matching can still search Prowlarr when that switch is off |
 | Companion scraper | Combines Prowlarr, Zilean, Torznab, and other sources configured in the separate [companion service](https://github.com/Monkfish1337/SeriousSportSync-Scraper) |
 | Sport-Video | Reads the public RSS and bounded sport category catalogues, matches releases against existing events before downloading any torrent metadata, then validates same-origin detail pages and bounded bencoded torrent files |
 
-All four sit on one card in **Server**, as collapsible blocks whose summaries
-show which are on. Each has an enable toggle, so a source can be taken out of
-the pipeline for comparison without deleting its URL and credentials. The first
-three are on by default and a source saved before the toggles existed stays
-enabled; Sport-Video is off until you turn it on, because it reaches a
-third-party site on a schedule.
+The four source connections sit under **Server → Discovery pipelines** and keep
+their settings when disabled. Their automatic work is controlled from the
+source tabs in **Discovery**: Prowlarr, Sport-Video and Bitmagnet each have their
+own promotion selection. Sport-Video is off on a fresh install because it polls
+a third-party site on a schedule.
 
 Torrent results are checked against each user's TorBox account and resolved on
 play. Discovery never adds content to TorBox automatically; an uncached release
@@ -179,11 +172,11 @@ continue through the NZB DAV row.
 
 The local Smart Availability Index stores encrypted, normalized discoveries in
 SQLite. Fresh torrent, UU, native indexer, and Easynews searches are reused;
-TorBox cache observations stay isolated by account credentials. A bounded
-background job prepares torrent and TorBox results for selected catalogs aired
-in the last three days, so likely playable links are ready before a user opens
-an event. Usenet and Easynews benefit from on-demand search reuse but do no
-background work unless an administrator opts in from **Database**.
+TorBox cache observations stay isolated by account credentials. The bounded
+general preparation job is Bitmagnet-only. Prowlarr has its measured queue and
+Sport-Video has its own sequential preparation worker. Usenet Ultimate, native
+Usenet and Easynews remain fast live responders and create no background indexer
+traffic.
 
 ### Credentials
 
@@ -222,8 +215,10 @@ Metadata sources -> event catalog -> promotion-aware matching -> stream rows
 - Discovery sources return candidates; SeriousSportSync applies promotion rules.
 - The user's configured service resolves the selected result only when needed.
 
-Bitmagnet, direct Prowlarr and the optional companion are all request-only: SSS
-contacts them for the event a user opens. The companion is useful when several
+Bitmagnet answers live requests from its local index and is also prepared in
+bounded background batches. Direct Prowlarr normally serves the matches its
+measured queue saved; the operator can separately enable live playback search.
+The companion remains request-driven and is useful when several private
 discovery sources need to be combined behind one endpoint.
 
 ## Configure
@@ -249,10 +244,8 @@ user can jump straight to any step.
 The web interface is designed so routine operation does not require editing
 JSON or application code. Changes take effect without rebuilding the image.
 
-- **Server:** appearance, invites, users, catalogs, and the torrent discovery
-  and metadata source credentials — Bitmagnet, Prowlarr and the companion, each
-  with its own enable toggle, plus API keys for football-data.org and
-  API-Football. Eight
+- **Server:** instance time zone, appearance, discovery pipeline connections,
+  provider timing and source enable switches. Eight
   skins ship (Sportsroom, Floodlight, Pitch, Amber, Terrace, Broadcast,
   Daylight, Newsprint); a skin sets mode, accent, and corner radius for the
   whole instance and loads nothing remotely.
@@ -268,12 +261,17 @@ JSON or application code. Changes take effect without rebuilding the image.
   separately from the shipped definitions so upgrades preserve tuning.
 - **Event Editor:** correct a source's date without changing the source. The
   override is reapplied after every refresh until it is removed.
-- **Sport-Video:** source status, scan controls, category selection, search,
-  filters, match visibility, preparation state, and per-release TorBox actions.
+- **Discovery:** seven-day torrent coverage, missing events and reasons, the
+  measured Prowlarr queue, Sport-Video ingestion, Bitmagnet preparation and
+  manual torrent-resource matching. Usenet and Easynews do not inflate these
+  torrent coverage totals.
+- **User Management:** access requests, approvals, users, roles and invitations.
+- **Sport-Video:** its Discovery tab contains source status, scan controls,
+  filters, preparation state, diagnostics and per-release TorBox actions.
 - **Collections:** group promotions into collection folders, choose bundled,
   promotion-derived, or custom artwork, and download the current JSON. Newly
   created promotions are handed directly into this workflow.
-- **Metadata:** create and test reusable event providers independently of
+- **Metadata:** save metadata API keys, force refreshes, and create or test reusable event providers independently of
   promotions. Use a ready-made adapter or connect a public JSON/API schedule by
   mapping its event-list, name, date, ID, venue, and artwork fields, without
   writing code. Preview normalized events without changing assignments or
@@ -305,7 +303,7 @@ Start with the short [.env.example](./.env.example). The annotated
 | <code>TRUST_PROXY</code> | <code>false</code> | Set to <code>1</code> only when SSS is exclusively behind your trusted reverse proxy/tunnel; enables forwarded client IP, host, protocol, and secure-cookie handling |
 | <code>REFRESH_INTERVAL_HOURS</code> | <code>6</code> | Metadata refresh interval |
 | <code>AVAILABILITY_DB_FILE</code> | <code>./data/availability.sqlite</code> | Encrypted reusable provider searches, event/release matches, card-part classification, and scoped availability observations |
-| <code>AVAILABILITY_WARM_ENABLED</code> | <code>true</code> | Proactively populate recent-event availability in the background |
+| <code>AVAILABILITY_WARM_ENABLED</code> | <code>true</code> | Proactively populate selected recent events from Bitmagnet in the background |
 | <code>AVAILABILITY_SERVE_CONFIRMED</code> | <code>true</code> | Reuse fresh, account-scoped confirmed results before repeating provider discovery |
 | <code>BITMAGNET_URL</code> | none | Optional direct Bitmagnet discovery; <code>/graphql</code> is appended automatically |
 | <code>BITMAGNET_LIMIT</code> | <code>300</code> | Results per Bitmagnet query |

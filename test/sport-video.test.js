@@ -32,6 +32,22 @@ test('parses dated catalogue cards and ignores navigation headings', () => {
   assert.equal(records[0].detailUrl, 'https://sport-video.org.ua/ABWN020926.html');
 });
 
+test('rejects impossible future release dates while allowing tomorrow at a timezone edge', () => {
+  const now = Date.parse('2026-09-22T12:00:00Z');
+  assert.equal(sportVideo.plausibleReleaseDate('2026-09-23', now), true);
+  assert.equal(sportVideo.plausibleReleaseDate('2026-09-24', now), false);
+  const index = 'new SearchPage("GOOD.html", "A vs B 23.09.2026 Football", "", "");'
+    + 'new SearchPage("BAD.html", "C vs D 19.11.2026 Football", "", "");';
+  assert.deepEqual(sportVideo.parseSearchIndex(index, now).map((row) => row.title), [
+    'A vs B 23.09.2026',
+  ]);
+  const cards = '<strong>A vs B 23.09.2026</strong><a href="./GOOD.html">x</a>'
+    + '<strong>C vs D 19.11.2026</strong><a href="./BAD.html">x</a>';
+  assert.deepEqual(sportVideo.parseCatalog(cards, 'football', now).map((row) => row.title), [
+    'A vs B 23.09.2026',
+  ]);
+});
+
 test('detail parsing accepts only same-origin torrent resources', () => {
   const record = {
     id: 'release', title: 'Atlanta Braves at Washington Nationals 02.09.2026',

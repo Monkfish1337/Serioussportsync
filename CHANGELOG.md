@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — final v1 candidate review
+
+- Discovery's live seven-day baseline is 127/132 events with saved torrent
+  identities. The measured Prowlarr queue has completed the first pass for every
+  currently missing eligible event; Bitmagnet and Sport-Video completed their
+  latest scheduled work without a worker error.
+- Sport-Video now rejects release dates beyond tomorrow and prunes bad future
+  rows retained by earlier images. This prevents upstream year typos from
+  becoming impossible future fixtures in Discovered catalogs.
+- The Promotions workspace hides materialized My Teams rows. Those generated
+  catalogs remain available instantly to each account and are managed from
+  Configure → Your Teams, without turning Promotions into a hundred-row roster.
+- README, configuration, roadmap and v1 validation documentation now describe
+  the unified Discovery tabs, promotion-selectable measured Prowlarr queue,
+  Bitmagnet-only general preparation, weekly WWE/AEW catalogs, account-specific
+  teams, Metadata keys and current built-in promotion set.
+
 ## 0.98.1 — 2026-09-13
 
 - Stop Prowlarr searches immediately when their discovery deadline expires, avoiding a timer-boundary race that could start one extra query and misclassify an unattempted query as a timeout.

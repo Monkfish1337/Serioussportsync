@@ -17,8 +17,10 @@ container restore and representative playback outcomes. A fixed seven-day waitin
 period is not required.
 
 Smart Play, additional provider-priority controls and replacing the metadata
-dispatcher with a common adapter registry are follow-up work after v1, rather
-than release blockers.
+dispatcher with a common adapter registry are follow-up work after v1. The v1
+candidate also includes per-promotion metadata start dates, account-specific My
+Teams catalogs, weekly WWE/AEW shows, manual torrent-resource matching and a
+unified Discovery workspace; these are complete rather than roadmap items.
 
 ## P1 security hardening
 
@@ -40,13 +42,13 @@ checks reuse account-scoped observations, successful playback raises confidence,
 and the original stream rows remain unchanged. Legacy positive-cache knowledge
 is imported without deleting its rollback source.
 
-Phase 2 was refined in v0.70.0 around visible user benefit. Smart Availability
-continues to cache every interactive provider, while automatic preparation now
-defaults to Torrent/TorBox for events in each account's selected catalogs aired
-in the last three days. Usenet and Easynews background searches are explicit
-opt-ins, playback backends are never pre-submitted, expired data is pruned
-automatically, and real torrent failures reach the diagnostics and circuit
-breaker instead of appearing successful.
+Phase 2 was refined again for the v1 candidate. Smart Availability caches every
+interactive provider, while the general automatic preparation worker is now
+Bitmagnet-only for selected recent events. Prowlarr uses its separate measured
+queue, and Sport-Video uses its own sequential preparation worker. Usenet and
+Easynews remain on-demand responders, playback backends are never pre-submitted,
+expired data is pruned automatically, and real torrent failures reach the
+diagnostics and circuit breaker instead of appearing successful.
 
 Next phases will add provider-priority settings and Smart Play rows for Full
 Event, Main Card, Prelims, and Early Prelims, followed by a short fallback
