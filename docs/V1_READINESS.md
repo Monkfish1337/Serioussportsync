@@ -159,5 +159,9 @@ this correction; earlier totals are not comparable.
   check, Nuvio collection contract check, backup/recovery check and a production
   dependency audit with zero known vulnerabilities. The published-container
   workflow is checked again after the candidate commit reaches `main`.
-- Representative playback and an isolated restore of actual production data
-  remain the two manual v1 release gates.
+- The operator confirmed representative Nuvio playback both locally and through
+  the published Cloudflare tunnel. The production-data restore drill was waived:
+  automated full-state recovery passed, and the operator accepted that runtime
+  configuration and accumulated discovery data may need rebuilding after a rare
+  unrecoverable volume failure. With that explicit tradeoff, the candidate met
+  the agreed v1 release gates.

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — final v1 candidate review
+## 1.0.0 — 2026-09-22
 
 - Discovery's live seven-day baseline is 127/132 events with saved torrent
   identities. The measured Prowlarr queue has completed the first pass for every
