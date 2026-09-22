@@ -37,7 +37,7 @@ test('native Usenet engine settings are bounded and persisted', () => {
   assert.throws(() => settings.setUsenetEngine({ profile: 'unsafe' }), /valid Usenet performance profile/);
 });
 
-test('Usenet operations page exposes tuning, migration settings and playback diagnostics', () => {
+test('Usenet operations page keeps connection settings, tuning and diagnostics in order', () => {
   telemetry.reset();
   const id = telemetry.begin({ filename: '<release>.mkv', eventId: 'event', startedAt: Date.now() - 25 });
   telemetry.firstByte(id); telemetry.addBytes(id, 1048576); telemetry.finish(id, 'completed');
@@ -47,10 +47,15 @@ test('Usenet operations page exposes tuning, migration settings and playback dia
     escapeHtml: (value) => String(value).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
     secretField: (label, name) => '<input type="password" aria-label="' + label + '" name="' + name + '">',
   });
-  assert.match(html, /Playback performance/);
+  assert.match(html, /Advanced playback tuning/);
   assert.match(html, /Startup segments/);
   assert.match(html, /Recent native playback/);
   assert.match(html, /Built-in Usenet/);
+  assert.ok(html.indexOf('Search and candidate discovery') < html.indexOf('Native NNTP playback'));
+  assert.ok(html.indexOf('Native NNTP playback') < html.indexOf('DIY playback on your LAN'));
+  assert.ok(html.indexOf('DIY playback on your LAN') < html.indexOf('Advanced playback tuning'));
+  assert.doesNotMatch(html, /name="(?:diyUsenetEnabled|diyNativeSearchEnabled|nativeNntpEnabled)"/);
+  assert.doesNotMatch(html, /pipeline-map/);
   assert.match(html, /&lt;release&gt;\.mkv/);
   assert.doesNotMatch(html, /<release>\.mkv/);
 });

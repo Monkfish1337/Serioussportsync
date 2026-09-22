@@ -584,16 +584,10 @@ function createApp() {
     const b = req.body || {};
     try {
       users.updateUserConfig(req.user.id, {
-        diyUsenetEnabled: b.diyUsenetEnabled === 'on'
-          || b.diyUsenetEnabled === '1' || b.diyUsenetEnabled === 'true',
-        diyNativeSearchEnabled: b.diyNativeSearchEnabled === 'on'
-          || b.diyNativeSearchEnabled === '1' || b.diyNativeSearchEnabled === 'true',
         diySearchKind: String(b.diySearchKind || '') === 'prowlarr' ? 'prowlarr' : 'newznab',
         diySearchName: String(b.diySearchName || '').trim().slice(0, 80),
         diySearchUrl: security.cleanHttpUrl(b.diySearchUrl, { label: 'Search URL' }),
         diySearchApiKey: String(b.diySearchApiKey || ''),
-        nativeNntpEnabled: b.nativeNntpEnabled === 'on'
-          || b.nativeNntpEnabled === '1' || b.nativeNntpEnabled === 'true',
         nntpHost: String(b.nntpHost || '').trim(),
         nntpPort: Math.min(65535, Math.max(1, parseInt(String(b.nntpPort || '563'), 10) || 563)),
         nntpTls: b.nntpTls === 'on' || b.nntpTls === '1' || b.nntpTls === 'true',

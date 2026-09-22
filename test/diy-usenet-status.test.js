@@ -58,3 +58,18 @@ test('configured backends remain visible while the master switch is off', () => 
   assert.equal(result.enabled, false);
   assert.equal(result.ready, false);
 });
+
+test('legacy secondary switches do not disable configured connections', () => {
+  const result = status({
+    diyUsenetEnabled: true,
+    diyNativeSearchEnabled: false,
+    nativeNntpEnabled: false,
+    diySearchKind: 'prowlarr',
+    diySearchUrl: 'http://prowlarr:9696',
+    diySearchApiKey: 'secret',
+    nntpHost: 'news.example.com',
+  });
+  assert.equal(result.discovery, true);
+  assert.equal(result.playback, true);
+  assert.equal(result.ready, true);
+});

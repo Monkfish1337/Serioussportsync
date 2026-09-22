@@ -359,6 +359,14 @@ test('saving Configure does not blank the settings that moved off it', async () 
   assert.equal(config.nntpHost, 'news.example.com');
   assert.equal(config.diyUsenetEnabled, true, 'Configure can enable the DIY master');
 
+  await post('/account/usenet/save', {
+    diySearchKind: 'prowlarr', diySearchName: 'My Prowlarr',
+    diySearchUrl: 'http://prowlarr:9696', diySearchApiKey: 'secret-key',
+    nntpHost: 'news.example.com', nntpPort: '563', nntpConnections: '20',
+  });
+  assert.equal(users.findById(user.id).config.diyUsenetEnabled, true,
+    'saving the toggle-free Usenet page must not switch off the wizard master');
+
   await post('/account/save', { torboxEnabled: 'on', maxStreams: '10' });
   const disabled = users.findById(user.id).config;
   assert.equal(disabled.diyUsenetEnabled, false, 'Configure can switch the DIY master off');

@@ -68,6 +68,8 @@ and belong on the signed-in **Account** page. Usenet Ultimate is its own
 standalone pipeline (a per-user manifest URL to your own UU instance). Built-in
 Usenet is a separate pipeline that uses a native indexer connection and a direct
 NNTP provider connection; it does not require a helper container.
+Its single on/off switch is on the Configure wizard; the dedicated Built-in
+Usenet page holds connection details, LAN playback routing, tuning and logs.
 
 For a Cloudflare-installed addon used on the same Wi-Fi as the server, set
 **Built-in Usenet → DIY playback on your LAN** to the LAN address of SSS
