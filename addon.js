@@ -582,6 +582,8 @@ function createApp() {
       users.updateUserConfig(req.user.id, {
         diyUsenetEnabled: b.diyUsenetEnabled === 'on'
           || b.diyUsenetEnabled === '1' || b.diyUsenetEnabled === 'true',
+        nzbdavEnabled: b.nzbdavEnabled === 'on'
+          || b.nzbdavEnabled === '1' || b.nzbdavEnabled === 'true',
         diyNativeSearchEnabled: b.diyNativeSearchEnabled === 'on'
           || b.diyNativeSearchEnabled === '1' || b.diyNativeSearchEnabled === 'true',
         diyUuSearchEnabled: b.diyUuSearchEnabled === 'on'
@@ -659,6 +661,10 @@ function createApp() {
         torboxApiKey: String(b.torboxApiKey || '').trim(),
         easynewsUsername: String(b.easynewsUsername || '').trim(),
         easynewsPassword: String(b.easynewsPassword || ''),
+        // Configure owns the master DIY switch. Backend-specific settings stay
+        // isolated to /account/usenet and are preserved when the master is off.
+        diyUsenetEnabled: req.user.role === 'admin' && (b.diyUsenetEnabled === 'on'
+          || b.diyUsenetEnabled === '1' || b.diyUsenetEnabled === 'true'),
         catalogs: finalCats,
         catalogsNone,
         // Served and shown are different choices, so they are stored
@@ -2898,6 +2904,7 @@ function renderAccountPage(user, opts) {
     +   (isAdmin ? '<details class="config-fold"><summary>DIY Usenet <span class="badge ms-2 ' + (diyStatus.ready ? 'bg-green-lt' : 'bg-secondary-lt') + '">' + (diyStatus.ready ? 'Ready' : 'Setup needed') + '</span></summary><div class="config-fold-body">'
     +     '<p class="text-secondary small mb-3">Your own Usenet search and playback backends for events the shared pipelines miss. Enable, test, and manage each part on its dedicated page.</p>'
     +     '<div class="d-flex flex-wrap gap-2 mb-3"><span class="badge ' + (diyStatus.discovery ? 'bg-green-lt' : 'bg-secondary-lt') + '">Discovery ' + (diyStatus.discovery ? 'ready' : 'not ready') + '</span><span class="badge ' + (diyStatus.nzbdav ? 'bg-green-lt' : 'bg-secondary-lt') + '">NZB DAV ' + (diyStatus.nzbdav ? 'ready' : 'off') + '</span><span class="badge ' + (diyStatus.nntp ? 'bg-green-lt' : 'bg-secondary-lt') + '">Native NNTP ' + (diyStatus.nntp ? 'ready' : 'off') + '</span></div>'
+    +     '<label class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" name="diyUsenetEnabled" value="on"' + (cfg.diyUsenetEnabled === true ? ' checked' : '') + '><span class="form-check-label"><strong>Enable the DIY Usenet pipeline</strong></span></label>'
     +     '<a class="btn btn-outline-primary" href="/account/usenet">Open DIY Usenet settings</a>'
     +   '</div></details>' : '')
     +   '<details class="config-fold"><summary>Catalogs and display order</summary>' + catalogsPanel + '</details>'

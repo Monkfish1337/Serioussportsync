@@ -41,8 +41,9 @@ the administrator and time. Restarting SSS resets the public request rate limite
 DIY Usenet is restricted to administrators, including saved configurations and
 background preparation. Its settings remain accessible through **Configure** for
 administrators; it is no longer a sidebar destination. Configure links to the
-dedicated page and reports readiness, while the dedicated page owns the native
-search, Usenet Ultimate discovery, NZB DAV and native NNTP switches. DIY is
+dedicated page, reports readiness, and provides the master pipeline switch.
+The dedicated page owns every detailed setting and can also change the master.
+DIY is
 ready only when at least one discovery source and one playback backend are both
 enabled and fully configured.
 

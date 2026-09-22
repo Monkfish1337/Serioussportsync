@@ -171,6 +171,7 @@ const nativeDiyOnlyManifest = buildManifest({
     torboxEnabled: false,
     uuEnabled: false,
     easynewsEnabled: false,
+    diyUsenetEnabled: true,
     diyNativeSearchEnabled: true,
     diyUuSearchEnabled: false,
     diySearchUrl: 'https://indexer.example/api',

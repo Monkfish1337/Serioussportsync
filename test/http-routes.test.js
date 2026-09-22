@@ -325,9 +325,8 @@ test('the wizard endpoints refuse anonymous callers', async () => {
 // 1. The Nuvio collection editor has forms of its own. Embedding it INSIDE the
 //    account form made the browser close the outer form at the first inner
 //    </form>, which orphaned the Save button — it rendered, and did nothing.
-// 2. The DIY Usenet fields moved to their own page. If /account/save still
-//    listed them, every Configure save would blank the lot, because those
-//    inputs are no longer in that form.
+// 2. The detailed DIY Usenet fields moved to their own page. Configure keeps
+//    the quick NZB DAV switch but must not blank the fields it does not render.
 test('saving Configure does not blank the settings that moved off it', async () => {
   const user = await makeUser('splitpage', 'admin');
   const login = await get('/login', {
@@ -353,12 +352,18 @@ test('saving Configure does not blank the settings that moved off it', async () 
   assert.equal(users.findById(user.id).config.diySearchName, 'My Prowlarr');
 
   // A Configure save carrying none of those fields.
-  await post('/account/save', { torboxEnabled: 'on', maxStreams: '10' });
+  await post('/account/save', { torboxEnabled: 'on', diyUsenetEnabled: 'on', maxStreams: '10' });
   const config = users.findById(user.id).config;
   assert.equal(config.diySearchName, 'My Prowlarr', 'Configure save must not blank DIY settings');
   assert.equal(config.diySearchApiKey, 'secret-key');
   assert.equal(config.nntpHost, 'news.example.com');
-  assert.equal(config.diyUsenetEnabled, true, 'Configure leaves the dedicated NZB DAV switch unchanged');
+  assert.equal(config.diyUsenetEnabled, true, 'Configure can enable the DIY master');
+
+  await post('/account/save', { torboxEnabled: 'on', maxStreams: '10' });
+  const disabled = users.findById(user.id).config;
+  assert.equal(disabled.diyUsenetEnabled, false, 'Configure can switch the DIY master off');
+  assert.equal(disabled.diySearchName, 'My Prowlarr',
+    'switching the master off preserves detailed DIY settings');
 });
 
 test('DIY connection tests return to the dedicated settings page', async () => {
