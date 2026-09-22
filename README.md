@@ -156,7 +156,10 @@ is submitted only when a user selects **Warm to TorBox**.
 Native DIY search and UU search can be enabled independently or merged, and UU
 is no longer required for DIY playback when native search is configured. The
 **DIY Usenet** page presents this as two stages: search and candidate
-discovery, then playback backends. New NNTP configurations default to 20
+discovery, then playback backends. It owns every DIY enable switch and shows
+separate readiness for discovery, NZB DAV and native NNTP; the main Configure
+page only reports that status. A usable pipeline requires at least one ready
+discovery source and one ready playback backend. New NNTP configurations default to 20
 connections, pre-authenticate their pool after resolution, and pipeline bounded
 read windows to reduce startup and seek latency; set a lower limit when the
 provider requires one. Compressed or encrypted RAR files and 7z releases

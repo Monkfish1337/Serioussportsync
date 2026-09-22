@@ -157,27 +157,31 @@ const diyOnlyManifest = buildManifest({
     easynewsEnabled: false,
     diyUsenetEnabled: true,
     uuManifestUrl: 'https://uu.example/private/manifest.json',
+    nzbdavUrl: 'http://nzbdav:3000',
+    nzbdavApiKey: 'key',
+    nzbdavWebdavUrl: 'http://nzbdav:3000',
   } },
 });
 assert.ok(
   diyOnlyManifest.resources.some((resource) => resource.name === 'stream'),
-  'DIY remains advertised when UU rows are disabled but UU search is configured',
+  'DIY remains advertised when UU discovery and NZB DAV playback are configured',
 );
 const nativeDiyOnlyManifest = buildManifest({
   user: { config: {
     torboxEnabled: false,
     uuEnabled: false,
     easynewsEnabled: false,
-    diyUsenetEnabled: true,
     diyNativeSearchEnabled: true,
     diyUuSearchEnabled: false,
     diySearchUrl: 'https://indexer.example/api',
     diySearchApiKey: 'key',
+    nativeNntpEnabled: true,
+    nntpHost: 'news.example.com',
   } },
 });
 assert.ok(
   nativeDiyOnlyManifest.resources.some((resource) => resource.name === 'stream'),
-  'native DIY search advertises streams without a UU manifest',
+  'native DIY search and NNTP advertise streams without a UU manifest or NZB DAV',
 );
 
 const collectionsOnlyManifest = buildManifest({
