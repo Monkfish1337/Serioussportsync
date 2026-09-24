@@ -11,6 +11,7 @@
   <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-1.1.0-blue.svg" alt="Version 1.1.0"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/discussions"><img src="https://img.shields.io/github/discussions/Monkfish1337/Serioussportsync?logo=github&label=discussions" alt="GitHub Discussions"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
 </p>
 
@@ -21,6 +22,23 @@ compatible clients.
 
 It hosts no media. Every playback connector is optional, self-hosted or
 user-supplied, and remains under the operator's control.
+
+## Community
+
+Questions, ideas and setups belong in
+[GitHub Discussions](https://github.com/Monkfish1337/Serioussportsync/discussions):
+
+- **[Q&A](https://github.com/Monkfish1337/Serioussportsync/discussions/categories/q-a)**
+  for installation, reverse proxies, TorBox, Usenet, Prowlarr and client help
+- **[Ideas](https://github.com/Monkfish1337/Serioussportsync/discussions/categories/ideas)**
+  for feature requests
+- **[Show and tell](https://github.com/Monkfish1337/Serioussportsync/discussions/categories/show-and-tell)**
+  for your setup, custom promotions and collections
+
+[Issues](https://github.com/Monkfish1337/Serioussportsync/issues) are for
+reproducible bugs. Before posting logs or screenshots anywhere, remove your
+manifest URL (it contains your private token) and any API keys or passwords.
+Please don't share links to copyrighted content, magnets, NZBs or streams.
 
 ## Start here
 
@@ -338,23 +356,6 @@ text search used by the DIY pipeline.
 
 Running from source requires Node.js 22 or newer. The supplied container builds
 and runs on Node.js 24.
-
-## Community
-
-Questions, ideas and setups belong in
-[GitHub Discussions](https://github.com/Monkfish1337/Serioussportsync/discussions):
-
-- **[Q&A](https://github.com/Monkfish1337/Serioussportsync/discussions/categories/q-a)**
-  for installation, reverse proxies, TorBox, Usenet, Prowlarr and client help
-- **[Ideas](https://github.com/Monkfish1337/Serioussportsync/discussions/categories/ideas)**
-  for feature requests
-- **[Show and tell](https://github.com/Monkfish1337/Serioussportsync/discussions/categories/show-and-tell)**
-  for your setup, custom promotions and collections
-
-[Issues](https://github.com/Monkfish1337/Serioussportsync/issues) are for
-reproducible bugs. Before posting logs or screenshots anywhere, remove your
-manifest URL (it contains your private token) and any API keys or passwords.
-Please don't share links to copyrighted content, magnets, NZBs or streams.
 
 ## Development
 
