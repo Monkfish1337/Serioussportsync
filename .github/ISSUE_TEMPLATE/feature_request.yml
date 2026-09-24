@@ -1,0 +1,30 @@
+name: Feature request
+description: A specific change or addition you'd like to see.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Still shaping the idea? [Discussions → Ideas](https://github.com/Monkfish1337/Serioussportsync/discussions/categories/ideas) is a good place to talk it through first.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      placeholder: When I open an event that's still airing, I can't tell whether releases are expected soon.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds you've tried
+  - type: input
+    id: area
+    attributes:
+      label: Area
+      description: e.g. a promotion or sport, discovery, TorBox, Usenet, Nuvio collections, admin pages.

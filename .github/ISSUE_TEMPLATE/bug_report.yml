@@ -1,0 +1,76 @@
+name: Bug report
+description: Something in SeriousSportSync is broken and you can reproduce it.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Setup questions get answered faster in [Discussions → Q&A](https://github.com/Monkfish1337/Serioussportsync/discussions/categories/q-a).
+
+        **Before pasting anything, remove your manifest URL** (it contains your private token) and any API keys, passwords, cookies or indexer/NNTP credentials.
+  - type: input
+    id: version
+    attributes:
+      label: SSS version
+      description: Shown in the admin header, e.g. v1.1.0.
+      placeholder: v1.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment
+      options:
+        - Docker Compose (repository compose file)
+        - Dockge stack
+        - Other Docker setup
+        - Running from source
+    validations:
+      required: true
+  - type: dropdown
+    id: access
+    attributes:
+      label: How clients reach SSS
+      options:
+        - LAN only
+        - HTTPS reverse proxy (Nginx Proxy Manager, Caddy, Traefik…)
+        - Cloudflare Tunnel
+        - Other
+    validations:
+      required: true
+  - type: checkboxes
+    id: pipelines
+    attributes:
+      label: Pipelines involved
+      options:
+        - label: TorBox
+        - label: Easynews
+        - label: Built-in Usenet
+        - label: Usenet Ultimate
+        - label: Prowlarr
+        - label: Bitmagnet
+        - label: Sport-Video
+        - label: Metadata / catalogs (no playback)
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened, and what did you expect?
+      placeholder: Opening ONE Friday Fights 162 in Nuvio shows no TorBox rows; I expected the cached release to appear.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the event in Nuvio
+        2. Press Refresh
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: From Admin → Logs, around the time it happened. Remove tokens, keys and manifest URLs first.
+      render: text
