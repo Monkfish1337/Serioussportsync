@@ -207,3 +207,49 @@ test('the matcher requires the card name, not merely a long word from it', () =>
   no('AEW.All.Out.2025.1080p');
   no('WWE.All.Out.2026');
 });
+
+// The weekly catalogues (AEW Dynamite, AEW Collision) are TheSportsDB-backed,
+// and the free key never reaches future episodes. AEW's schedule tops them up.
+// Records taken from the live /events page on 2026-09-23.
+test('weekly episodes come from AEW\'s schedule, one show per taping', () => {
+  const refresh = require('../scripts/refresh');
+  const transform = require('../lib/transform');
+  const records = [
+    { _id: 'a1', title: 'AEW Dynamite Pittsburgh', eventName: 'AEW Dynamite: Pittsburgh',
+      eventType: 'AEW: Dynamite', sortByDate: { $date: '2026-09-30T16:00:00.000Z' }, city: 'Pittsburgh, PA' },
+    { _id: 'a2', title: 'AEW Collision Highland Heights', eventName: 'AEW Collision: Highland Heights',
+      eventType: 'AEW: Collision', sortByDate: { $date: '2026-10-03T16:00:00.000Z' } },
+    { _id: 'a3', title: 'AEW Fright Night Dynamite Collision', eventName: 'AEW Fright Night: Dynamite & Collision',
+      eventType: 'AEW: Dynamite/Collision', sortByDate: { $date: '2026-10-28T16:00:00.000Z' } },
+    { _id: 'a4', title: 'AEW Dynamite Collision Indianapolis', eventName: 'AEW Dynamite/Collision: Indianapolis',
+      eventType: 'AEW: Dynamite/Collision', sortByDate: { $date: '2026-09-23T16:00:00.000Z' } },
+    { _id: 'a5', title: 'AEW Full Gear 2026', eventName: 'AEW: Full Gear',
+      eventType: 'AEW: Full Gear PPV', sortByDate: { $date: '2026-11-14T17:00:00.000Z' } },
+  ];
+  const events = records.map(aew.toRaw);
+  const dynamite = aew.weeklyEpisodes(events, 'Dynamite');
+  const collision = aew.weeklyEpisodes(events, 'Collision');
+  assert.deepEqual(dynamite.map((e) => [e.date, e.name]), [
+    ['2026-09-30', 'AEW Dynamite: Pittsburgh'],
+    ['2026-10-28', 'AEW Dynamite: Fright Night'],
+    ['2026-09-23', 'AEW Dynamite: Indianapolis'],
+  ]);
+  // Combined tapings air Collision on an unpublished later date: not guessed.
+  assert.deepEqual(collision.map((e) => [e.date, e.name]), [['2026-10-03', 'AEW Collision: Highland Heights']]);
+
+  const show = promotions.all.find((p) => p.id === 'aew-dynamite');
+  const norm = refresh.normalizeRecord(dynamite[0], show);
+  assert.equal(norm.id, 'aew-dynamite:aew-a1');
+  assert.equal(norm.source.type, 'aew');
+  assert.equal(show.includeEvent(norm), true);
+  assert.ok(show.searchTitles(norm).includes('AEW Dynamite 2026.09.30'));
+
+
+  // Once TheSportsDB lists the aired episode, the schedule copy goes.
+  const tsdbEp = transform.fromTsdb({ idEvent: '9', strEvent: 'Dynamite #340',
+    dateEvent: '2026-10-01', strTime: '00:00:00' }, show);
+  assert.equal(tsdbEp.date, '2026-09-30');
+  const byId = new Map([[norm.id, norm], [tsdbEp.id, tsdbEp]]);
+  assert.equal(refresh.dropSupplementalDuplicates(byId, show), 1);
+  assert.deepEqual(Array.from(byId.keys()), [tsdbEp.id]);
+});

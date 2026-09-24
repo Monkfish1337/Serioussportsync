@@ -125,6 +125,35 @@ function sourceStartDate(promotion, dateFrom) {
   return promotion && promotion.metadataStartDate || dateFrom;
 }
 
+// AEW's schedule feeds three promotions (AEW, AEW Dynamite, AEW Collision).
+// Fetch the two pages once per refresh, not once per promotion.
+async function fetchAewSchedule(log, sourceCache) {
+  const key = 'aew:schedule';
+  if (sourceCache && sourceCache.has(key)) return sourceCache.get(key);
+  const events = await aew.fetchAll({ log });
+  if (sourceCache) sourceCache.set(key, events);
+  return events;
+}
+
+// A weekly AEW catalogue holds TSDB episodes plus AEW-schedule episodes. Once
+// an episode airs TheSportsDB usually lists it too, and the schedule copy —
+// cached from before, when it was the only record — would sit beside it as a
+// duplicate. TSDB's wins: it carries the episode number the searches use.
+function dropSupplementalDuplicates(byId, promotion) {
+  const primaryDates = new Set();
+  for (const ev of byId.values()) {
+    if (ev.promotion === promotion.id && (!ev.source || ev.source.type !== 'aew')) primaryDates.add(ev.date);
+  }
+  let dropped = 0;
+  for (const [id, ev] of byId) {
+    if (ev.promotion === promotion.id && ev.source && ev.source.type === 'aew' && primaryDates.has(ev.date)) {
+      byId.delete(id);
+      dropped++;
+    }
+  }
+  return dropped;
+}
+
 async function refreshPromotion(promotion, log, opts) {
   opts = opts || {};
   log('==> refreshing ' + promotion.id + ' (' + promotion.name + ')');
@@ -174,6 +203,18 @@ async function refreshPromotion(promotion, log, opts) {
       raw = await tsdb.fetchAll(fetchOptions);
       if (opts.sourceCache) opts.sourceCache.set(cacheKey, raw);
     }
+    if (promotion.aewScheduleShow && aew && !opts.skipSupplement) {
+      // Future AEW episodes TheSportsDB cannot see. Best effort: a failure
+      // here keeps the TSDB episodes rather than failing the promotion.
+      try {
+        const schedule = await fetchAewSchedule(log, opts.sourceCache);
+        const episodes = aew.weeklyEpisodes(schedule, promotion.aewScheduleShow);
+        log('  aew schedule: +' + episodes.length + ' ' + promotion.aewScheduleShow + ' episode(s)');
+        raw = raw.concat(episodes);
+      } catch (err) {
+        log('  aew schedule unavailable, TSDB episodes only: ' + err.message);
+      }
+    }
   } else if (promotion.source.type === 'wikipedia') {
     if (!wiki) { log('  wikipedia source unavailable — skipping'); return { ok: true }; }
     raw = await wiki.fetchAll({ pattern: promotion.source.yearPagePattern, promotion, log });
@@ -185,7 +226,7 @@ async function refreshPromotion(promotion, log, opts) {
     // upcoming cards at all. One request, no key, no date window — the page
     // lists everything announced, which is about eighteen events.
     if (!aew) { log('  aew source unavailable — skipping'); return { ok: true }; }
-    raw = await aew.fetchAll({ log });
+    raw = await fetchAewSchedule(log, opts.sourceCache);
   } else if (promotion.source.type === 'mlb') {
     if (!mlb) { log('  mlb source unavailable — skipping'); return { ok: true }; }
     const today = new Date(); today.setUTCHours(0, 0, 0, 0);
@@ -370,6 +411,10 @@ async function refreshPromotion(promotion, log, opts) {
 
 function normalizeRecord(raw, promotion) {
   if (!promotion || !promotion.source) return null;
+  // AEW-schedule episodes mixed into a TSDB weekly catalogue.
+  if (promotion.aewScheduleShow && raw && raw.source && raw.source.type === 'aew') {
+    return transform.fromWiki(raw, promotion);
+  }
   if (promotion.source.type === 'thesportsdb') return transform.fromTsdb(raw, promotion);
   if (promotion.source.type === 'football-data') return transform.fromFootballData(raw, promotion);
   if (promotion.source.type === 'api-football') return transform.fromApiFootball(raw, promotion);
@@ -485,7 +530,8 @@ async function runRefresh(options) {
     if (expectedSourceType) {
       let mismatch = false;
       if (expectedSourceType === 'thesportsdb') {
-        if (cachedSourceType && cachedSourceType !== 'thesportsdb') mismatch = true;
+        if (cachedSourceType && cachedSourceType !== 'thesportsdb'
+            && !(p.aewScheduleShow && cachedSourceType === 'aew')) mismatch = true;
         if (!cachedSourceType) {
           const sourcePart = ev.id.slice(ev.id.indexOf(':') + 1);
           if (!/^\d+$/.test(sourcePart)) mismatch = true; // slug ID under a TSDB promotion = stale
@@ -558,6 +604,15 @@ async function runRefresh(options) {
       promotionEvents.push(norm);
     }
     log('  ' + p.id + ': +' + added + ' new, ~' + updated + ' updated, -' + skipped + ' outside scope');
+    if (p.aewScheduleShow) {
+      const dupes = dropSupplementalDuplicates(byId, p);
+      if (dupes) {
+        for (let i = promotionEvents.length - 1; i >= 0; i--) {
+          if (!byId.has(promotionEvents[i].id)) promotionEvents.splice(i, 1);
+        }
+        log('  ' + p.id + ': -' + dupes + ' schedule episode(s) now listed by TheSportsDB');
+      }
+    }
     totalAdded += added;
     totalUpdated += updated;
     totalSkipped += skipped;
@@ -653,4 +708,4 @@ if (require.main === module) {
 }
 
 module.exports = { runRefresh, refreshPromotion, normalizeRecord, inScope, activeSeasons,
-  knownPromotionPrefixes, isOrphanEventId };
+  knownPromotionPrefixes, isOrphanEventId, dropSupplementalDuplicates };
