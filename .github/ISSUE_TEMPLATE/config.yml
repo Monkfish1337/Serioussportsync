@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and setup help
+    url: https://github.com/Monkfish1337/Serioussportsync/discussions/categories/q-a
+    about: Installation, reverse proxies, TorBox, Usenet, Prowlarr, Nuvio or Stremio. Ask in Discussions → Q&A.
+  - name: Ideas and feature discussion
+    url: https://github.com/Monkfish1337/Serioussportsync/discussions/categories/ideas
+    about: Not sure it's a feature request yet? Start a conversation in Discussions → Ideas.
+  - name: Security issue
+    url: https://github.com/Monkfish1337/Serioussportsync/blob/main/docs/SECURITY.md#reporting
+    about: Please don't report vulnerabilities in a public issue. See the security guide.

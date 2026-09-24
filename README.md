@@ -339,6 +339,23 @@ text search used by the DIY pipeline.
 Running from source requires Node.js 22 or newer. The supplied container builds
 and runs on Node.js 24.
 
+## Community
+
+Questions, ideas and setups belong in
+[GitHub Discussions](https://github.com/Monkfish1337/Serioussportsync/discussions):
+
+- **[Q&A](https://github.com/Monkfish1337/Serioussportsync/discussions/categories/q-a)**
+  for installation, reverse proxies, TorBox, Usenet, Prowlarr and client help
+- **[Ideas](https://github.com/Monkfish1337/Serioussportsync/discussions/categories/ideas)**
+  for feature requests
+- **[Show and tell](https://github.com/Monkfish1337/Serioussportsync/discussions/categories/show-and-tell)**
+  for your setup, custom promotions and collections
+
+[Issues](https://github.com/Monkfish1337/Serioussportsync/issues) are for
+reproducible bugs. Before posting logs or screenshots anywhere, remove your
+manifest URL (it contains your private token) and any API keys or passwords.
+Please don't share links to copyrighted content, magnets, NZBs or streams.
+
 ## Development
 
 Build the local checkout with the development override:
