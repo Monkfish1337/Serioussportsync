@@ -198,7 +198,7 @@ test('rejects archive-only NZBs with an explicit NZB DAV fallback message', asyn
         close() {}, destroy() {},
       }),
     }),
-  /use the NZB DAV row/);
+  /choose another release, or a TorBox or Easynews row/);
 });
 
 test('resolves and serves a stored video split across RAR5 volumes', async () => {
