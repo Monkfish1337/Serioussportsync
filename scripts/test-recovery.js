@@ -14,6 +14,12 @@ const password = 'disposable-recovery-test-password';
 const secret = 'disposable-recovery-secret-00000000000000000000000000000000';
 const eventId = 'mlb:recovery-fixture';
 
+// Extract from inside the target folder with a relative, forward-slash path:
+// GNU tar on Windows reads an absolute C:\... archive path as a remote host.
+function extract(archive, target) {
+  execFileSync('tar', ['-xzf', path.relative(target, archive).split(path.sep).join('/')], { cwd: target });
+}
+
 function environment(dir) {
   const data = path.join(dir, 'data');
   const env = { ...process.env, SESSION_SECRET: secret, ADMIN_USER: '', HOST: '127.0.0.1',
@@ -162,7 +168,7 @@ async function run() {
     const archive = path.join(root, 'recovery.tar.gz');
     fs.writeFileSync(archive, Buffer.from(await response.arrayBuffer()));
     await stopServer(server); server = null;
-    execFileSync('tar', ['-xzf', archive, '-C', path.join(restored, 'data')]);
+    extract(archive, path.join(restored, 'data'));
     helper('verify', restored);
     server = await startServer(restored); await checkHttp(server);
     await stopServer(server); server = null; helper('verify', restored);
@@ -173,7 +179,7 @@ async function run() {
       assert.equal(path.dirname(restored), os.tmpdir());
       assert.ok(path.basename(restored).startsWith('sss-recovery-'));
       fs.rmSync(path.join(restored, 'data'), { recursive: true, force: true }); fs.mkdirSync(path.join(restored, 'data'));
-      execFileSync('tar', ['-xzf', archive, '-C', path.join(restored, 'data')]);
+      extract(archive, path.join(restored, 'data'));
       server = await startServer(restored, path.resolve(process.env.SSS_ROLLBACK_SOURCE)); await checkHttp(server);
       await stopServer(server); server = null; helper('verify', restored);
     }
