@@ -17,7 +17,7 @@ values use the maintained application defaults.
 | `ADMIN_USER` | none | Username promoted to administrator when it signs up. The password is created in the browser. |
 | `SSS_BIND_ADDRESS` | `127.0.0.1` | Host address published by the supplied Compose file. Use the server's LAN IP for trusted LAN access. This is a Compose setting, not an application setting. |
 | `SSS_HOST_PORT` | `7000` | Host port published by the supplied Compose file. |
-| `PUBLIC_URL` | request origin | Fixed public origin used in private install and resolve URLs. |
+| `PUBLIC_URL` | request origin | Fixed public origin used in private install and playback (resolve) URLs. Set it whenever users reach SSS over HTTPS through a reverse proxy; otherwise these URLs are generated as `http://` and playback fails. See [Reverse proxy or tunnel](INSTALLATION.md#reverse-proxy-or-tunnel). |
 | `TRUST_PROXY` | `false` | Set to `1` only when SSS is reachable exclusively through a trusted reverse proxy or tunnel. |
 | `ADDON_TYPE` | `movie` | Catalog item type. Some Nuvio clients may work better with `series`. |
 

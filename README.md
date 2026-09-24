@@ -294,7 +294,7 @@ Start with the short [.env.example](./.env.example). The annotated
 | --- | --- | --- |
 | <code>SESSION_SECRET</code> | required | Signs login cookies; use at least 32 random characters |
 | <code>ADMIN_USER</code> | none | Username promoted to administrator during initial signup |
-| <code>PUBLIC_URL</code> | auto-detected | Public origin used for private install and resolve URLs |
+| <code>PUBLIC_URL</code> | auto-detected | Public origin used for private install and resolve URLs. Set it behind an HTTPS reverse proxy, or playback links are generated as <code>http://</code> |
 | <code>TRUST_PROXY</code> | <code>false</code> | Set to <code>1</code> only when SSS is exclusively behind your trusted reverse proxy/tunnel; enables forwarded client IP, host, protocol, and secure-cookie handling |
 | <code>REFRESH_INTERVAL_HOURS</code> | <code>6</code> | Metadata refresh interval |
 | <code>AVAILABILITY_DB_FILE</code> | <code>./data/availability.sqlite</code> | Encrypted reusable provider searches, event/release matches, card-part classification, and scoped availability observations |
