@@ -2920,6 +2920,7 @@ function renderAccountPage(user, opts) {
     +       '<div class="product-card"><h3>Nuvio collection</h3><p class="text-secondary small">Export folders using the enabled catalogs and saved order.</p><div class="d-flex flex-wrap gap-2"><a class="btn btn-primary" href="/account/nuvio-collections.json" download>Download JSON</a><button class="btn btn-outline-primary" type="button" id="copyNuvioJsonBtn">Copy JSON</button></div><span class="text-secondary small" id="copyNuvioJsonStatus" aria-live="polite"></span></div>'
     +     '</div>'
     +     '<div class="manifest-output"><label class="form-label">Your private manifest URL</label><div class="input-group"><input class="form-control text-mono" id="murl" value="' + escapeHtml(installUrl) + '" readonly><button class="btn btn-outline-success" type="button" id="copyUrlOutputBtn">Copy</button></div></div>'
+    +     require('./lib/https-origin-warning').httpsOriginWarning('murl', 'alert alert-warning mt-3')
     +     '<textarea id="nuvioJsonPayload" class="d-none" tabindex="-1" aria-hidden="true" readonly>' + escapeHtml(nuvioJson) + '</textarea>'
     +     '<div class="config-management"><button class="btn btn-outline-danger" type="submit" formaction="/account/regenerate-token" formnovalidate onclick="return confirm(\'Rotate the manifest? Your current install URL stops working immediately.\');">Rotate manifest URL</button></div>'
     +   '</div></section>'

@@ -110,9 +110,35 @@ makes configuration failures much easier to identify.
 ## Reverse proxy or tunnel
 
 Keep the default loopback bind when the reverse proxy runs on the same host.
-Set `PUBLIC_URL=https://sports.example.com` if generated install links use the
-wrong address. Set `TRUST_PROXY=1` only when direct access is blocked and all
-traffic reaches SSS through your trusted proxy or tunnel.
+
+**If users reach SSS over HTTPS, set `PUBLIC_URL`.** A reverse proxy such as
+Nginx Proxy Manager, Caddy or Traefik usually terminates HTTPS and talks to SSS
+over plain HTTP on port 7000. SSS builds every link it hands out from the
+address it sees, so without `PUBLIC_URL` those links start with `http://`:
+
+```yaml
+environment:
+  PUBLIC_URL: "https://sports.example.com"
+```
+
+Recreate the container after setting it (`docker compose up -d`).
+
+This covers more than the install link. SSS also generates the TorBox playback
+links inside every stream response, and they use the same address. Changing
+the manifest link from `http://` to `https://` by hand makes the addon install
+and its catalogs work, but playback then fails, because those playback links
+are still `http://`. The Account page and the setup wizard show a warning when
+the page is open over HTTPS but the generated links are HTTP.
+
+Alternatively, `TRUST_PROXY=1` makes SSS read the scheme and host from the
+proxy's `X-Forwarded-Proto` and `X-Forwarded-Host` headers. Set it only when
+direct access is blocked and all traffic reaches SSS through your trusted proxy
+or tunnel, because those headers are otherwise client-controlled.
+`PUBLIC_URL` is the simpler choice when there is a single public address.
+
+Cloudflare Tunnel setups often work without either setting, because
+Cloudflare's "Always Use HTTPS" redirects `http://` requests to `https://`
+before they reach SSS. Setting `PUBLIC_URL` is still recommended there.
 
 The [Security guide](SECURITY.md) explains forwarded-header trust and exposure.
 
@@ -200,6 +226,18 @@ Set `SSS_HOST_PORT=7010` in `.env`, recreate the container, and open port 7010.
 Open SSS using the same public scheme and hostname configured in `PUBLIC_URL`.
 For a reverse proxy, forward the original host and protocol. Enable
 `TRUST_PROXY=1` only when the proxy is the exclusive route to SSS.
+
+### Behind an HTTPS proxy, the addon installs but playback fails
+
+Symptoms: the generated manifest URL starts with `http://`, catalogs and stream
+rows appear, but choosing a TorBox row fails (for example
+`avformat can't open input | Invalid data found when processing input`), and
+the SSS logs show no `resolve` request when Play is selected.
+
+SSS does not know its public address is HTTPS, so the playback links it
+generates are `http://`. Set `PUBLIC_URL=https://your.domain`, recreate the
+container, then reinstall the addon from **Account** so every link uses the
+HTTPS address. See [Reverse proxy or tunnel](#reverse-proxy-or-tunnel).
 
 ### Metadata works but playback does not
 
