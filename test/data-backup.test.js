@@ -17,7 +17,9 @@ test('online backup restores both WAL databases standalone and preserves ordinar
     archive=await createArchive(data);
     assert.equal(path.dirname(path.dirname(archive.archive)),path.join(data,'.backup-staging'));
     clearInterval(timer);
-    execFileSync('tar',['-xzf',archive.archive,'-C',restore]);
+    // Relative, forward-slash path from the target folder: GNU tar on Windows
+    // reads an absolute C:\... archive path as a remote host.
+    execFileSync('tar',['-xzf',path.relative(restore,archive.archive).split(path.sep).join('/')],{cwd:restore});
     assert.equal(fs.existsSync(path.join(restore,'.backup-staging')),false);
     assert.equal(JSON.parse(fs.readFileSync(path.join(restore,'users.json'))).users[0].role,'admin');
     for(const file of files) {
