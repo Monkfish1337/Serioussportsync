@@ -56,6 +56,22 @@ test('weekly wrestling shows recompute the US Eastern air date instead of TSDB\'
   assert.equal(raw.correctDate('RAW #1736', '2026-08-31'), '2026-08-31');
 });
 
+// Real records, 2026-09-24. A scheduled-but-unaired episode has no local time
+// and a midnight placeholder on the local date; shifting it put future Raws on
+// Sundays. An aired one has a real local time and still needs the shift.
+test('unaired weekly episodes keep the placeholder date', () => {
+  const raw = byId('wwe-raw');
+  const future = transform.fromTsdb({ idEvent: '1', strEvent: 'RAW #1740', dateEvent: '2026-09-28',
+    dateEventLocal: '2026-09-28', strTime: '00:00:00', strTimeLocal: '' }, raw);
+  assert.equal(future.date, '2026-09-28');
+  const aired = transform.fromTsdb({ idEvent: '2', strEvent: 'RAW #1739', dateEvent: '2026-09-22',
+    dateEventLocal: '2026-09-21', strTime: '00:00:00', strTimeLocal: '19:00:00' }, raw);
+  assert.equal(aired.date, '2026-09-21');
+  const smackdown = transform.fromTsdb({ idEvent: '3', strEvent: 'SmackDown #1414', dateEvent: '2026-09-25',
+    dateEventLocal: '2026-09-25', strTime: '00:00:00' }, byId('wwe-smackdown'));
+  assert.equal(smackdown.date, '2026-09-25');
+});
+
 test('weekly release matching requires the right show and date', () => {
   const promotion = byId('wwe-raw');
   const event = { name: 'WWE Raw #1739', date: '2026-09-21' };
