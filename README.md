@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version 1.0.0"></a>
+  <a href="https://github.com/Monkfish1337/Serioussportsync/releases"><img src="https://img.shields.io/badge/version-1.1.0-blue.svg" alt="Version 1.1.0"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml"><img src="https://github.com/Monkfish1337/Serioussportsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/Monkfish1337/Serioussportsync/pkgs/container/serioussportsync"><img src="https://img.shields.io/badge/GHCR-container-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
@@ -142,6 +142,31 @@ a third-party site on a schedule.
 Torrent results are checked against each user's TorBox account and resolved on
 play. Discovery never adds content to TorBox automatically; an uncached release
 is submitted only when a user selects **Warm to TorBox**.
+
+### How a stream request is answered
+
+Discovery runs in the background, so opening an event is usually a database
+lookup rather than a search:
+
+1. **Database first.** Every release the background jobs have matched to the
+   event is served straight away: Bitmagnet preparation, the Prowlarr queue,
+   Sport-Video and earlier live answers all count. Bitmagnet is also asked,
+   because a local index answers in milliseconds.
+2. **Live Prowlarr only when needed.** If the database holds nothing for the
+   event, and live search is enabled under **Server → Direct Prowlarr**, SSS
+   searches Prowlarr live within the discovery budget. Promotions in the
+   Prowlarr queue rely on the queue instead.
+3. **Refresh searches live.** Pressing Refresh in Nuvio or Stremio within
+   `LIVE_REFRESH_WINDOW_SECONDS` (default 30) of a database answer runs one
+   live search, even for queued promotions. The refreshed list starts with a
+   summary such as `🔄 Live search: 2 new releases` or `no new releases`, and
+   marks new rows with 🆕.
+4. **Everything found is kept.** Live results are saved to the database, even
+   ones that arrive after the response has gone. The next request, from any
+   account, serves them without searching again.
+
+With live search disabled, requests are answered from the database and
+Bitmagnet only, and Refresh does not search.
 
 ### Usenet and Easynews
 

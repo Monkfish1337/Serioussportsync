@@ -1,19 +1,61 @@
 # Changelog
 
-## Unreleased — one built-in Usenet path
+## 1.1.0 — 2026-09-24
 
-- Removed the Usenet Ultimate and NZB DAV choices from account configuration
-  and stream generation. Built-in Usenet now owns discovery and playback end to
-  end through the configured Newznab/NZBHydra/Prowlarr indexer and NNTP provider.
-- Deleted `lib/sources/usenet-ultimate.js`, `lib/sources/nzbdav.js`,
-  `lib/sources/nzbdav-playback.js`, `lib/sources/nzbdav-webdav.js` and
-  `lib/webdav-proxy.js`, along with their `uuManifestUrl`/`uuEnabled`/
-  `diyUuSearchEnabled`/`nzbdav*` account fields, admin form sections, and
-  `/resolve/nzbdav`, `/account/test-nzbdav` routes. No helper container is
-  needed for Usenet playback anymore — just an indexer connection and an NNTP
-  provider connection.
-- Updated account labels and operator documentation (README, Configuration,
-  Installation, Security) around the native path.
+### Discovery: database first, live search on Refresh
+
+- Stream requests are answered from the database first. Any release already
+  matched to the event, whichever background job or earlier search found it, is
+  served without a live Prowlarr or companion search. Bitmagnet is still asked.
+  Previously a request with stored matches could still spend around 20 seconds
+  on live Prowlarr.
+- Pressing Refresh in Nuvio or Stremio within `LIVE_REFRESH_WINDOW_SECONDS`
+  (default 30) of a database answer runs one live search, including for
+  promotions in the Prowlarr queue. The refreshed list leads with
+  `🔄 Live search: N new releases`, `no new releases` or `still searching`, and
+  marks new rows with 🆕.
+- Everything a live search finds is saved to the database, including results
+  that arrive after the response, for every promotion.
+
+### MLB and discovery timing
+
+- Evening games west of Eastern time are no longer treated as starting a day
+  early. About a third of MLB games were searched by the Prowlarr queue before
+  first pitch and counted as missing on Discovery → Overview.
+- MLB searches no longer ask for the previous day's date; that form is kept for
+  ESPN's UTC-dated NFL and NBA night games.
+- Postponed and cancelled MLB, NFL and NBA games are skipped by discovery and
+  the coverage report.
+
+### Catalogs
+
+- AEW Dynamite and Collision list announced future episodes from AEW's own
+  schedule. TheSportsDB's free key cannot reach them.
+- Upcoming WWE Raw and SmackDown episodes show on the right day. Unaired
+  episodes were landing a day early (Raw on Sunday, SmackDown on Thursday).
+
+### Usenet
+
+- Built-in Usenet is native end to end: a Newznab, NZBHydra or Prowlarr indexer
+  for search and SSS's own NNTP client for playback. NZB DAV and its helper
+  container are gone.
+- Usenet Ultimate remains its own standalone pipeline, alongside TorBox,
+  Easynews and Built-in Usenet.
+- Built-in Usenet playback can use a configured LAN address, the settings page
+  is simpler, and streaming start-up and controls are improved: playback starts
+  after one segment, the connection pool is pre-authenticated in the background
+  and reads ahead in a pipelined window (about one second from Play to
+  streaming for an 11 GB release on a test server).
+- An unplayable archive now suggests another release or a TorBox or Easynews
+  row, instead of the removed NZB DAV row.
+
+### Setup and documentation
+
+- Behind an HTTPS reverse proxy, the install guide now explains that
+  `PUBLIC_URL` is required. The Account page and setup wizard warn when a page
+  opened over HTTPS is generating `http://` links (#31).
+- README explains how a stream request is answered.
+- SeriousSportSync branding refreshed in the UI and manifest.
 
 ## 1.0.0 — 2026-09-22
 
