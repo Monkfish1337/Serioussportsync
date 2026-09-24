@@ -42,7 +42,10 @@
 - Usenet Ultimate remains its own standalone pipeline, alongside TorBox,
   Easynews and Built-in Usenet.
 - Built-in Usenet playback can use a configured LAN address, the settings page
-  is simpler, and streaming start-up and controls are improved.
+  is simpler, and streaming start-up and controls are improved: playback starts
+  after one segment, the connection pool is pre-authenticated in the background
+  and reads ahead in a pipelined window (about one second from Play to
+  streaming for an 11 GB release on a test server).
 - An unplayable archive now suggests another release or a TorBox or Easynews
   row, instead of the removed NZB DAV row.
 
