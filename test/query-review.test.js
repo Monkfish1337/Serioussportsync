@@ -78,3 +78,44 @@ test('Prowlarr records successful zero, timeout and never-started queries from a
     assert.equal(rows.find(r=>r.pattern==='slow').zeros,0);
   } finally {settings.getProwlarr=old;db.close();}
 });
+
+// Live, 2026-09-24: Fulham vs Man United opened from the Man United team
+// catalog ("epl-mun") recorded its Usenet and Easynews searches under that
+// id, which Review aliases never showed — the EPL page looked as though
+// those sources had matched nothing.
+test('team-catalog searches appear on the league page and follow its rules', () => {
+  const db = review.createReview(':memory:', () => Date.parse('2026-09-24'));
+  const league = {id:'epl', isRelevantStreamTitle: title => ({ok:/Fulham/.test(title)})};
+  const team = {id:'epl-mun', reviewParent:'epl', isRelevantStreamTitle: league.isRelevantStreamTitle};
+  const event = {id:'epl-mun:560583', date:'2026-09-20'};
+  try {
+    const ctx = db.context('native-indexer', team, event);
+    ctx.record('Fulham vs Manchester United 2026.09.20','success',[{title:'EPL.2026.09.20.Fulham.vs.Manchester.United.1080p'}],6000);
+    ctx.record('FUL-MUN 2026-09-20','success',[],8800);
+    assert.equal(db.rows('epl').length, 0, 'the league alone has nothing of its own');
+    const rows = db.rows('epl', ['epl-mun']);
+    const hit = rows.find(r => r.pattern === 'fulham vs manchester united {date}');
+    assert.equal(hit.matched, 1);
+    assert.equal(hit.promotion, 'epl-mun');
+    // Disabling from the league page acts on the team-catalog row...
+    const zero = rows.find(r => r.pattern === 'ful-mun {date}');
+    assert.throws(() => db.setPolicy('epl', zero.key, 'disabled'), /Query not found/);
+    db.setPolicy('epl', zero.key, 'disabled', ['epl-mun']);
+    assert.equal(db.rows('epl', ['epl-mun']).find(r => r.key === zero.key).action, 'disabled');
+    // ...and a rule saved on the league applies when the team catalog searches.
+    const leagueCtx = db.context('native-indexer', league, {id:'epl:560583', date:'2026-09-20'});
+    leagueCtx.record('Man Utd Fulham 2026.09.20','success',[],10900);
+    const leagueRow = db.rows('epl').find(r => r.pattern === 'man utd fulham {date}');
+    db.setPolicy('epl', leagueRow.key, 'disabled');
+    assert.deepEqual(db.context('native-indexer', team, event)
+      .filter(['Man Utd Fulham 2026.09.20', 'FUL-MUN 2026-09-20', 'Fulham vs Manchester United 2026.09.20']),
+      ['Fulham vs Manchester United 2026.09.20']);
+  } finally { db.close(); }
+});
+
+test('team catalogs name their league as review parent', () => {
+  const promotions = require('../lib/promotions');
+  const built = promotions.createGenericPromotion({id:'epl-mun', name:'Man United', autoTeam:true, source:'football-data', competitionId:'PL'});
+  assert.equal(built.reviewParent, 'epl');
+  assert.equal(promotions.createGenericPromotion({id:'my-custom', name:'X', source:'tsdb', leagueId:'1'}).reviewParent, null);
+});
