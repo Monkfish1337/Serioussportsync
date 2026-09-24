@@ -54,6 +54,7 @@ should normally be managed from **Metadata**, **Promotions**, and
 | `COMPANION_RESEARCH_TIMEOUT_MS` | `60000` | Hard client timeout for explicit Promotion Wizard research only; it does not affect playback. |
 | `PROMOTION_OVERRIDES_FILE` | `data/promotion-overrides.json` | Optional path for upgrade-safe matching overlays applied to shipped promotions. |
 | `PROWLARR_URL` / `PROWLARR_API_KEY` | none | Optional direct Prowlarr discovery bootstrap. These can be saved in Admin instead. |
+| `LIVE_REFRESH_WINDOW_SECONDS` | `30` | Stream requests are served from stored releases without a live Prowlarr search when the database already has one for the event. Pressing Refresh in Nuvio/Stremio within this many seconds of such a serve runs one live search; its results, including any that arrive after the response, are saved to the database. `0` disables it. |
 | `ZILEAN_URL` | none | Optional direct Zilean endpoint for legacy/bootstrap discovery. |
 | `STREAM_MAX_ROWS` | `20` | Maximum rows returned for an event. |
 | `STREAM_PIPELINE_TIMEOUT_MS` | `8000` | Maximum duration of each interactive playback pipeline. |
