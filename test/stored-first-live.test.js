@@ -77,8 +77,12 @@ test('Refresh shortly after a stored serve runs one live search', async () => {
     assert.equal(searches, 0, 'first request: database serve');
     assert.equal((await request('two')).length, 1);
     assert.equal(searches, 0, 'another account is not a Refresh press');
-    assert.equal((await request('one')).length, 2, 'the live result is served alongside the stored one');
+    const refreshed = await request('one');
+    assert.equal(refreshed.length, 2, 'the live result is served alongside the stored one');
     assert.equal(searches, 1, 'Refresh press: live search');
+    assert.match(refreshed[0].title, /^\u{1F504} Live search: 1 new release\n/u, 'the response says what the live search added');
+    assert.deepEqual(refreshed.map(row => row.name.startsWith('\u{1F195}')), refreshed.map(row => row.title.includes('2160p')),
+      'only the newly found release is flagged');
     assert.ok(index.storedForEvent({eventId: 'ufc:331', provider: 'torrent'}).some(c => c.infoHash === fresh.infoHash),
       'the live result is captured by the database');
     assert.equal(streams.takeRefreshPress('one|ufc:331'), false, 'the press is consumed');
@@ -119,10 +123,46 @@ test('a Refresh-forced live answer arriving after the response is still stored',
       titles: ['UFC 331'], torboxKey: 'k', discoveryBudgetMs: 20, liveProwlarr: true, log: () => {},
       urlCtx: {origin: 'http://sss.invalid', userId: 'one', apiToken: 'fixture', showWarmRows: false}});
     assert.equal(rows.length, 1, 'the response went out with the stored release only');
+    assert.match(rows[0].title, /Live search: no new releases so far — still searching, refresh again shortly/);
     await Promise.race([done, new Promise(resolve => setTimeout(resolve, 2000))]);
     await new Promise(resolve => setImmediate(resolve));
     assert.ok(index.storedForEvent({eventId: 'ufc:331', provider: 'torrent'}).some(c => c.infoHash === late.infoHash),
       'the late live result is captured by the database');
+  } finally {
+    [availability.getDefault, settings.getCompanion, settings.getProwlarr, settings.getBitmagnet,
+      settings.getSportVideo, prowlarr.multiSearch, torbox.checkCachedBatch] = originals;
+    streams.STORED_SERVES.clear();
+    index.close();
+  }
+});
+
+// Live log, 2026-09-24: a Refresh on UFC Fight Night 288 searched Prowlarr,
+// which returned only releases already stored, and nothing in Nuvio changed —
+// indistinguishable from a Refresh that never searched.
+test('a Refresh that finds nothing new says so', async () => {
+  streams.STORED_SERVES.clear();
+  const index = availability.createAvailabilityIndex({file: ':memory:', secret: process.env.SESSION_SECRET});
+  const originals = [availability.getDefault, settings.getCompanion, settings.getProwlarr,
+    settings.getBitmagnet, settings.getSportVideo, prowlarr.multiSearch, torbox.checkCachedBatch];
+  availability.getDefault = () => index;
+  settings.getCompanion = () => ({enabled: false});
+  settings.getProwlarr = () => ({enabled: true, url: 'http://example.invalid', apiKey: 'fixture'});
+  settings.getBitmagnet = () => ({enabled: false});
+  settings.getSportVideo = () => ({enabled: false});
+  const stored = {title: 'UFC.Fight.Night.288.Main.Card.1080p.WEB', infoHash: 'a'.repeat(40), size: 5000};
+  prowlarr.multiSearch = async () => ({ok: true, results: [stored]});
+  torbox.checkCachedBatch = async hashes => new Set(hashes);
+  index.recordEventCandidates({eventId: 'ufc:288', provider: 'torrent', scope: 'bitmagnet-only', results: [stored]});
+  const request = () => streams.pipelineTorrentTorbox({event: {id: 'ufc:288', name: 'UFC Fight Night 288', date: '2026-09-12'},
+    promo: {id: 'ufc', isRelevantStreamTitle: title => ({ok: /Fight.Night.288/.test(title)})},
+    titles: ['UFC Fight Night 288'], torboxKey: 'k', discoveryBudgetMs: 1000, liveProwlarr: true, log: () => {},
+    urlCtx: {origin: 'http://sss.invalid', userId: 'one', apiToken: 'fixture', showWarmRows: false}});
+  try {
+    const first = await request();
+    assert.ok(!/Live search/.test(first[0].title), 'an ordinary database serve carries no note');
+    const refreshed = await request();
+    assert.match(refreshed[0].title, /^\u{1F504} Live search: no new releases\n/u);
+    assert.ok(!refreshed[0].name.startsWith('\u{1F195}'));
   } finally {
     [availability.getDefault, settings.getCompanion, settings.getProwlarr, settings.getBitmagnet,
       settings.getSportVideo, prowlarr.multiSearch, torbox.checkCachedBatch] = originals;
