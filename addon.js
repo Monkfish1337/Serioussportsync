@@ -1922,8 +1922,11 @@ function createApp() {
     const promotion = promotions.all.find(item => item.id === req.params.id);
     if (!promotion) return res.status(404).send('Promotion not found');
     try {
-      require('./lib/query-review').getDefault().setPolicy(promotion.id, String(req.body.key || ''), String(req.body.action || ''));
-      availabilityStore.getDefault().clearPromotion(promotion.id);
+      // A league page also lists and governs its team catalogs' searches, so a
+      // rule change must refresh their cached searches too.
+      const related = require('./lib/admin-query-review').relatedIds(promotion);
+      require('./lib/query-review').getDefault().setPolicy(promotion.id, String(req.body.key || ''), String(req.body.action || ''), related);
+      for (const id of [promotion.id, ...related]) availabilityStore.getDefault().clearPromotion(id);
       res.redirect(303, '/admin/promotions/' + encodeURIComponent(promotion.id) + '/aliases');
     } catch (error) {res.status(400).send('Query action failed: ' + error.message);}
   });
