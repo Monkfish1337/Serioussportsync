@@ -859,7 +859,10 @@ function createApp() {
         provider, eventId, infoHash,
         exp: req.query.exp, sig: req.query.sig,
       });
+      const played = (outcome, extra) => require('./lib/diagnosis-journal').recordPlay(Object.assign({
+        eventId, user: req.userAccount.username, provider, outcome }, extra || {}));
       if (!v.ok) {
+        played('rejected', { error: 'link ' + v.reason });
         console.warn('[resolve] signature rejected (' + v.reason + ') for '
           + req.userAccount.username + ' ' + eventId + ' ' + infoHash);
         return res.status(403)
@@ -877,6 +880,7 @@ function createApp() {
           userId: req.params.userId,
         });
         if (out && out.nativeNntp) {
+          if (!req.headers.range || /^bytes=0-/.test(String(req.headers.range))) played('ok', { ms: Date.now() - resolveStartedAt });
           const range = req.headers.range ? ' ' + String(req.headers.range) : '';
           console.log('[resolve ' + req.userAccount.username + '] native nntp '
             + req.method + range);
@@ -889,13 +893,16 @@ function createApp() {
             });
         }
         if (out && out.url) {
+          played('ok', { ms: Date.now() - resolveStartedAt });
           res.setHeader('Cache-Control', 'no-store');
           return res.redirect(302, out.url);
         }
         // Not cached / unresolvable on this provider — tell the player plainly.
+        played('not-cached', { ms: Date.now() - resolveStartedAt });
         res.status(404).send('Not cached on ' + provider + ' (or no longer available).');
       } catch (err) {
         console.error('[resolve] handler error:', err);
+        played('error', { error: err && err.message });
         if (!res.headersSent) {
           res.removeHeader('Content-Range');
           res.removeHeader('Content-Length');
@@ -1178,17 +1185,28 @@ function createApp() {
     res.setHeader('Cache-Control', 'no-store');
     res.send(renderLogsPage(req.user, req.query));
   });
-  // Diagnosis: findings across every source, one-event investigation and a
+  // Diagnosis: the journey overview, one-event troubleshooting and a
   // directory of tools (lib/diagnosis, lib/admin-diagnosis).
   app.get('/admin/diagnosis', requireAdmin, (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
-    const tab = String(req.query.tab || 'findings');
+    const tab = String(req.query.tab || 'overview');
     const diagnosis = require('./lib/diagnosis');
     const data = { tab };
     if (tab === 'event') data.investigation = diagnosis.investigate(String(req.query.q || ''));
     else if (tab !== 'tools') data.findings = diagnosis.collect();
     res.send(tablerChrome.tablerPage('Diagnosis', require('./lib/admin-diagnosis').render(data),
       { user: req.user, currentSection: 'diagnosis' }));
+  });
+  // Hide a finding for 30 days (it returns early if it gets worse), or show it again.
+  app.post('/admin/diagnosis/hide', requireAdmin, (req, res) => {
+    const id = String((req.body && req.body.id) || '');
+    if (id) require('./lib/diagnosis').mute(id, String(req.body.severity || 'notice'), 30);
+    res.redirect(303, '/admin/diagnosis#hidden');
+  });
+  app.post('/admin/diagnosis/show', requireAdmin, (req, res) => {
+    const id = String((req.body && req.body.id) || '');
+    if (id) require('./lib/diagnosis').unmute(id);
+    res.redirect(303, '/admin/diagnosis');
   });
 
   // Client check: walk an account's addon the way Nuvio does (lib/client-check).
