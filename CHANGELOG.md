@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.1 — 2026-09-25
 
 - **NHL** is a built-in catalog from ESPN's schedule, with an alias table for
   all 32 teams (nicknames, cities and three-letter codes). NHL teams can be
@@ -12,6 +12,8 @@
   (Discussions #40).
 - GitHub Discussions is linked from the top of the README, with issue forms
   for bugs and feature requests.
+- F1 practice sessions match by number: Practice 3 no longer offers Practice 1
+  and 2 releases, and searches ask for the right session first (Discussions #42).
 - Admin backups work on Windows hosts (tar is run with relative paths).
 
 ## 1.1.0 — 2026-09-24
