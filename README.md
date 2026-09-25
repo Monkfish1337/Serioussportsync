@@ -71,7 +71,7 @@ choices. Advanced overrides are kept in the [configuration reference](docs/CONFI
 
 ## Supported sports
 
-Twenty-five promotions ship built in. Most need no API key; the exceptions are
+Twenty-six promotions ship built in. Most need no API key; the exceptions are
 noted below. Each account can also add team catalogs from **Your teams** without
 exposing every available club as a normal catalog.
 
@@ -113,6 +113,7 @@ leaves the rest working.
 | --- | --- | --- |
 | NFL | ESPN | Fixtures, `Away at Home` naming |
 | NBA | ESPN | Fixtures |
+| NHL | ESPN | Fixtures, nickname and three-letter code matching |
 | MLB | Official MLB schedule | Regular-season date and `Away @ Home` searches |
 
 **Discovered sports**
@@ -267,7 +268,7 @@ user can jump straight to any step.
 
 1. **Services** — TorBox, Easynews, and Built-in Usenet, plus the
    maximum number of streams per fixture and whether warm-to-cache rows appear.
-2. **Your teams** — pick a Premier League club, NFL, NBA, or MLB team to follow.
+2. **Your teams** — pick a Premier League club, NFL, NBA, MLB or NHL team to follow.
    An administrator can create a promotion straight from a pick.
 3. **Catalogs** — the rows this account sees, in the order it sees them.
 4. **Collections** — Nuvio collection folders, and **Push to Nuvio**, which

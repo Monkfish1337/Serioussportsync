@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- **NHL** is a built-in catalog from ESPN's schedule, with an alias table for
+  all 32 teams (nicknames, cities and three-letter codes). NHL teams can be
+  followed from **Configure → Your teams** (Discussions #43).
+- Review aliases shows searches made from **My Teams** catalogs on their
+  league's page, labelled, and league rules apply to them.
+- The Sport-Video tab reports how many prepared pages offered more than one
+  torrent, measuring whether per-variant releases are worth adding
+  (Discussions #40).
+- GitHub Discussions is linked from the top of the README, with issue forms
+  for bugs and feature requests.
+- Admin backups work on Windows hosts (tar is run with relative paths).
+
 ## 1.1.0 — 2026-09-24
 
 ### Discovery: database first, live search on Refresh
