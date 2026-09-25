@@ -1178,13 +1178,26 @@ function createApp() {
     res.setHeader('Cache-Control', 'no-store');
     res.send(renderLogsPage(req.user, req.query));
   });
+  // Diagnosis: findings across every source, one-event investigation and a
+  // directory of tools (lib/diagnosis, lib/admin-diagnosis).
+  app.get('/admin/diagnosis', requireAdmin, (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    const tab = String(req.query.tab || 'findings');
+    const diagnosis = require('./lib/diagnosis');
+    const data = { tab };
+    if (tab === 'event') data.investigation = diagnosis.investigate(String(req.query.q || ''));
+    else if (tab !== 'tools') data.findings = diagnosis.collect();
+    res.send(tablerChrome.tablerPage('Diagnosis', require('./lib/admin-diagnosis').render(data),
+      { user: req.user, currentSection: 'diagnosis' }));
+  });
+
   // Client check: walk an account's addon the way Nuvio does (lib/client-check).
   app.get('/admin/client-check', requireAdmin, (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.send(tablerChrome.tablerPage('Client check', require('./lib/admin-client-check').render({
       users: require('./lib/users').listUsers().map((u) => ({ id: u.id, username: u.username })),
-      promotions: promotions.all, currentUserId: req.user.id,
-    }), { user: req.user, currentSection: 'client-check' }));
+      promotions: promotions.all, currentUserId: req.user.id, eventId: String(req.query.eventId || ''),
+    }), { user: req.user, currentSection: 'diagnosis' }));
   });
   app.get('/admin/client-check/status.json', requireAdmin, (req, res) => {
     res.setHeader('Cache-Control', 'no-store');

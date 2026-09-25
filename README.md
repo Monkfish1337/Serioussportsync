@@ -304,7 +304,16 @@ JSON or application code. Changes take effect without rebuilding the image.
   measured Prowlarr queue, Sport-Video ingestion, Bitmagnet preparation and
   manual torrent-resource matching. Usenet and Easynews do not inflate these
   torrent coverage totals.
-- **Client check:** walks an account's addon the way Nuvio does (manifest, every
+- **Diagnosis:** the starting point when something is wrong. **Findings**
+  checks everything SSS records (refresh outcomes, missing API keys, weekly
+  shows with no upcoming episodes, torrent coverage, failing indexers, learned
+  rules that name one event, search patterns that never find anything, Client
+  check results, Sport-Video and Usenet status, recent errors) and links each
+  problem to the page that fixes it. **Investigate an event** shows everything
+  known about one event: saved releases, recent requests, the searches used and
+  why releases were turned down. **All tools** lists every diagnostic page by
+  the question it answers.
+- **Client check** (a Diagnosis tab): walks an account's addon the way Nuvio does (manifest, every
   catalog, event details and stream lists) and reports empty catalogs, slow or
   failing pipelines, malformed rows and http links, without opening a client.
   Each promotion is checked on a recent event SSS already holds a release for,

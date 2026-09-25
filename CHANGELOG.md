@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- **Diagnosis** (admin sidebar) brings the diagnostic tools into one place.
+  - **Findings** reads what SSS already records and lists problems by severity,
+    each with the page that fixes it: failed or skipped refreshes, promotions
+    missing an API key, empty catalogs, weekly shows with no upcoming episodes,
+    promotions with poor torrent coverage, indexers failing in a row (flagged
+    critical when it is the most productive one), learned matching rules that
+    name a single event, search patterns that never find anything, the last
+    Client check, Sport-Video errors, built-in Usenet switched on but not
+    configured, PUBLIC_URL unset, and recent errors by area.
+  - **Investigate an event** gathers one event's metadata, saved releases (torrent,
+    Usenet, Easynews, Sport-Video, Prowlarr queue), recent requests, search
+    queries and rejection reasons, with links to the tools that act on it.
+  - **All tools** lists every diagnostic page by the question it answers.
+  - Client check moves under Diagnosis.
+- Metadata refreshes record each promotion's outcome (refreshed, failed or
+  skipped, with the reason) for the Diagnosis page. A promotion skipped for a
+  missing key was previously visible only in the log.
+
 - **Client check** (admin sidebar): walks an account's addon over HTTP the way
   Nuvio does (manifest, every catalog, event details and the stream list) and
   reports what a client would see: empty catalogs, missing posters, rows with
