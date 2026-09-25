@@ -327,3 +327,40 @@ test('full Torrent/TorBox discovery records discovered, matched, and ready count
     index.close();
   }
 });
+
+// Nobody seeding means TorBox can never finish downloading it: a cached copy
+// plays, but an uncached one is not offered as a warm row.
+test('an unseeded, uncached torrent is not offered as a warm row', async () => {
+  const index = createAvailabilityIndex({ file: ':memory:', secret: process.env.SESSION_SECRET });
+  const originals = [availabilityStore.getDefault, settings.getCompanion, settings.getProwlarr, settings.getBitmagnet, torbox.checkCachedBatch];
+  const companion = { url: 'http://scraper:8080', authToken: 'token' };
+  const prowlarr = { url: '', apiKey: '' };
+  const candidates = [
+    { title: 'ONE.Friday.Fights.170.720p.WEB', infoHash: '4'.repeat(40), size: 9, seeders: 0 },
+    { title: 'ONE.Friday.Fights.170.1080p.WEB', infoHash: '5'.repeat(40), size: 8, seeders: 3 },
+  ];
+  const sourceScope = index.scopeFingerprint('torrent', {
+    discoveryVersion: 4, prowlarrLiveBudgetMs: settings.getDiscoveryTiming().prowlarrLiveBudgetMs, sources: 'all',
+    companionUrl: companion.url, companionToken: companion.authToken, prowlarrUrl: prowlarr.url, prowlarrApiKey: prowlarr.apiKey,
+  });
+  index.recordSearch({ eventId: 'one:170', promotionId: 'one', provider: 'torrent', scope: sourceScope, queries: ['ONE Friday Fights 170'], results: candidates });
+  availabilityStore.getDefault = () => index;
+  settings.getCompanion = () => companion;
+  settings.getProwlarr = () => prowlarr;
+  settings.getBitmagnet = () => ({ url: '', limit: 300, concurrency: 4, timeoutMs: 15000, videoOnly: false, enabled: true });
+  torbox.checkCachedBatch = async () => new Set();
+  try {
+    const rows = await streams.pipelineTorrentTorbox({
+      promo: { id: 'one', isRelevantStreamTitle: () => ({ ok: true }) },
+      event: { id: 'one:170', name: 'ONE Friday Fights 170', date: '2026-09-11', excludePatterns: [] },
+      titles: ['ONE Friday Fights 170'], torboxKey: 'torbox-key', discoveryBudgetMs: 100,
+      urlCtx: { origin: 'http://sss:7000', userId: 'user-1', apiToken: 'token', showWarmRows: true }, log: () => {},
+    });
+    const warm = rows.filter((row) => /\/warm\/torbox\//.test(row.url));
+    assert.equal(warm.length, 1);
+    assert.ok(warm[0].url.includes('5'.repeat(40)), 'only the seeded one');
+  } finally {
+    [availabilityStore.getDefault, settings.getCompanion, settings.getProwlarr, settings.getBitmagnet, torbox.checkCachedBatch] = originals;
+    index.close();
+  }
+});

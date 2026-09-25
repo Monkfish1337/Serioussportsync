@@ -495,3 +495,60 @@ test('Search now waits out an in-flight search, and the queue timer stands aside
     assert.doesNotMatch(sweep.note,/switched off/);
   } finally {queue.close();}
 });
+
+// Found on 2026-09-25: Twins @ Giants and Diamondbacks @ Rockies (23 Sept)
+// were on 720pier only with 0 seeders, so their torrents were never fetched,
+// their hashes never known and TorBox never asked.
+test('unseeded torrents are fetched after seeded ones when asked, never otherwise',async()=>{
+  const settings=require('../lib/settings'),source=require('../lib/sources/prowlarr'),{Response}=require('node-fetch');
+  const original=settings.getProwlarr;
+  settings.getProwlarr=()=>({url:'http://prowlarr.invalid',apiKey:'fixture'});
+  const fetched=[];
+  const fetchImpl=async url=>{
+    if (url.includes('/api/v1/search?')) return new Response(JSON.stringify([
+      {title:'MLB 2026 / RS / 23.09.2026 / Minnesota Twins @ San Francisco Giants (3/3)',downloadUrl:'/download/unseeded',seeders:0,indexer:'720pier'},
+      {title:'MLB 2026 / RS / 22.09.2026 / Minnesota Twins @ San Francisco Giants (2/3)',downloadUrl:'/download/seeded',seeders:3,indexer:'720pier'}]));
+    fetched.push(url.split('/download/')[1]);
+    return new Response(null,{status:302,headers:{location:'magnet:?xt=urn:btih:'+(url.includes('unseeded')?'a':'b').repeat(40)}});
+  };
+  try {
+    const plain=await source.multiSearch(['Giants Twins'],{detailed:true,indexerId:36,fetchImpl,hydrationLimit:3,hydrationConcurrency:1});
+    assert.deepEqual(fetched,['seeded'],'live searches still skip unseeded torrents');
+    assert.equal(plain.results.length,1);
+    fetched.length=0;
+    const opted=await source.multiSearch(['Giants Twins'],{detailed:true,indexerId:36,fetchImpl,hydrationLimit:3,hydrationConcurrency:1,hydrateUnseeded:true});
+    assert.deepEqual(fetched,['seeded','unseeded'],'seeded first, then unseeded');
+    assert.equal(opted.results.length,2);
+  } finally {settings.getProwlarr=original;}
+});
+
+test('the background queue and manual search ask for unseeded torrents',async()=>{
+  const seen=[];
+  const {deps}=setup({search:async(_q,opts)=>{seen.push(opts.hydrateUnseeded);return {ok:true,partial:false,results:[]};},
+    manualProwlarrSearch:async(_q,opts)=>{seen.push(opts.hydrateUnseeded);return {ok:true,results:[]};},
+    bitmagnet:()=>({})});
+  const queue=discovery.createQueue(':memory:',deps);
+  try {
+    await queue.run();
+    await queue.manualSearch(fixtures[0],'');
+    assert.deepEqual(seen,[true,true]);
+  } finally {queue.close();}
+});
+
+// Found on 2026-09-25: Astros @ Mariners (22 Sept) was due a retry on the
+// 23rd and still waiting on the 25th, because a backlog of never-searched
+// NHL games always went first.
+test('every third search goes to a due retry, even with a backlog of first searches',async()=>{
+  const games=[{id:'mlb:a',name:'A vs B',date:'2026-09-11'},...['c','d','e','f','g'].map((x,i)=>({id:'mlb:'+x,name:x+' vs y',date:'2026-09-0'+(9-i)}))];
+  const order=[];
+  const {deps,advance}=setup({events:()=>games,search:async(_q,opts)=>{order.push(opts);return {ok:true,partial:false,results:[]};}});
+  const queue=discovery.createQueue(':memory:',deps);
+  const picked=async()=>{const r=await queue.run();advance(121000);return r.eventId;};
+  try {
+    assert.equal(await picked(),'mlb:a','newest first');
+    advance(3*24*HOUR);                     // mlb:a is now due a retry
+    const next=[await picked(),await picked(),await picked()];
+    assert.ok(next.includes('mlb:a'),'the due retry is not starved: '+next.join(', '));
+    assert.equal(next.filter(id=>id!=='mlb:a').length,2,'first searches still get most turns');
+  } finally {queue.close();}
+});
