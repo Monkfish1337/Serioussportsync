@@ -156,3 +156,43 @@ test('the refresh record keeps other promotions when one promotion refreshes on 
   assert.equal(saved.promotions.find((p) => p.id === 'motd').status, 'failed', 'kept');
   assert.equal(saved.promotions.find((p) => p.id === 'nhl').at, '2026-09-25T11:00:00Z');
 });
+
+// Found on the live server on 2026-09-25, after the first Diagnosis run.
+test('an indexer that stopped saving matches is flagged even when its failure counter looks fine', () => {
+  const result = run({ queueStatus: () => ({
+    // 720pier as it really was: 169 successes, 1 consecutive failure, still searched today.
+    indexers: [
+      { name: '720pier', successes: 169, failures: 1, requests: 19, day: day(0), next_at: 0 },
+      { name: 'RuTracker.org', successes: 36, failures: 0, requests: 91, day: day(0), next_at: 0 },
+    ],
+    matchedEvents: [
+      { event: 'mlb:1', at: NOW - 4 * 86400000, indexers: ['720pier'] },
+      { event: 'mlb:2', at: NOW - 3600000, indexers: ['RuTracker.org'] },
+    ],
+    eventStates: [],
+  }) });
+  const stopped = titled(result, /720pier has not found a usable torrent since/);
+  assert.ok(stopped);
+  assert.equal(stopped.severity, 'critical');
+  assert.match(stopped.detail, /expired cookie/);
+  assert.ok(!titled(result, /RuTracker/), 'an indexer still saving matches is fine');
+});
+
+test('weekly-show rules are judged as they are used, after episode numbers are stripped', () => {
+  const result = run({
+    promotions: () => [{ id: 'wwe-raw', name: 'WWE Raw', enabled: true, weeklyShow: true, source: { type: 'thesportsdb' }, isRelevantStreamTitle: () => ({ ok: true }) }],
+    overrides: () => [{ promotionId: 'wwe-raw', promotionAliases: ['WWE Raw', 'WWE Monday Night Raw S34E36'],
+      relevanceKeywords: ['wwe monday night raw s34e36'], searchTitleTemplates: ['{name}'] }],
+    sanitizeWeekly: require('../lib/promotion-overrides').sanitizeWeekly,
+  });
+  assert.ok(!titled(result, /learned rules that name a single event/), 'S34E36 is never searched with');
+});
+
+test('coverage advice follows the reason: an unselected promotion points at the Prowlarr selection', () => {
+  const result = run({ coverage: () => ({ promotions: [{ id: 'nhl', total: 47, missing: 38,
+    reasons: { 'Not selected for Prowlarr; no saved match recorded': 38 } }] }) });
+  const nhl = titled(result, /NHL: 38 of 47 recent events have no saved torrent/);
+  assert.equal(nhl.severity, 'warning', 'unconfigured, not broken');
+  assert.equal(nhl.fix.href, '/admin/discovery?tab=prowlarr');
+  assert.match(nhl.detail, /No background source searches this promotion/);
+});
