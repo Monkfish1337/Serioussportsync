@@ -1178,6 +1178,35 @@ function createApp() {
     res.setHeader('Cache-Control', 'no-store');
     res.send(renderLogsPage(req.user, req.query));
   });
+  // Client check: walk an account's addon the way Nuvio does (lib/client-check).
+  app.get('/admin/client-check', requireAdmin, (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(tablerChrome.tablerPage('Client check', require('./lib/admin-client-check').render({
+      users: require('./lib/users').listUsers().map((u) => ({ id: u.id, username: u.username })),
+      promotions: promotions.all, currentUserId: req.user.id,
+    }), { user: req.user, currentSection: 'client-check' }));
+  });
+  app.get('/admin/client-check/status.json', requireAdmin, (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(require('./lib/admin-client-check').status());
+  });
+  app.post('/admin/client-check/run', requireAdmin, (req, res) => {
+    const body = req.body || {};
+    const user = require('./lib/users').findById(String(body.userId || req.user.id));
+    if (!user || !user.apiToken) return res.status(400).send('Account not found');
+    const origin = publicOriginFromReq(req);
+    let host = '';
+    try { host = new URL(origin).host; } catch (_) { /* fall back to the loopback host */ }
+    const promotion = String(body.promotion || '').trim();
+    require('./lib/admin-client-check').start({
+      user, origin, host,
+      pageProtocol: String(body.pageProtocol || '') === 'https:' ? 'https:' : 'http:',
+      only: promotion ? [promotion] : null,
+      eventId: String(body.eventId || '').trim() || null,
+    });
+    res.redirect(303, '/admin/client-check');
+  });
+
   app.get('/admin/logs.json', requireAdmin, (req, res) => {
     const rows = logBuffer.filtered(logQuery(req, { sinceId: req.query.sinceId }));
     res.setHeader('Cache-Control', 'no-store');
