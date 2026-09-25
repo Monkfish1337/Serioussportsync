@@ -569,17 +569,29 @@ async function runRefresh(options) {
 
   let totalAdded = 0, totalUpdated = 0, totalSkipped = 0;
   const failures = [];
+  // Per-promotion outcome for the Diagnosis page (lib/refresh-status.js). A
+  // promotion that returns without events has logged why — a missing key, an
+  // unavailable module — and that line is the reason it is recorded with.
+  const outcomes = [];
   const sourceCache = opts.sourceCache || new Map();
   for (const p of toFetch) {
     let raw;
+    const said = [];
+    const promotionLog = (message) => { said.push(String(message)); log(message); };
     try {
-      raw = await refreshPromotion(p, log, { sourceCache });
+      raw = await refreshPromotion(p, promotionLog, { sourceCache });
     } catch (err) {
       log('  ' + p.id + ' FATAL: ' + err.message);
       failures.push({ promotion: p.id, error: err.message });
+      outcomes.push({ id: p.id, status: 'failed', reason: String(err.message).slice(0, 300) });
       continue;
     }
-    if (!Array.isArray(raw)) continue;
+    if (!Array.isArray(raw)) {
+      const why = said.slice().reverse().find((line) => /skipping|unavailable|not configured|no api key|unknown source/i.test(line))
+        || said[said.length - 1] || 'returned no events';
+      outcomes.push({ id: p.id, status: 'skipped', reason: why.trim().slice(0, 300) });
+      continue;
+    }
 
     const promotionEvents = [];
     let added = 0, updated = 0, skipped = 0;
@@ -604,6 +616,7 @@ async function runRefresh(options) {
       promotionEvents.push(norm);
     }
     log('  ' + p.id + ': +' + added + ' new, ~' + updated + ' updated, -' + skipped + ' outside scope');
+    outcomes.push({ id: p.id, status: 'ok', fetched: raw.length, added, updated, skipped });
     if (p.aewScheduleShow) {
       const dupes = dropSupplementalDuplicates(byId, p);
       if (dupes) {
@@ -694,6 +707,12 @@ async function runRefresh(options) {
     + (failures.length ? ', ' + failures.length + ' failed' : '') + ')');
   const result = { ok, total: merged.length, added: totalAdded, updated: totalUpdated,
     prunedOrphans };
+  if (opts.recordStatus !== false) {
+    require('../lib/refresh-status').record({
+      finishedAt: new Date().toISOString(), ok, durationMs: Date.now() - start,
+      scope: targetPromotionId ? targetPromotionId : 'all', total: merged.length, promotions: outcomes,
+    });
+  }
   if (failures.length) {
     result.error = failures.length === 1
       ? failures[0].error
