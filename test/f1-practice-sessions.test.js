@@ -23,6 +23,10 @@ test('a practice event accepts only its own practice number', () => {
   assert.equal(ok('Formula.1.2026.Azerbaijan.GP.Free.Practice.3.1080p'), true);
   assert.equal(ok('Формула 1 2026 Этап 17 Азербайджан Третья практика'), true);
   assert.equal(ok('Формула 1 2026 Этап 17 Азербайджан Практика 1'), false);
+  // No separator before the number, from a live request on 2026-09-25.
+  const p2 = { id: 'f1:p2', name: 'Azerbaijan Grand Prix Practice 2', date: '2026-09-24', round: '15' };
+  assert.equal(f1.isRelevantStreamTitle('Formula1.S2026E81.Round15.Azerbaijan.Practice2.F1TV.International.1080p.WEB-DL.AAC2.0.H265', p2).ok, true);
+  assert.equal(f1.isRelevantStreamTitle('Formula1.S2026E80.Round15.Azerbaijan.Practice1.F1TV.International.1080p.WEB-DL.AAC2.0.H265', p2).reason, 'practice(1≠2)');
   // A release naming no number (all practices bundled) is still offered.
   assert.equal(ok('Formula 1 2026 Azerbaijan GP Practice 1080p'), true);
   assert.equal(f1.isRelevantStreamTitle('Formula 1 Azerbaijan Grand Prix Practice 1 24.09.2026', practice3).reason, 'practice(1≠3)');
@@ -40,4 +44,17 @@ test('other sessions are unaffected', () => {
   assert.equal(f1.isRelevantStreamTitle('Formula 1 Azerbaijan Grand Prix Qualifying 26.09.2026', quali).ok, true);
   assert.equal(f1.isRelevantStreamTitle('Formula 1 Azerbaijan Grand Prix Practice 3 25.09.2026', quali).ok, false);
   assert.equal(f1.searchTitles(quali)[0], 'Formula 1 2026 Azerbaijan GP Qualifying');
+});
+
+// From the same live request: support programmes name the weekend but no
+// session, and a race event took them for unlabelled race rips.
+test('support programmes are not offered as the race', () => {
+  const race = { id: 'f1:r', name: 'Azerbaijan Grand Prix', date: '2026-09-27', round: '15' };
+  const ok = (title) => f1.isRelevantStreamTitle(title, race).ok;
+  assert.equal(ok('Formula1.2026.Round15.Azerbaijan.Paddock.Uncut.SKYF1UHD.WEBRiP.2160p.H265.DDP5.1.English-MWR'), false);
+  assert.equal(ok('Formula1.2026.Round15.Azerbaijan.Weekend.Warm-Up.F1TV.WEB-DL.1080p.H264.English-MWR'), false);
+  assert.equal(ok('Formula1.2026.Round15.Azerbaijan.Race.Build-Up.SKY.1080p'), false);
+  assert.equal(ok('Formula1.2026.Round15.Azerbaijan.Grand.Prix.SKYF1UHD.2160p'), true, 'unlabelled race rip');
+  assert.equal(ok('Formula1.2026.Round15.Azerbaijan.Race.F1TV.1080p'), true);
+  assert.equal(ok('F1.2026.R15.Azerbaijan.Full.Weekend.1080p'), true);
 });
