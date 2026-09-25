@@ -406,3 +406,70 @@ test('cooldown reset cannot bypass an exhausted daily budget',async()=>{
     assert.equal(calls,1);assert.equal(queue.status().indexers[0].requests,1);
   } finally {queue.close();}
 });
+
+// Search now: the queue's pacing is skipped on request, its protections are not.
+const finished = async (queue) => { for (let i = 0; i < 1000 && !(queue.status().sweep || {}).finishedAt; i++) await new Promise((r) => setImmediate(r)); return queue.status().sweep; };
+const spread = [{id:'mlb:1',name:'Mets vs Yankees',date:'2026-09-11'},{id:'mlb:2',name:'Mariners vs Rangers',date:'2026-09-10'},{id:'nba:3',name:'Lakers vs Celtics',date:'2026-09-11'}];
+
+test('Search now searches each missing game of a promotion once, straight away',async()=>{
+  const searched=[];
+  const {deps}=setup({events:()=>spread,sleep:async()=>{},indexers:async()=>[{id:30,name:'RuTracker'},{id:31,name:'720pier'}],
+    search:async(queries,opts)=>{searched.push(opts.indexerId+':'+queries[0]);return {ok:true,partial:false,results:[]};}});
+  const queue=discovery.createQueue(':memory:',deps);
+  try {
+    await queue.run(); // the queue's own search: now every game and indexer is "waiting"
+    assert.equal((await queue.run()).skipped,'spacing');
+    const started=queue.searchNow({promotion:'mlb'});
+    assert.equal(started.planned,2);
+    const sweep=await finished(queue);
+    assert.deepEqual(sweep.searches.map(s=>s.eventId),['mlb:2','mlb:1'],'one search per game, never-searched first, only MLB');
+    assert.equal(searched.length,3);
+    assert.ok(sweep.searches.every(s=>s.indexer==='RuTracker'),'the proven indexer is still preferred');
+    assert.equal(sweep.note,'');
+  } finally {queue.close();}
+});
+
+test('Search now for one game tries each indexer until it matches',async()=>{
+  const {deps}=setup({events:()=>spread,sleep:async()=>{},indexers:async()=>[{id:30,name:'RuTracker'},{id:31,name:'720pier'},{id:32,name:'Knaben'}],
+    search:async(_q,opts)=>({ok:true,partial:false,results:opts.indexerId===31?[{title:'MLB Mariners vs Rangers 1080p',infoHash:'a'.repeat(40),seeders:4}]:[]})});
+  const queue=discovery.createQueue(':memory:',deps);
+  try {
+    queue.searchNow({eventId:'mlb:2'});
+    const sweep=await finished(queue);
+    assert.deepEqual(sweep.searches.map(s=>s.indexer),['RuTracker','720pier'],'stops at the first match');
+    assert.equal(sweep.matched,1);
+    assert.throws(()=>queue.searchNow({eventId:'mlb:2'}),/already has a saved, seeded match/);
+  } finally {queue.close();}
+});
+
+test('Search now keeps failure cooldowns and refuses what it cannot do',async()=>{
+  let calls=0;
+  const {deps}=setup({events:()=>spread,sleep:async()=>{},search:async()=>{calls++;return {ok:false,upstreamFailed:true,results:[]};}});
+  const queue=discovery.createQueue(':memory:',deps);
+  try {
+    await queue.run(); // fails: the only indexer cools down
+    assert.equal(calls,1);
+    queue.searchNow({promotion:'mlb'});
+    const sweep=await finished(queue);
+    assert.equal(calls,1,'a failing indexer is not searched');
+    assert.match(sweep.note,/cooling down or out of budget/);
+    assert.throws(()=>queue.searchNow({promotion:'ucl'}),/Add this promotion to the Prowlarr queue first/);
+    assert.throws(()=>queue.searchNow({eventId:'mlb:404'}),/Choose a selected past event/);
+  } finally {queue.close();}
+  const off=discovery.createQueue(':memory:',{...deps,options:()=>({enabled:false,intervalSeconds:120,dailyRequests:10,lookbackDays:30,timeoutSeconds:120})});
+  try { assert.throws(()=>off.searchNow({}),/switched off/); } finally {off.close();}
+});
+
+test('only one Search now runs at a time',async()=>{
+  let release;
+  const {deps}=setup({events:()=>spread,sleep:async()=>{},search:()=>new Promise(r=>{release=()=>r({ok:true,partial:false,results:[]});})});
+  const queue=discovery.createQueue(':memory:',deps);
+  try {
+    queue.searchNow({promotion:'mlb'});
+    assert.throws(()=>queue.searchNow({promotion:'nba'}),/already running/);
+    for (let i=0;i<50 && !release;i++) await new Promise(r=>setImmediate(r));
+    release(); await new Promise(r=>setImmediate(r));
+    for (let i=0;i<50 && !(queue.status().sweep.searches.length>1);i++) { if (release) release(); await new Promise(r=>setImmediate(r)); }
+    await finished(queue);
+  } finally {queue.close();}
+});

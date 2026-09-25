@@ -1191,7 +1191,7 @@ function createApp() {
     res.setHeader('Cache-Control', 'no-store');
     const tab = String(req.query.tab || 'overview');
     const diagnosis = require('./lib/diagnosis');
-    const data = { tab };
+    const data = { tab, flash: String(req.query.flash || '').slice(0, 300) };
     if (tab === 'event') data.investigation = diagnosis.investigate(String(req.query.q || ''));
     else if (tab !== 'tools') data.findings = diagnosis.collect();
     res.send(tablerChrome.tablerPage('Diagnosis', require('./lib/admin-diagnosis').render(data),
@@ -1959,12 +1959,23 @@ function createApp() {
     res.redirect(303,'/admin/prowlarr-discovery');
     } catch(error) {res.status(400).send(security.safeErrorMessage(error));}
   });
-  app.post('/admin/prowlarr-discovery/queue', requireAdmin, (req,res) => {
-    const event = store.getEvent(String(req.body.eventId || ''));
-    if (!event) return res.status(404).send('Event not found');
-    try {require('./lib/prowlarr-discovery').getDefault().enqueue(event); res.redirect(303,'/admin/prowlarr-discovery');}
-    catch (error) {res.status(400).send(error.message);}
-  });
+  // Search now, for one promotion, one event or every selected promotion. Runs
+  // in the background; its progress shows on Discovery → Prowlarr.
+  const searchNowRoute = (req,res) => {
+    const back = /^\/admin\/[^/]/.test(String(req.body.back || '')) ? String(req.body.back) : '/admin/discovery?tab=prowlarr';
+    const go = (message) => {
+      const [path, hash] = back.split('#');
+      res.redirect(303, path + (path.includes('?') ? '&' : '?') + 'flash=' + encodeURIComponent(message) + (hash ? '#' + hash : ''));
+    };
+    const eventId = String(req.body.eventId || '');
+    if (eventId && !store.getEvent(eventId)) return go('Event not found.');
+    try {
+      const started = require('./lib/prowlarr-discovery').getDefault().searchNow({promotion:String(req.body.promotion || ''),eventId});
+      go('Searching ' + started.label + ' now: up to ' + started.planned + ' search' + (started.planned===1?'':'es') + ', about 10 seconds apart. Progress shows on Discovery → Prowlarr.');
+    } catch (error) {go(error.message);}
+  };
+  app.post('/admin/prowlarr-discovery/search-now', requireAdmin, searchNowRoute);
+  app.post('/admin/prowlarr-discovery/queue', requireAdmin, searchNowRoute);
   app.post('/admin/prowlarr-discovery/reset-cooldown', requireAdmin, (req,res) => {
     try {
       require('./lib/prowlarr-discovery').getDefault().resetCooldown(req.body.indexerId);
