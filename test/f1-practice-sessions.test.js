@@ -58,3 +58,20 @@ test('support programmes are not offered as the race', () => {
   assert.equal(ok('Formula1.2026.Round15.Azerbaijan.Race.F1TV.1080p'), true);
   assert.equal(ok('F1.2026.R15.Azerbaijan.Full.Weekend.1080p'), true);
 });
+
+// Madrid (round 14) on 2026-09-25: studio shows around qualifying read as
+// qualifying, and around the race as the race.
+test('studio shows are not offered as qualifying or the race', () => {
+  const quali = { id: 'f1:q', name: 'Spanish Grand Prix Qualifying', date: '2026-09-12', round: '14' };
+  const race = { id: 'f1:r', name: 'Spanish Grand Prix', date: '2026-09-13', round: '14' };
+  const q = (title) => f1.isRelevantStreamTitle(title, quali).ok;
+  const r = (title) => f1.isRelevantStreamTitle(title, race).ok;
+  assert.equal(q('Formula1.2026.Round14.Spain.Madrid.Pre-Qualifying.Show.F1TV.WEB-DL.1080p.H264.English-MWR'), false);
+  assert.equal(q('Formula1.2026.Round14.Spain.Madrid.Post-Qualifying.Show.F1TV.WEB-DL.1080p.H264.English-MWR'), false);
+  assert.equal(q('Formula1.2026.Round14.Spain.Madrid.Teds.Qualifying.Notebook.SKYF1UHD.WEBRiP.2160p.H265.DDP5.1.English-MWR'), false);
+  assert.equal(q('Formula1.2026.Round14.Spain.Madrid.Qualifying.F1TV.WEB-DL.2160p.HLG.H265.Multi-MWR'), true);
+  assert.equal(r('Formula1.2026.Round14.Spain.Madrid.Pre-Race.Show.F1TV.WEB-DL.1080p.H264.English-MWR'), false);
+  assert.equal(r('Formula1.2026.Round14.Spain.Madrid.Post-Race.Show.F1TV.WEB-DL.1080p.H264.English-MWR'), false);
+  assert.equal(r('Formula1.2026.Round14.Spain.Madrid.Jolyon.Palmers.Analysis.F1TV.WEB-DL.1080p.H264.English-MWR'), false);
+  assert.equal(r('Formula1.2026.Round14.Spain.Madrid.Race.SKYF1UHD.WEBRiP.2160p.H265.DDP5.1.English-MWR'), true);
+});
