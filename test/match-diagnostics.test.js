@@ -167,3 +167,23 @@ test('an unrelated sport scores near zero and a true pairing scores high', () =>
   assert.equal(rows[1].slice(1, -1).split('","')[overlapAt], '0');
   assert.equal(rows[2].slice(1, -1).split('","')[overlapAt], '1');
 });
+
+// Found on 2026-09-25: on the football-heavy weekend of 20-21 September the
+// day before alone held more than the 25-release cap, so the report never
+// read "Toronto Blue Jays at Baltimore Orioles 21.09.2026" for that game and
+// showed MLB releases as matching nothing, although the real matcher had.
+test('a busy day before does not crowd out the release on the event\'s own day', () => {
+  const date = today(-4);
+  const before = today(-5);
+  const dmy = (d) => d.slice(8, 10) + '.' + d.slice(5, 7) + '.' + d.slice(0, 4);
+  const event = { id: 'ucl:diag-busy', name: 'AEK Athens vs Levski Sofia', date,
+    aliases: ['AEK Athens vs Levski Sofia'], teamNames: { home: ['AEK Athens'], away: ['Levski Sofia'] } };
+  const crowd = Array.from({ length: 40 }, (_, i) => ({ id: 'c' + i, title: 'Club ' + i + ' vs Club ' + (i + 50) + ' ' + dmy(before),
+    date: before, detailUrl: 'https://sport-video.org.ua/c' + i + '.html' }));
+  seedReleases(crowd.concat([{ id: 'own', title: 'AEK Athens vs Levski Sofia ' + dmy(date), date,
+    detailUrl: 'https://sport-video.org.ua/own.html', infoHash: 'b'.repeat(40) }]));
+  const report = diagnostics.diagnose({ events: [event], promotionId: 'ucl', days: 30 });
+  const own = report.rows.find((r) => r.release && r.release.title.startsWith('AEK Athens vs Levski Sofia'));
+  assert.ok(own, 'the event\'s own release is read');
+  assert.equal(own.decision, 'matched');
+});
