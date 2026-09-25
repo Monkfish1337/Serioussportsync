@@ -473,3 +473,25 @@ test('only one Search now runs at a time',async()=>{
     await finished(queue);
   } finally {queue.close();}
 });
+
+// Found on 2026-09-25: the queue's timer started a search between two of the
+// sweep's, and the sweep stopped with "Prowlarr discovery was switched off".
+test('Search now waits out an in-flight search, and the queue timer stands aside while it runs',async()=>{
+  let release;const calls=[];
+  const {deps}=setup({events:()=>spread,sleep:async()=>{await new Promise(r=>setImmediate(r));},
+    search:(q,opts)=>{calls.push(opts.indexerId);return new Promise(r=>{release=()=>r({ok:true,partial:false,results:[]});});}});
+  const queue=discovery.createQueue(':memory:',deps);
+  try {
+    const scheduled=queue.run();           // the timer's own search is in flight
+    for (let i=0;i<20 && !release;i++) await new Promise(r=>setImmediate(r));
+    queue.searchNow({promotion:'mlb'});    // its first attempt finds the queue busy
+    for (let i=0;i<5;i++) await new Promise(r=>setImmediate(r));
+    release(); release=null; await scheduled;
+    assert.equal((await queue.run()).skipped,'sweep','the timer does not run while Search now is active');
+    for (let i=0;i<200 && !(queue.status().sweep||{}).finishedAt;i++) { if (release) {release();release=null;} await new Promise(r=>setImmediate(r)); }
+    const sweep=queue.status().sweep;
+    assert.ok(sweep.finishedAt);
+    assert.equal(sweep.searches.length,2,'both MLB games, after waiting for the timer');
+    assert.doesNotMatch(sweep.note,/switched off/);
+  } finally {queue.close();}
+});
