@@ -104,9 +104,12 @@ test('stream judging flags broken rows, timeouts, slowness and http links on an 
   assert.match(judged.problems.join(' '), /no playable link/);
   assert.match(judged.warnings.join(' '), /easynews timed out/);
   assert.match(judged.warnings.join(' '), /slow/);
-  assert.match(judged.warnings.join(' '), /PUBLIC_URL/);
+  // http links are flagged for a single run-level warning, not on every event.
+  assert.equal(judged.httpLinks, true);
+  assert.doesNotMatch(judged.warnings.join(' '), /PUBLIC_URL/);
   const lan = clientCheck.judgeStreams({ streams: [{ name: 'NNTP', url: 'http://192.168.1.16:7000/x' }] }, 500, true, 'https:');
   assert.equal(lan.verdict, 'pass', 'LAN playback links are http by design');
+  assert.equal(lan.httpLinks, false);
 });
 
 test('a metadata-only account is valid: streams are not offered, and that is information', () => {
@@ -115,6 +118,19 @@ test('a metadata-only account is valid: streams are not offered, and that is inf
   assert.equal(judged.streamOffered, false);
   assert.equal(judged.verdict, 'warn');
   assert.deepEqual(judged.problems, []);
+});
+
+test('Discovered upcoming rows are empty by design, and missing posters point at PUBLIC_URL', () => {
+  assert.equal(clientCheck.judgeCatalog({ metas: [] }, { expectEmpty: true }).verdict, 'info');
+  const noArt = clientCheck.judgeCatalog({ metas: [{ id: 'a', name: 'A' }] }, { publicUrlSet: false });
+  assert.match(noArt.warnings.join(' '), /bundled artwork needs PUBLIC_URL/);
+  assert.doesNotMatch(clientCheck.judgeCatalog({ metas: [{ id: 'a', name: 'A' }] }, { publicUrlSet: true }).warnings.join(' '), /PUBLIC_URL/);
+});
+
+test('Discovered promotions skip every search pipeline but Sport-Video torrents', () => {
+  for (const p of promotions.all.filter((x) => String(x.id).startsWith('discovered-'))) {
+    assert.deepEqual([...p.disabledPipelines].sort(), ['diy-usenet', 'easynews', 'uu'], p.id);
+  }
 });
 
 test('an empty catalog is a warning and a malformed item a failure', () => {
