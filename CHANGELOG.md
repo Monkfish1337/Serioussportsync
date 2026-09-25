@@ -10,6 +10,13 @@
   already holds a release for; events with none are labelled exploratory, so a
   working install is never reported broken. Replaces "Check it works", removed
   in 0.95.1. The last five reports are kept.
+- Discovered catalogs (raw Sport-Video releases) no longer run built-in Usenet
+  searches. They already skipped Usenet Ultimate and Easynews; built-in Usenet
+  was missed, and spent the full discovery budget on every Discovered event
+  for no rows.
+- Client check reports http:// links once for the run rather than on every
+  event, treats a Discovered catalog's empty Upcoming row as expected, and
+  explains missing posters when PUBLIC_URL is unset.
 
 ## 1.1.1 — 2026-09-25
 
