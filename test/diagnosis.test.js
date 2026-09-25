@@ -331,3 +331,12 @@ test('the refresh record keeps other promotions when one promotion refreshes on 
   assert.equal(saved.promotions.find((p) => p.id === 'motd').status, 'failed', 'kept');
   assert.equal(saved.promotions.find((p) => p.id === 'nhl').at, '2026-09-25T11:00:00Z');
 });
+
+test('a queued promotion missing games offers Search now, sent as a form that returns here', () => {
+  const result = run({ queueStatus: () => ({ indexers: [], eventStates: [], options: { enabled: true, promotions: ['motogp'] } }) });
+  const gap = titled(result, /MotoGP: 6 of 10/);
+  assert.deepEqual(gap.fix.post, { action: '/admin/prowlarr-discovery/search-now', fields: { back: '/admin/diagnosis#stage-coverage', promotion: 'motogp' } });
+  const html = page.render({ tab: 'overview', findings: result, flash: 'Searching MOTOGP now' });
+  assert.match(html, /<form method="POST" action="\/admin\/prowlarr-discovery\/search-now" class="dx-post"><input type="hidden" name="back" value="\/admin\/diagnosis#stage-coverage"><input type="hidden" name="promotion" value="motogp"><button class="btn sm primary">Search MotoGP now<\/button>/);
+  assert.match(html, /Searching MOTOGP now/);
+});
