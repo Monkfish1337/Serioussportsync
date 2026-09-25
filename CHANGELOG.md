@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **Client check** (admin sidebar): walks an account's addon over HTTP the way
+  Nuvio does (manifest, every catalog, event details and the stream list) and
+  reports what a client would see: empty catalogs, missing posters, rows with
+  no link, timed-out or failing pipelines, slow responses and http links on an
+  https install. Each promotion is checked on a recently finished event SSS
+  already holds a release for; events with none are labelled exploratory, so a
+  working install is never reported broken. Replaces "Check it works", removed
+  in 0.95.1. The last five reports are kept.
+
 ## 1.1.1 — 2026-09-25
 
 - **NHL** is a built-in catalog from ESPN's schedule, with an alias table for

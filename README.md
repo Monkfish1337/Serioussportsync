@@ -304,6 +304,11 @@ JSON or application code. Changes take effect without rebuilding the image.
   measured Prowlarr queue, Sport-Video ingestion, Bitmagnet preparation and
   manual torrent-resource matching. Usenet and Easynews do not inflate these
   torrent coverage totals.
+- **Client check:** walks an account's addon the way Nuvio does (manifest, every
+  catalog, event details and stream lists) and reports empty catalogs, slow or
+  failing pipelines, malformed rows and http links, without opening a client.
+  Each promotion is checked on a recent event SSS already holds a release for,
+  so "no rows" is only reported as a failure where rows were expected.
 - **User Management:** access requests, approvals, users, roles and invitations.
 - **Sport-Video:** its Discovery tab contains source status, scan controls,
   filters, preparation state, diagnostics and per-release TorBox actions.
