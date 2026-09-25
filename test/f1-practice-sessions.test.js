@@ -23,6 +23,10 @@ test('a practice event accepts only its own practice number', () => {
   assert.equal(ok('Formula.1.2026.Azerbaijan.GP.Free.Practice.3.1080p'), true);
   assert.equal(ok('Формула 1 2026 Этап 17 Азербайджан Третья практика'), true);
   assert.equal(ok('Формула 1 2026 Этап 17 Азербайджан Практика 1'), false);
+  // No separator before the number, from a live request on 2026-09-25.
+  const p2 = { id: 'f1:p2', name: 'Azerbaijan Grand Prix Practice 2', date: '2026-09-24', round: '15' };
+  assert.equal(f1.isRelevantStreamTitle('Formula1.S2026E81.Round15.Azerbaijan.Practice2.F1TV.International.1080p.WEB-DL.AAC2.0.H265', p2).ok, true);
+  assert.equal(f1.isRelevantStreamTitle('Formula1.S2026E80.Round15.Azerbaijan.Practice1.F1TV.International.1080p.WEB-DL.AAC2.0.H265', p2).reason, 'practice(1≠2)');
   // A release naming no number (all practices bundled) is still offered.
   assert.equal(ok('Formula 1 2026 Azerbaijan GP Practice 1080p'), true);
   assert.equal(f1.isRelevantStreamTitle('Formula 1 Azerbaijan Grand Prix Practice 1 24.09.2026', practice3).reason, 'practice(1≠3)');
@@ -40,4 +44,34 @@ test('other sessions are unaffected', () => {
   assert.equal(f1.isRelevantStreamTitle('Formula 1 Azerbaijan Grand Prix Qualifying 26.09.2026', quali).ok, true);
   assert.equal(f1.isRelevantStreamTitle('Formula 1 Azerbaijan Grand Prix Practice 3 25.09.2026', quali).ok, false);
   assert.equal(f1.searchTitles(quali)[0], 'Formula 1 2026 Azerbaijan GP Qualifying');
+});
+
+// From the same live request: support programmes name the weekend but no
+// session, and a race event took them for unlabelled race rips.
+test('support programmes are not offered as the race', () => {
+  const race = { id: 'f1:r', name: 'Azerbaijan Grand Prix', date: '2026-09-27', round: '15' };
+  const ok = (title) => f1.isRelevantStreamTitle(title, race).ok;
+  assert.equal(ok('Formula1.2026.Round15.Azerbaijan.Paddock.Uncut.SKYF1UHD.WEBRiP.2160p.H265.DDP5.1.English-MWR'), false);
+  assert.equal(ok('Formula1.2026.Round15.Azerbaijan.Weekend.Warm-Up.F1TV.WEB-DL.1080p.H264.English-MWR'), false);
+  assert.equal(ok('Formula1.2026.Round15.Azerbaijan.Race.Build-Up.SKY.1080p'), false);
+  assert.equal(ok('Formula1.2026.Round15.Azerbaijan.Grand.Prix.SKYF1UHD.2160p'), true, 'unlabelled race rip');
+  assert.equal(ok('Formula1.2026.Round15.Azerbaijan.Race.F1TV.1080p'), true);
+  assert.equal(ok('F1.2026.R15.Azerbaijan.Full.Weekend.1080p'), true);
+});
+
+// Madrid (round 14) on 2026-09-25: studio shows around qualifying read as
+// qualifying, and around the race as the race.
+test('studio shows are not offered as qualifying or the race', () => {
+  const quali = { id: 'f1:q', name: 'Spanish Grand Prix Qualifying', date: '2026-09-12', round: '14' };
+  const race = { id: 'f1:r', name: 'Spanish Grand Prix', date: '2026-09-13', round: '14' };
+  const q = (title) => f1.isRelevantStreamTitle(title, quali).ok;
+  const r = (title) => f1.isRelevantStreamTitle(title, race).ok;
+  assert.equal(q('Formula1.2026.Round14.Spain.Madrid.Pre-Qualifying.Show.F1TV.WEB-DL.1080p.H264.English-MWR'), false);
+  assert.equal(q('Formula1.2026.Round14.Spain.Madrid.Post-Qualifying.Show.F1TV.WEB-DL.1080p.H264.English-MWR'), false);
+  assert.equal(q('Formula1.2026.Round14.Spain.Madrid.Teds.Qualifying.Notebook.SKYF1UHD.WEBRiP.2160p.H265.DDP5.1.English-MWR'), false);
+  assert.equal(q('Formula1.2026.Round14.Spain.Madrid.Qualifying.F1TV.WEB-DL.2160p.HLG.H265.Multi-MWR'), true);
+  assert.equal(r('Formula1.2026.Round14.Spain.Madrid.Pre-Race.Show.F1TV.WEB-DL.1080p.H264.English-MWR'), false);
+  assert.equal(r('Formula1.2026.Round14.Spain.Madrid.Post-Race.Show.F1TV.WEB-DL.1080p.H264.English-MWR'), false);
+  assert.equal(r('Formula1.2026.Round14.Spain.Madrid.Jolyon.Palmers.Analysis.F1TV.WEB-DL.1080p.H264.English-MWR'), false);
+  assert.equal(r('Formula1.2026.Round14.Spain.Madrid.Race.SKYF1UHD.WEBRiP.2160p.H265.DDP5.1.English-MWR'), true);
 });
