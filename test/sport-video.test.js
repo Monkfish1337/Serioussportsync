@@ -317,3 +317,43 @@ test('never warms automatically until a promotion is explicitly selected', async
     settings.getSportVideo = original;
   }
 });
+
+// Discussions #40: some detail pages may offer several quality variants.
+// Only the first torrent is used; the rest are counted so the Sport-Video tab
+// can show whether one record per variant is worth building.
+test('detail parsing counts the torrents a page offers and keeps using the first', () => {
+  const record = {
+    id: 'variants', title: 'Team A vs Team B 01.01.2026',
+    detailUrl: 'https://sport-video.org.ua/TATB010126.html',
+  };
+  const html = '<h2>Team A vs Team B 01.01.2026 1080p</h2>'
+    + '<a href="./TeamA-vs-TeamB-01.01.2026-1080p.mkv.torrent">Download 1080p</a>'
+    + '<a href="./TeamA-vs-TeamB-01.01.2026-1080p.mkv.torrent">Mirror</a>'
+    + '<h2>Team A vs Team B 01.01.2026 4K</h2>'
+    + '<a href="./TeamA-vs-TeamB-01.01.2026-4K.mkv.torrent">Download 4K</a>';
+  const parsed = sportVideo.parseDetail(html, record);
+  assert.match(parsed.torrentUrl, /1080p\.mkv\.torrent$/, 'the first variant is still the one used');
+  assert.equal(parsed.torrentVariants, 2, 'a repeated link is one variant');
+  assert.deepEqual(parsed.torrentVariantNames,
+    ['TeamA-vs-TeamB-01.01.2026-1080p.mkv.torrent', 'TeamA-vs-TeamB-01.01.2026-4K.mkv.torrent']);
+  const single = sportVideo.parseDetail('<a href="./Only.mkv.torrent"></a>', record);
+  assert.equal(single.torrentVariants, 1);
+  assert.equal(single.torrentVariantNames, undefined);
+});
+
+test('the Sport-Video tab reports pages with several torrents, by file name only', () => {
+  const body = (status) => admin.renderBody({
+    config: { enabled: true, autoScan: true, intervalHours: 6, startDelaySeconds: 90, maxDetailsPerScan: 50, categories: [] },
+    status, releases: [], cached: new Set(), torboxConfigured: true,
+  });
+  assert.match(body({ releases: 0 }), /Measured from the next prepared page/);
+  const html = body({
+    releases: 3, variantPagesChecked: 40, multiVariantPages: 1,
+    multiVariantExamples: [{ title: 'Team A vs Team B 01.01.2026', count: 2,
+      names: ['TeamA-vs-TeamB-01.01.2026-1080p.mkv.torrent', 'TeamA-vs-TeamB-01.01.2026-4K.mkv.torrent'] }],
+  });
+  assert.match(html, /1 of 40 prepared pages/);
+  assert.match(html, /Team A vs Team B 01\.01\.2026 · 2 torrents/);
+  assert.match(html, /TeamA-vs-TeamB-01\.01\.2026-4K\.mkv\.torrent/);
+  assert.doesNotMatch(html, /https?:\/\/[^"'<\s]*\.torrent/, 'no torrent URLs');
+});
