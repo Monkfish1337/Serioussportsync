@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `npm test` runs every suite CI runs (unit, Nuvio collections, account page,
+  recovery). A `.gitattributes` file keeps text files LF on every platform, so
+  Windows checkouts match the repository (#67).
 - The Prowlarr queue learns which indexers ignore dates. When a date-only
   search such as `MLB 2026.09.23` returns five or more results and none carry
   that date, the indexer gets no date-only searches for 30 days; its turns go

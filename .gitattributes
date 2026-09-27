@@ -1,0 +1,14 @@
+# Store and check out text with LF everywhere (Windows included), so
+# checkouts match the repository and editors never mix line endings.
+* text=auto eol=lf
+
+# Binary assets.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.sqlite binary
