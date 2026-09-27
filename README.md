@@ -191,11 +191,22 @@ Bitmagnet only, and Refresh does not search.
 
 | Source | Playback | How it works |
 | --- | --- | --- |
-| Native Newznab, NZBHydra, or Prowlarr | Built-in Usenet (native NNTP) | SSS searches the indexer directly, filters candidates once, and streams the matched release straight from your NNTP provider — no helper container |
+| Native Newznab, NZBHydra, or Prowlarr | Built-in Usenet through TorBox | SSS searches the account's own indexer and hands the NZB to the account's TorBox, which downloads it and plays it. Only the small NZB file passes through the server — suited to a bandwidth-capped VPS. Available to every account |
+| Native Newznab, NZBHydra, or Prowlarr | Built-in Usenet (native NNTP) | SSS searches the indexer directly, filters candidates once, and streams the matched release straight from your NNTP provider through the server — no helper container. Administrators only |
 | Easynews | Easynews | Searches and plays with credentials stored on the user's account |
 
-Built-in Usenet is one pipeline: a native indexer connection for discovery and
-a direct NNTP provider connection for playback. The admin **Usenet** page
+Built-in Usenet is one pipeline: a native indexer connection for discovery,
+then playback through TorBox, native NNTP, or both (the admin's choice; other
+accounts always play through TorBox). TorBox rows show whether TorBox already
+has the release: ⚡ Instant (a finished download in the account), 📦 Cached
+(attach and wait), ⏳ Processing or ⏳ Queue. To know, SSS downloads the top N
+NZBs when an event is opened, where N is the account's **NZBs checked per
+event** (default 5, 0–20; each counts against the indexer's download limit).
+An uncached release starts playing once TorBox finishes, through a few signed
+redirects, without a second click. The NZB is uploaded, never the indexer link,
+so the indexer's API key never reaches TorBox. Accounts other than admins may
+only point their indexer at public internet addresses.
+For native NNTP playback: The admin **Usenet** page
 presents this as two stages — search and candidate discovery, then native NNTP
 playback. It owns the indexer and NNTP credentials, native performance
 profiles, connection state, first-byte timing, throughput, retries and recent

@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- **Built-in Usenet can play through TorBox**, for every account. SSS searches
+  the account's own indexer, hands the NZB to the account's TorBox, and the
+  player streams from TorBox's CDN: only the small NZB file passes through the
+  server, so it suits a bandwidth-capped VPS. Ported from NZB-Sport-Pro:
+  - Rows say what TorBox has: ⚡ Instant (a finished download the account
+    owns), 📦 Cached (attach and wait), ⏳ Processing (already queued; playing
+    reuses the job) and ⏳ Queue.
+  - Each account sets **NZBs checked per event** (default 5, 0–20). Checking
+    downloads the NZB, which counts against the indexer's download limit.
+  - An uncached release starts playing when TorBox finishes, through up to five
+    signed redirects of up to 35 s each, without a second click. A failed job
+    names TorBox's reason.
+  - The NZB is uploaded, never the indexer link, so the indexer's API key never
+    reaches TorBox. NZBs are held in memory only.
+- Every account can now set its own Usenet indexer. Native NNTP playback (which
+  streams through the server) stays admin-only; admins choose TorBox, native
+  NNTP or both. Accounts other than admins may only reach public internet
+  addresses, checked for the indexer and for every NZB link and redirect.
+
 - **Diagnosis** (admin sidebar) brings the diagnostic tools into one place.
   - **Findings** reads what SSS already records and lists problems by severity,
     each with the page that fixes it: failed or skipped refreshes, promotions
