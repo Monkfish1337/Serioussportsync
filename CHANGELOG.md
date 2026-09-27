@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 — 2026-09-27
 
 - **TorBox Usenet**, a new pipeline for every account, separate from built-in
   Usenet and every other source. SSS searches the indexer the account sets for
@@ -22,20 +22,43 @@
   - Accounts other than admins may only use an indexer on a public internet
     address, checked for the indexer and for every NZB link and redirect.
 
-- **Diagnosis** (admin sidebar) brings the diagnostic tools into one place.
-  - **Findings** reads what SSS already records and lists problems by severity,
-    each with the page that fixes it: failed or skipped refreshes, promotions
-    missing an API key, empty catalogs, weekly shows with no upcoming episodes,
-    promotions with poor torrent coverage, indexers failing in a row (flagged
-    critical when it is the most productive one), learned matching rules that
-    name a single event, search patterns that never find anything, the last
-    Client check, Sport-Video errors, built-in Usenet switched on but not
-    configured, PUBLIC_URL unset, and recent errors by area.
-  - **Investigate an event** gathers one event's metadata, saved releases (torrent,
-    Usenet, Easynews, Sport-Video, Prowlarr queue), recent requests, search
-    queries and rejection reasons, with links to the tools that act on it.
-  - **All tools** lists every diagnostic page by the question it answers.
-  - Client check moves under Diagnosis.
+- **Diagnosis** (admin sidebar) follows an event from schedule to playback and
+  shows where it breaks.
+  - **Overview**: six stages (Access, Schedule, Sources, Matching, Coverage,
+    Playback), each with its key numbers and findings. Every finding says what
+    is wrong, why it matters, how to fix it step by step, and what it is based
+    on, with a button to the fix. **Start here** opens the most serious one.
+    Findings can be hidden for 30 days; they return early if they get worse.
+  - It finds, among others: torrent downloads failing for an indexer (as when
+    a Prowlarr update broke 720pier), an indexer still searched but saving
+    nothing for two days, failed or skipped refreshes, missing API keys,
+    empty catalogs, weekly shows with no upcoming episodes, poor torrent
+    coverage, learned rules that name one event, past events opened today with
+    no links, slow opens, failing plays, accounts that cannot play anything,
+    and recent errors, each under the stage it affects.
+  - **Troubleshoot an event** walks one event through Listed, Aired, Searched,
+    Release found, Links shown and Played, and stops at the step that fails.
+    An event that has not aired, or only just finished, reads "Not ready yet".
+  - A small record of opens, plays and torrent downloads (seven days, next to
+    the database) gives Playback real numbers.
+  - **All tools** lists every diagnostic page by stage. Client check moves
+    under Diagnosis.
+- **Prowlarr Search now**: search missing games straight away instead of
+  waiting for the queue, for one promotion (one search per game, up to 20),
+  one game (each indexer in turn until it matches) or every selected
+  promotion. It skips the queue's pacing but keeps failure cooldowns, daily
+  budgets and ten seconds between requests. Buttons on Discovery → Prowlarr
+  and in Diagnosis; progress shows as it runs.
+- The Prowlarr queue fetches torrents nobody is seeding as a last resort, so
+  TorBox can still be asked whether it has them cached, and every third search
+  goes to a retry more than six hours overdue, so a backlog of new games no
+  longer holds retries back for days. An uncached, unseeded torrent is not
+  offered as a warm row.
+- The Sport-Video match report reads an event's own day first; on busy
+  weekends the day before filled its cap and releases showed as unmatched.
+- F1: `Practice2` written without a separator is recognised, and support
+  programmes (Paddock Uncut, Weekend Warm-Up, pre/post-race and qualifying
+  shows) are no longer taken for the race or qualifying.
 - Metadata refreshes record each promotion's outcome (refreshed, failed or
   skipped, with the reason) for the Diagnosis page. A promotion skipped for a
   missing key was previously visible only in the log.
