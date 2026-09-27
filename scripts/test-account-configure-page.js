@@ -358,7 +358,8 @@ function listen(app) {
     assert.strictEqual(usenetSave.status, 302, 'Built-in Usenet settings save');
 
     assert.strictEqual(save.status, 302, 'installed-app null-origin form saves successfully');
-    assert.strictEqual(save.headers.get('location'), '/account?flash=saved&step=0');
+    // No returnStep: back to Services, step 1 since the Overview became step 0.
+    assert.strictEqual(save.headers.get('location'), '/account?flash=saved&step=1');
     const saved = users.findById(user.id).config;
     assert.strictEqual(saved.torboxEnabled, true);
     assert.strictEqual(saved.torboxApiKey, 'test-torbox-key');
