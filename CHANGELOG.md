@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.1 — 2026-09-27
 
 - TorBox Usenet searches one of three sources, chosen on its settings page:
   **Newznab indexers** added directly (several at once, searched in parallel;
