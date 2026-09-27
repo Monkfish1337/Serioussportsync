@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Playable coverage.** Discovery → Overview and Diagnosis show how many
+  games with a saved release TorBox has confirmed as cached in the last 48
+  hours (any account), alongside those checked and not cached and those not
+  checked yet. Diagnosis warns when fewer than half of a league's checked games
+  are cached (#65).
 - The Prowlarr queue learns which indexers ignore dates. When a date-only
   search such as `MLB 2026.09.23` returns five or more results and none carry
   that date, the indexer gets no date-only searches for 30 days; its turns go
