@@ -209,7 +209,8 @@ profiles plus bounded advanced controls. Native NNTP serves direct videos and
 stored, unencrypted RAR4/RAR5 videos with HTTP byte ranges.
 
 TorBox Usenet is its own pipeline with its own switch (Configure) and its own
-settings page (indexer, and **NZBs checked per event**, default 5, 0–20). Rows
+settings page (its search source: several Newznab indexers, one NZBHydra or one
+Prowlarr; and **NZBs checked per event**, default 5, 0–20). Rows
 show what TorBox has: ⚡ Instant (a finished download in the account), 📦 Cached
 (attach and wait), ⏳ Processing or ⏳ Queue. Checking an NZB downloads it,
 which counts against the indexer's download limit. An uncached release starts

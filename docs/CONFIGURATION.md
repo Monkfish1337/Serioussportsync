@@ -73,8 +73,9 @@ Its single on/off switch is on the Configure wizard; the dedicated Built-in
 Usenet page holds connection details, LAN playback routing, tuning and logs.
 
 TorBox Usenet is a separate pipeline available to every account: its switch is
-on Configure, and **Configure → TorBox Usenet settings** holds its own indexer
-and how many NZBs are checked per event. The account's TorBox downloads and
+on Configure, and **Configure → TorBox Usenet settings** holds its search source
+(several Newznab indexers, one NZBHydra or one Prowlarr) and how many NZBs are
+checked per event. The account's TorBox downloads and
 serves each release, so nothing streams through the server. Accounts other than
 administrators may only use indexers on public internet addresses.
 `TORBOX_USENET_PLAY_WAIT_MS` (default 35000) and `TORBOX_USENET_WAIT_REDIRECTS`

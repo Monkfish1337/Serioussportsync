@@ -118,7 +118,19 @@ test('the pipeline is its own: its switch, its indexer and a TorBox key, nothing
   assert.equal(pipeline.enabled({ ...config, torboxEnabled: false }), false);
   const builtIn = { diyUsenetEnabled: true, diySearchUrl: 'https://other.example', diySearchApiKey: 'k', torboxApiKey: 'TB-KEY' };
   assert.equal(pipeline.enabled(builtIn), false, 'built-in Usenet settings do not switch it on');
-  assert.equal(pipeline.indexerConfig({ ...config, _publicNetworkOnly: true }).publicOnly, true);
+  assert.equal(pipeline.indexerConfigs({ ...config, _publicNetworkOnly: true })[0].publicOnly, true);
+});
+
+test('three search sources: several Newznab indexers, one NZBHydra, or one Prowlarr', () => {
+  const two = JSON.stringify([{ name: 'NZBGeek', url: 'https://api.nzbgeek.info', apiKey: 'a' }, { url: 'https://api.drunkenslug.com', apiKey: 'b' }]);
+  const newznab = pipeline.indexerConfigs({ tbuSearchKind: 'newznab', tbuNewznabIndexers: two });
+  assert.deepEqual(newznab.map((c) => [c.kind, c.name, c.url]), [['newznab', 'NZBGeek', 'https://api.nzbgeek.info'], ['newznab', 'Newznab 2', 'https://api.drunkenslug.com']]);
+  assert.equal(pipeline.status({ torboxUsenetEnabled: true, torboxApiKey: 't', tbuSearchKind: 'newznab', tbuNewznabIndexers: two }).indexers, 2);
+  const hydra = pipeline.indexerConfigs({ tbuSearchKind: 'nzbhydra', tbuSearchUrl: 'https://hydra.example', tbuSearchApiKey: 'k', tbuNewznabIndexers: two });
+  assert.deepEqual(hydra.map((c) => [c.kind, c.name]), [['newznab', 'NZBHydra']], 'NZBHydra speaks Newznab; the indexer list is not used');
+  assert.deepEqual(pipeline.indexerConfigs({ tbuSearchKind: 'prowlarr', tbuSearchUrl: 'https://prowlarr.example', tbuSearchApiKey: 'k' }).map((c) => c.kind), ['prowlarr']);
+  assert.deepEqual(pipeline.indexerConfigs({ tbuSearchUrl: 'https://api.nzbgeek.info', tbuSearchApiKey: 'x', tbuSearchName: 'Old' }).map((c) => c.name), ['Old'],
+    'a single indexer saved before the list existed still works');
   assert.equal(pipeline.checkCount({}), 5);
   assert.equal(pipeline.checkCount({ torboxUsenetCheckCount: 50 }), 20);
   assert.equal(pipeline.checkCount({ torboxUsenetCheckCount: '0' }), 0);

@@ -757,14 +757,32 @@ function createApp() {
   // only use an indexer on a public address.
   const torboxUsenetPage = require('./lib/account-torbox-usenet-page');
   const tbuBack = (res, message) => res.redirect(303, '/account/torbox-usenet?flash=' + encodeURIComponent(message));
-  const tbuIndexerFromForm = (req) => ({
-    enabled: true,
-    kind: String(req.body.tbuSearchKind || '') === 'prowlarr' ? 'prowlarr' : 'newznab',
-    name: String(req.body.tbuSearchName || '').trim().slice(0, 80),
-    url: security.cleanHttpUrl(req.body.tbuSearchUrl, { label: 'Indexer URL' }),
-    apiKey: String(req.body.tbuSearchApiKey || '').trim(),
-    publicOnly: req.user.role !== 'admin',
-  });
+  // The form's search source as saved settings: Newznab indexers (several
+  // rows) or one NZBHydra/Prowlarr. Every URL is validated, and for an
+  // account without admin rights must be a public address.
+  const tbuSettingsFromForm = async (req) => {
+    const b = req.body || {};
+    const pipeline = require('./lib/torbox-usenet-pipeline');
+    const kind = pipeline.SOURCE_KINDS.includes(b.tbuSearchKind) ? b.tbuSearchKind : 'newznab';
+    const publicOnly = req.user.role !== 'admin';
+    const list = (value) => [].concat(value === undefined ? [] : value).map((v) => String(v || ''));
+    const check = async (url, label) => {
+      const clean = security.cleanHttpUrl(url, { label });
+      if (clean && publicOnly) await security.assertPublicUrl(clean, { label });
+      return clean;
+    };
+    if (kind === 'newznab') {
+      const names = list(b.nzIndexerName), urls = list(b.nzIndexerUrl), keys = list(b.nzIndexerApiKey);
+      const indexers = [];
+      for (let i = 0; i < urls.length && indexers.length < pipeline.MAX_NEWZNAB_INDEXERS; i++) {
+        if (!urls[i].trim()) continue;
+        indexers.push({ name: (names[i] || '').trim().slice(0, 80), url: await check(urls[i], 'Indexer ' + (i + 1) + ' URL'), apiKey: (keys[i] || '').trim() });
+      }
+      return { tbuSearchKind: kind, tbuNewznabIndexers: JSON.stringify(indexers), tbuSearchName: '', tbuSearchUrl: '', tbuSearchApiKey: '' };
+    }
+    return { tbuSearchKind: kind, tbuSearchName: String(b.tbuSearchName || '').trim().slice(0, 80),
+      tbuSearchUrl: await check(b.tbuSearchUrl, (kind === 'prowlarr' ? 'Prowlarr' : 'NZBHydra') + ' URL'), tbuSearchApiKey: String(b.tbuSearchApiKey || '').trim() };
+  };
   app.get('/account/torbox-usenet', requireLogin, (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.send(tablerChrome.tablerPage('TorBox Usenet', torboxUsenetPage.renderBody({
@@ -773,25 +791,29 @@ function createApp() {
   });
   app.post('/account/torbox-usenet/save', requireLogin, async (req, res) => {
     try {
-      const indexer = tbuIndexerFromForm(req);
-      if (indexer.publicOnly && indexer.url) await security.assertPublicUrl(indexer.url, { label: 'Indexer URL' });
-      users.updateUserConfig(req.user.id, {
+      users.updateUserConfig(req.user.id, Object.assign(await tbuSettingsFromForm(req), {
         torboxUsenetEnabled: req.body.torboxUsenetEnabled === 'on',
-        tbuSearchKind: indexer.kind, tbuSearchName: indexer.name, tbuSearchUrl: indexer.url, tbuSearchApiKey: indexer.apiKey,
         torboxUsenetCheckCount: require('./lib/torbox-usenet-pipeline').checkCount({ torboxUsenetCheckCount: req.body.torboxUsenetCheckCount }),
-      });
+      }));
       tbuBack(res, 'TorBox Usenet settings saved.');
     } catch (error) { tbuBack(res, 'Save failed: ' + security.safeErrorMessage(error)); }
   });
+  // Searches each source in the form (before saving) and reports each one.
   app.post('/account/torbox-usenet/test', requireLogin, async (req, res) => {
     const query = String(req.body.tbuTestQuery || 'UFC').trim().slice(0, 200) || 'UFC';
-    let lastError = '';
     try {
-      const result = await usenetIndexer.search([query], tbuIndexerFromForm(req), {
-        log: (line) => { if (/one variant/.test(line)) lastError = line.replace(/^.*—\s*/, ''); },
-      });
-      if (!result.ok) throw new Error(lastError || result.error || 'search failed');
-      tbuBack(res, 'Indexer connected: ' + result.results.length + ' result(s) for "' + query + '". Save to keep these settings.');
+      const pipeline = require('./lib/torbox-usenet-pipeline');
+      const configs = pipeline.indexerConfigs(Object.assign({ _publicNetworkOnly: req.user.role !== 'admin' }, await tbuSettingsFromForm(req)))
+        .filter((c) => usenetIndexer.isConfigured(c));
+      if (!configs.length) throw new Error('add a URL and API key first');
+      const lines = await Promise.all(configs.map(async (config) => {
+        let lastError = '';
+        const result = await usenetIndexer.search([query], config, {
+          log: (line) => { if (/one variant/.test(line)) lastError = line.replace(/^.*—\s*/, ''); },
+        });
+        return config.name + ': ' + (result.ok ? result.results.length + ' result(s)' : 'failed, ' + (lastError || result.error || 'search failed'));
+      }));
+      tbuBack(res, 'Test search for "' + query + '". ' + lines.join('. ') + '. Save to keep these settings.');
     } catch (error) { tbuBack(res, 'Test search failed: ' + security.safeErrorMessage(error)); }
   });
 
