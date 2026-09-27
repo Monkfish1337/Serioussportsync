@@ -396,7 +396,12 @@ function createApp() {
       user: req.user,
       isAdmin: req.user.role === 'admin',
       isFirstRun: !cfg.catalogDefaultsVersion && !String(cfg.torboxApiKey || '').trim(),
-      step: STEP_IDS[Math.max(0, Math.min(STEP_IDS.length - 1, parseInt(req.query.step, 10) || 0))],
+      // First runs start on the Overview; a returning visit goes straight
+      // to Services, since it came to change something.
+      step: req.query.step !== undefined
+        ? STEP_IDS[Math.max(0, Math.min(STEP_IDS.length - 1, parseInt(req.query.step, 10) || 0))]
+        : (!cfg.catalogDefaultsVersion && !String(cfg.torboxApiKey || '').trim() ? 'overview' : 'services'),
+      liveRefreshSeconds: (() => { const n = Number(process.env.LIVE_REFRESH_WINDOW_SECONDS); return Number.isFinite(n) && n >= 0 ? n : 30; })(),
       flash: req.query.flash || null,
       installUrl: origin + '/u/' + req.user.id + '/' + (req.user.apiToken || '') + '/manifest.json',
       promotions: ordered.map((p) => ({
@@ -706,7 +711,7 @@ function createApp() {
       // Land back on the step they were on. A save that throws you to the top
       // of a five-step flow is the fastest way to make the flow feel hostile.
       const back = parseInt((req.body || {}).returnStep, 10);
-      const step = Number.isFinite(back) && back >= 0 && back <= 4 ? back : 0;
+      const step = Number.isFinite(back) && back >= 0 && back < STEP_IDS.length ? back : 1;
       res.redirect('/account?flash=saved&step=' + step);
     } catch (err) {
       res.redirect('/account?flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(err)));

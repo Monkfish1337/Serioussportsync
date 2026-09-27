@@ -35,8 +35,8 @@ const PROMOTIONS = [
 // which legitimately contain a <form> and the selector strings this file
 // asserts about.
 function stepMarkup(html) {
-  const start = html.indexOf('<section class="wrap step-panel" data-step="3"');
-  const end = html.indexOf('<section class="wrap step-panel" data-step="4"');
+  const start = html.indexOf('<section class="wrap step-panel" data-step="4"');
+  const end = html.indexOf('<section class="wrap step-panel" data-step="5"');
   return html.slice(start, end === -1 ? undefined : end);
 }
 
