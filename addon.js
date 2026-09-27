@@ -803,6 +803,18 @@ function createApp() {
       tbuBack(res, 'TorBox Usenet settings saved.');
     } catch (error) { tbuBack(res, 'Save failed: ' + security.safeErrorMessage(error)); }
   });
+  // Check TorBox Usenet (#66): a read-only round trip with the saved
+  // settings, shown step by step on the page.
+  app.post('/account/torbox-usenet/check', requireLogin, async (req, res) => {
+    const cfg = require('./lib/diy-access').playbackConfig(req.user);
+    let check;
+    try { check = await require('./lib/torbox-usenet-pipeline').check({ userConfig: cfg, query: req.body.tbuTestQuery }); }
+    catch (error) { check = { ok: false, steps: [{ name: 'Check', ok: false, detail: security.safeErrorMessage(error) }] }; }
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(tablerChrome.tablerPage('TorBox Usenet', torboxUsenetPage.renderBody({
+      cfg: req.user.config || {}, isAdmin: req.user.role === 'admin', check,
+    }), { user: req.user, currentSection: 'configure' }));
+  });
   // Searches each source in the form (before saving) and reports each one.
   app.post('/account/torbox-usenet/test', requireLogin, async (req, res) => {
     const query = String(req.body.tbuTestQuery || 'UFC').trim().slice(0, 200) || 'UFC';
