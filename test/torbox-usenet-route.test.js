@@ -105,16 +105,27 @@ test('any account saves its own TorBox Usenet indexer; a local-network indexer i
   const save = (fields) => fetch(base + '/account/torbox-usenet/save', { method: 'POST', redirect: 'manual',
     headers: { cookie, 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(fields) });
 
-  const lan = await save({ torboxUsenetEnabled: 'on', tbuSearchUrl: 'http://192.168.1.16:9696', tbuSearchApiKey: 'k', torboxUsenetCheckCount: '3' });
+  const lan = await save({ torboxUsenetEnabled: 'on', tbuSearchKind: 'prowlarr', tbuSearchUrl: 'http://192.168.1.16:9696', tbuSearchApiKey: 'k', torboxUsenetCheckCount: '3' });
   assert.match(decodeURIComponent(lan.headers.get('location')), /public internet address/);
   assert.equal(users.findById(user.id).config.tbuSearchUrl, '', 'nothing saved');
 
-  const ok = await save({ torboxUsenetEnabled: 'on', tbuSearchKind: 'newznab', tbuSearchUrl: 'https://1.1.1.1', tbuSearchApiKey: 'k', torboxUsenetCheckCount: '3' });
+  // Two Newznab indexers from repeated rows; the empty row is ignored.
+  const body = new URLSearchParams({ torboxUsenetEnabled: 'on', tbuSearchKind: 'newznab', torboxUsenetCheckCount: '3' });
+  for (const [name, url, key] of [['One', 'https://1.1.1.1', 'k1'], ['', '', ''], ['Two', 'https://8.8.8.8', 'k2']]) {
+    body.append('nzIndexerName', name); body.append('nzIndexerUrl', url); body.append('nzIndexerApiKey', key);
+  }
+  const ok = await save(body);
   assert.match(decodeURIComponent(ok.headers.get('location')), /saved/);
   const saved = users.findById(user.id).config;
   assert.equal(saved.torboxUsenetEnabled, true);
-  assert.equal(saved.tbuSearchUrl, 'https://1.1.1.1');
+  assert.deepEqual(JSON.parse(saved.tbuNewznabIndexers), [{ name: 'One', url: 'https://1.1.1.1', apiKey: 'k1' }, { name: 'Two', url: 'https://8.8.8.8', apiKey: 'k2' }]);
   assert.equal(saved.torboxUsenetCheckCount, 3);
+  const raw = JSON.parse(fs.readFileSync(process.env.USERS_FILE, 'utf8')).users.find((u) => u.id === user.id).config.tbuNewznabIndexers;
+  assert.doesNotMatch(raw, /k1|k2|1\.1\.1\.1/, 'the indexer list is encrypted on disk');
+
+  const lanRow = new URLSearchParams({ tbuSearchKind: 'newznab' });
+  lanRow.append('nzIndexerName', 'Home'); lanRow.append('nzIndexerUrl', 'http://10.0.0.5'); lanRow.append('nzIndexerApiKey', 'k');
+  assert.match(decodeURIComponent((await save(lanRow)).headers.get('location')), /Indexer 1 URL must be a public internet address/);
   assert.equal(saved.diyUsenetEnabled, false, 'built-in Usenet is untouched');
   assert.equal(saved.diySearchUrl, '');
 });

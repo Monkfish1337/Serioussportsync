@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- TorBox Usenet searches one of three sources, chosen on its settings page:
+  **Newznab indexers** added directly (several at once, searched in parallel;
+  one failing does not stop the others), one **NZBHydra**, or one
+  **Prowlarr**. The indexer list is encrypted at rest, a single indexer saved
+  in 1.2.0 carries over, and Test search reports each source separately.
+
 ## 1.2.0 — 2026-09-27
 
 - **TorBox Usenet**, a new pipeline for every account, separate from built-in
