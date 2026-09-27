@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Configure opens with an **Overview** for new accounts: how SeriousSportSync
+  works (schedules become catalogs, releases are found ahead of time, opening
+  an event is instant, playback comes from your own service) and how pressing
+  Refresh within `LIVE_REFRESH_WINDOW_SECONDS` (default 30) runs a full live
+  search, including Prowlarr for leagues prepared in the background. Returning
+  visits still open on Services.
+- The Configure wizard's step list is built from its step definitions; the
+  browser kept its own list of five, which would have stopped Next short of
+  Install once a step was added.
+
 ## 1.2.1 — 2026-09-27
 
 - TorBox Usenet searches one of three sources, chosen on its settings page:
