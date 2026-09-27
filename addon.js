@@ -684,6 +684,9 @@ function createApp() {
         // isolated to /account/usenet and are preserved when the master is off.
         diyUsenetEnabled: req.user.role === 'admin' && (b.diyUsenetEnabled === 'on'
           || b.diyUsenetEnabled === '1' || b.diyUsenetEnabled === 'true'),
+        // TorBox Usenet's own switch, only from a form that shows its card.
+        ...(b.torboxUsenetCard === '1' ? { torboxUsenetEnabled: b.torboxUsenetEnabled === 'on'
+          || b.torboxUsenetEnabled === '1' || b.torboxUsenetEnabled === 'true' } : {}),
         catalogs: finalCats,
         catalogsNone,
         // Served and shown are different choices, so they are stored
@@ -746,6 +749,50 @@ function createApp() {
       res.redirect('/account/usenet?flash=' + encodeURIComponent(
         'Native NNTP connection failed: ' + security.safeErrorMessage(error)));
     }
+  });
+
+  // --- TorBox Usenet: a separate pipeline, for every account ----------
+  // Its own indexer and NZB check count; lib/torbox-usenet-pipeline plays
+  // results through the account's TorBox. An account without admin rights may
+  // only use an indexer on a public address.
+  const torboxUsenetPage = require('./lib/account-torbox-usenet-page');
+  const tbuBack = (res, message) => res.redirect(303, '/account/torbox-usenet?flash=' + encodeURIComponent(message));
+  const tbuIndexerFromForm = (req) => ({
+    enabled: true,
+    kind: String(req.body.tbuSearchKind || '') === 'prowlarr' ? 'prowlarr' : 'newznab',
+    name: String(req.body.tbuSearchName || '').trim().slice(0, 80),
+    url: security.cleanHttpUrl(req.body.tbuSearchUrl, { label: 'Indexer URL' }),
+    apiKey: String(req.body.tbuSearchApiKey || '').trim(),
+    publicOnly: req.user.role !== 'admin',
+  });
+  app.get('/account/torbox-usenet', requireLogin, (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(tablerChrome.tablerPage('TorBox Usenet', torboxUsenetPage.renderBody({
+      cfg: req.user.config || {}, isAdmin: req.user.role === 'admin', flash: String(req.query.flash || '').slice(0, 300),
+    }), { user: req.user, currentSection: 'configure' }));
+  });
+  app.post('/account/torbox-usenet/save', requireLogin, async (req, res) => {
+    try {
+      const indexer = tbuIndexerFromForm(req);
+      if (indexer.publicOnly && indexer.url) await security.assertPublicUrl(indexer.url, { label: 'Indexer URL' });
+      users.updateUserConfig(req.user.id, {
+        torboxUsenetEnabled: req.body.torboxUsenetEnabled === 'on',
+        tbuSearchKind: indexer.kind, tbuSearchName: indexer.name, tbuSearchUrl: indexer.url, tbuSearchApiKey: indexer.apiKey,
+        torboxUsenetCheckCount: require('./lib/torbox-usenet-pipeline').checkCount({ torboxUsenetCheckCount: req.body.torboxUsenetCheckCount }),
+      });
+      tbuBack(res, 'TorBox Usenet settings saved.');
+    } catch (error) { tbuBack(res, 'Save failed: ' + security.safeErrorMessage(error)); }
+  });
+  app.post('/account/torbox-usenet/test', requireLogin, async (req, res) => {
+    const query = String(req.body.tbuTestQuery || 'UFC').trim().slice(0, 200) || 'UFC';
+    let lastError = '';
+    try {
+      const result = await usenetIndexer.search([query], tbuIndexerFromForm(req), {
+        log: (line) => { if (/one variant/.test(line)) lastError = line.replace(/^.*—\s*/, ''); },
+      });
+      if (!result.ok) throw new Error(lastError || result.error || 'search failed');
+      tbuBack(res, 'Indexer connected: ' + result.results.length + ' result(s) for "' + query + '". Save to keep these settings.');
+    } catch (error) { tbuBack(res, 'Test search failed: ' + security.safeErrorMessage(error)); }
   });
 
   app.post('/account/regenerate-token', requireLogin, (req, res) => {
@@ -896,6 +943,33 @@ function createApp() {
           played('ok', { ms: Date.now() - resolveStartedAt });
           res.setHeader('Cache-Control', 'no-store');
           return res.redirect(302, out.url);
+        }
+        // TorBox Usenet still downloading. Keep the player's request alive
+        // through a few signed redirects (each waits up to 35s on TorBox), so
+        // a normal 1-3 minute job starts playing without a second click. The
+        // `wait` counter varies the URL so players do not see a redirect
+        // loop; every round re-verifies the signature. From NZB-Sport-Pro.
+        if (out && out.queued) {
+          const rounds = Math.max(0, Math.min(15, parseInt(process.env.TORBOX_USENET_WAIT_REDIRECTS || '5', 10) || 0));
+          const round = Math.max(0, parseInt(String(req.query.wait || '0'), 10) || 0);
+          res.setHeader('Cache-Control', 'no-store');
+          if (round < rounds) {
+            const next = new URL(req.originalUrl, 'http://sss.invalid');
+            next.searchParams.set('wait', String(round + 1));
+            return res.redirect(302, next.pathname + next.search);
+          }
+          played('queued', { ms: Date.now() - resolveStartedAt });
+          res.setHeader('Retry-After', String(out.retryAfter || 10));
+          return res.status(425).send('TorBox is still downloading this release. It is saved in your TorBox; play the same result again in a minute.');
+        }
+        if (out && out.error === 'torbox-job-failed') {
+          played('error', { error: 'TorBox job failed: ' + (out.state || '') });
+          return res.status(502).set('Cache-Control', 'no-store')
+            .send('TorBox could not download this release (' + String(out.detail || out.state || 'failed').replace(/\s+/g, ' ').slice(0, 200) + '). Choose another result.');
+        }
+        if (out && /^candidate-/.test(out.error || '')) {
+          played('rejected', { error: out.error });
+          return res.status(410).set('Cache-Control', 'no-store').send('This link has expired. Close and re-open the event to search again.');
         }
         // Not cached / unresolvable on this provider — tell the player plainly.
         played('not-cached', { ms: Date.now() - resolveStartedAt });

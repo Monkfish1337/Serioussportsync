@@ -193,6 +193,7 @@ Bitmagnet only, and Refresh does not search.
 | --- | --- | --- |
 | Native Newznab, NZBHydra, or Prowlarr | Built-in Usenet (native NNTP) | SSS searches the indexer directly, filters candidates once, and streams the matched release straight from your NNTP provider — no helper container |
 | Easynews | Easynews | Searches and plays with credentials stored on the user's account |
+| Your own Newznab, NZBHydra, or Prowlarr | TorBox Usenet | A separate pipeline, for every account. SSS searches the indexer the account sets for it and hands the NZB to the account's TorBox, which downloads it and plays it. Only the small NZB file passes through the server, so it suits a bandwidth-capped VPS |
 
 Built-in Usenet is one pipeline: a native indexer connection for discovery and
 a direct NNTP provider connection for playback. The admin **Usenet** page
@@ -206,6 +207,16 @@ resolution, fetch one segment for startup and then pipeline a bounded
 read-ahead window. The page offers Balanced, Low latency and Resilient
 profiles plus bounded advanced controls. Native NNTP serves direct videos and
 stored, unencrypted RAR4/RAR5 videos with HTTP byte ranges.
+
+TorBox Usenet is its own pipeline with its own switch (Configure) and its own
+settings page (indexer, and **NZBs checked per event**, default 5, 0–20). Rows
+show what TorBox has: ⚡ Instant (a finished download in the account), 📦 Cached
+(attach and wait), ⏳ Processing or ⏳ Queue. Checking an NZB downloads it,
+which counts against the indexer's download limit. An uncached release starts
+playing once TorBox finishes, through a few signed redirects, without a second
+click. The NZB is uploaded, never the indexer link, so the indexer's API key
+never reaches TorBox. Accounts other than admins may only use an indexer on a
+public internet address. The TorBox plan must include Usenet downloads.
 
 ### The availability index
 
