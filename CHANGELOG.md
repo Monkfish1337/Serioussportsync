@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- The Prowlarr queue learns which indexers ignore dates. When a date-only
+  search such as `MLB 2026.09.23` returns five or more results and none carry
+  that date, the indexer gets no date-only searches for 30 days; its turns go
+  to team-name searches, which work there. A date-only search that returns
+  dated results clears it. Shown on Discovery → Prowlarr (#63).
+- Search now never runs the same query on the same indexer twice in one sweep;
+  games sharing a date move on to their next query instead (#64).
 - Configure opens with an **Overview** for new accounts: how SeriousSportSync
   works (schedules become catalogs, releases are found ahead of time, opening
   an event is instant, playback comes from your own service) and how pressing

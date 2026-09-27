@@ -552,3 +552,48 @@ test('every third search goes to a due retry, even with a backlog of first searc
     assert.equal(next.filter(id=>id!=='mlb:a').length,2,'first searches still get most turns');
   } finally {queue.close();}
 });
+
+// Issue #63, from the live server on 2026-09-25: 720pier answered
+// "MLB 2026.09.23" with its newest 22 releases of any sport.
+test('an indexer that ignores dates stops getting date-only searches',async()=>{
+  const games=[{id:'mlb:1',name:'Twins vs Giants',date:'2026-09-11'},{id:'mlb:2',name:'Rockies vs Diamondbacks',date:'2026-09-10'}];
+  const queries=[];
+  const undated=Array.from({length:22},(_,i)=>({title:'NHL 2026-2027 / PS / 24.09.2026 / Game '+i}));
+  const {deps,advance}=setup({events:()=>games,indexers:async()=>[{id:36,name:'720pier'}],
+    search:async(q,opts)=>{queries.push(q[0]);if(/^MLB \d{4}\.\d{2}\.\d{2}$/.test(q[0])) await opts.onRawResults(undated);return {ok:true,partial:false,results:[]};}});
+  const queue=discovery.createQueue(':memory:',deps);
+  try {
+    await queue.run();
+    assert.equal(queries[0],'MLB 2026.09.11','the first search is the date-only one');
+    assert.equal(queue.status().indexers[0].ignoresDates,true);
+    advance(121000);
+    await queue.run();
+    assert.equal(queries.length,2);
+    assert.doesNotMatch(queries[1],/^MLB \d{4}\.\d{2}\.\d{2}$/,'the next game skips its date-only search there');
+  } finally {queue.close();}
+});
+
+test('dated results, or too few results, do not mark an indexer as ignoring dates',async()=>{
+  for (const rows of [[{title:'MLB 2026 / RS / 11.09.2026 / Twins @ Giants'},...Array.from({length:10},(_,i)=>({title:'other '+i}))],
+    [{title:'unrelated one'},{title:'unrelated two'}]]) {
+    const {deps}=setup({events:()=>[{id:'mlb:1',name:'Twins vs Giants',date:'2026-09-11'}],
+      search:async(_q,opts)=>{await opts.onRawResults(rows);return {ok:true,partial:false,results:[]};}});
+    const queue=discovery.createQueue(':memory:',deps);
+    try { await queue.run(); assert.equal(queue.status().indexers[0].ignoresDates,false); } finally {queue.close();}
+  }
+});
+
+// Issue #64: an NHL Search now ran "NHL 2026.09.20" on 720pier three times.
+test('Search now never repeats the same query on the same indexer',async()=>{
+  const sameDay=[{id:'mlb:1',name:'Mets vs Yankees',date:'2026-09-11'},{id:'mlb:2',name:'Mariners vs Rangers',date:'2026-09-11'},{id:'mlb:3',name:'Cubs vs Reds',date:'2026-09-11'}];
+  const {deps}=setup({events:()=>sameDay,sleep:async()=>{},search:async()=>({ok:true,partial:false,results:[]})});
+  const queue=discovery.createQueue(':memory:',deps);
+  try {
+    queue.searchNow({promotion:'mlb'});
+    const sweep=await finished(queue);
+    const pairs=sweep.searches.map(s=>s.indexer+'|'+s.query);
+    assert.equal(sweep.searches.length,3);
+    assert.equal(new Set(pairs).size,pairs.length,'every search is different: '+pairs.join(', '));
+    assert.equal(pairs.filter(p=>p.endsWith('MLB 2026.09.11')).length,1,'the shared date-only query runs once');
+  } finally {queue.close();}
+});
