@@ -1,7 +1,7 @@
 'use strict';
 
 // The play route for TorBox Usenet, on the real Express app: a regular (not
-// admin) account plays a built-in Usenet result, and the player is sent to
+// admin) account plays a TorBox Usenet result, and the player is sent to
 // TorBox, or kept waiting while TorBox downloads. Nothing is streamed by SSS.
 
 const test = require('node:test');
@@ -49,10 +49,10 @@ async function playLink(user, eventId) {
   return '/u/' + user.id + '/' + user.apiToken + '/resolve/torbox-usenet/' + encodeURIComponent(eventId) + '/' + stored.id + '?exp=' + exp + '&sig=' + sig;
 }
 
-test('a regular account plays a built-in Usenet result from TorBox, never through SSS', async () => {
+test('a regular account plays a TorBox Usenet result from TorBox, never through SSS', async () => {
   const user = await users.createUser({ username: 'viewer', password: 'correct-horse-battery-staple', role: 'user' });
-  users.updateUserConfig(user.id, { diyUsenetEnabled: true, usenetPlayback: 'nntp', torboxApiKey: 'TB-KEY',
-    nntpHost: 'news.example', nntpUsername: 'u', nntpPassword: 'p' });
+  users.updateUserConfig(user.id, { torboxUsenetEnabled: true, tbuSearchUrl: 'https://indexer.example', tbuSearchApiKey: 'SECRET', torboxApiKey: 'TB-KEY',
+    diyUsenetEnabled: true, nntpHost: 'news.example', nntpUsername: 'u', nntpPassword: 'p' });
   const handed = [];
   nntpPlayback.downloadNzb = async (url, opts) => { handed.push({ url, publicOnly: opts.publicOnly }); return Buffer.from('<nzb/>'); };
   torboxUsenet.resolveNzb = async (buffer, title, key) => {
@@ -65,7 +65,7 @@ test('a regular account plays a built-in Usenet result from TorBox, never throug
   assert.deepEqual(handed[0], { url: 'https://indexer.example/api?t=get&id=1&apikey=SECRET', publicOnly: true },
     'SSS fetched only the NZB, and for a regular account only from a public address');
   assert.deepEqual(handed[1], { toTorbox: '<nzb/>', key: 'TB-KEY' }, 'and handed that NZB to the account\'s TorBox');
-  // Its stored "nntp" choice is ignored: a regular account cannot stream through the server.
+  // Built-in Usenet is untouched: still admin-only, so its NNTP link is refused.
   const { exp, sig } = urlSign.signResolve({ userId: user.id, provider: 'nntp', eventId: 'mlb:823168', infoHash: 'x' });
   const nntp = await fetch(base + '/u/' + user.id + '/' + user.apiToken + '/resolve/nntp/mlb%3A823168/x?exp=' + exp + '&sig=' + sig, { redirect: 'manual' });
   assert.equal(nntp.status, 403);
@@ -73,7 +73,7 @@ test('a regular account plays a built-in Usenet result from TorBox, never throug
 
 test('while TorBox downloads, the player is kept waiting through signed redirects, then told to retry', async () => {
   const user = await users.createUser({ username: 'waiter', password: 'correct-horse-battery-staple', role: 'user' });
-  users.updateUserConfig(user.id, { diyUsenetEnabled: true, torboxApiKey: 'TB-KEY' });
+  users.updateUserConfig(user.id, { torboxUsenetEnabled: true, tbuSearchUrl: 'https://indexer.example', tbuSearchApiKey: 'SECRET', torboxApiKey: 'TB-KEY' });
   nntpPlayback.downloadNzb = async () => Buffer.from('<nzb/>');
   torboxUsenet.resolveNzb = async () => ({ ok: true, queued: true, id: 77, retryAfter: 35 });
   const link = await playLink(user, 'mlb:824301');
@@ -90,4 +90,31 @@ test('while TorBox downloads, the player is kept waiting through signed redirect
   const failed = await fetch(base + await playLink(user, 'mlb:824302'), { redirect: 'manual' });
   assert.equal(failed.status, 502);
   assert.match(await failed.text(), /missing articles/);
+});
+
+test('any account saves its own TorBox Usenet indexer; a local-network indexer is refused', async () => {
+  const user = await users.createUser({ username: 'setter', password: 'correct-horse-battery-staple', role: 'user' });
+  const login = await fetch(base + '/login', { method: 'POST', redirect: 'manual',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ username: 'setter', password: 'correct-horse-battery-staple' }) });
+  const cookie = (login.headers.get('set-cookie') || '').split(';')[0];
+  assert.ok(cookie, 'signed in');
+  const page = await fetch(base + '/account/torbox-usenet', { headers: { cookie } });
+  assert.equal(page.status, 200);
+  assert.match(await page.text(), /NZBs checked per event/);
+  const save = (fields) => fetch(base + '/account/torbox-usenet/save', { method: 'POST', redirect: 'manual',
+    headers: { cookie, 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(fields) });
+
+  const lan = await save({ torboxUsenetEnabled: 'on', tbuSearchUrl: 'http://192.168.1.16:9696', tbuSearchApiKey: 'k', torboxUsenetCheckCount: '3' });
+  assert.match(decodeURIComponent(lan.headers.get('location')), /public internet address/);
+  assert.equal(users.findById(user.id).config.tbuSearchUrl, '', 'nothing saved');
+
+  const ok = await save({ torboxUsenetEnabled: 'on', tbuSearchKind: 'newznab', tbuSearchUrl: 'https://1.1.1.1', tbuSearchApiKey: 'k', torboxUsenetCheckCount: '3' });
+  assert.match(decodeURIComponent(ok.headers.get('location')), /saved/);
+  const saved = users.findById(user.id).config;
+  assert.equal(saved.torboxUsenetEnabled, true);
+  assert.equal(saved.tbuSearchUrl, 'https://1.1.1.1');
+  assert.equal(saved.torboxUsenetCheckCount, 3);
+  assert.equal(saved.diyUsenetEnabled, false, 'built-in Usenet is untouched');
+  assert.equal(saved.diySearchUrl, '');
 });

@@ -67,16 +67,18 @@ should normally be managed from **Metadata**, **Promotions**, and
 TorBox, Usenet Ultimate, Easynews, and built-in Usenet settings are account-scoped
 and belong on the signed-in **Account** page. Usenet Ultimate is its own
 standalone pipeline (a per-user manifest URL to your own UU instance). Built-in
-Usenet is a separate pipeline that uses a native indexer connection and plays
-through TorBox (every account) or a direct NNTP provider connection
-(administrators); it does not require a helper container. Each account sets its
-own indexer, and how many NZBs are checked against TorBox per event, on the
-Built-in Usenet page. Accounts other than administrators may only use indexers
-on public internet addresses. `TORBOX_USENET_PLAY_WAIT_MS` (default 35000) and
-`TORBOX_USENET_WAIT_REDIRECTS` (default 5) bound how long a play waits for
-TorBox to finish an uncached download.
+Usenet is a separate pipeline that uses a native indexer connection and a direct
+NNTP provider connection; it does not require a helper container.
 Its single on/off switch is on the Configure wizard; the dedicated Built-in
 Usenet page holds connection details, LAN playback routing, tuning and logs.
+
+TorBox Usenet is a separate pipeline available to every account: its switch is
+on Configure, and **Configure → TorBox Usenet settings** holds its own indexer
+and how many NZBs are checked per event. The account's TorBox downloads and
+serves each release, so nothing streams through the server. Accounts other than
+administrators may only use indexers on public internet addresses.
+`TORBOX_USENET_PLAY_WAIT_MS` (default 35000) and `TORBOX_USENET_WAIT_REDIRECTS`
+(default 5) bound how long a play waits for TorBox to finish a download.
 
 For a Cloudflare-installed addon used on the same Wi-Fi as the server, set
 **Built-in Usenet → DIY playback on your LAN** to the LAN address of SSS

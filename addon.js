@@ -564,8 +564,7 @@ function createApp() {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
     const body = accountUsenetPage.renderBody({
-      cfg: require('./lib/diy-access').playbackConfig(req.user),
-      isAdmin: req.user.role === 'admin',
+      cfg: req.user.config || {},
       engine: settings.getUsenetEngine(),
       diyPlaybackOrigin: settings.getDiyPlaybackOrigin(),
       runtime: nntpPlayback.telemetry.snapshot(),
@@ -578,44 +577,31 @@ function createApp() {
       user: req.user, currentSection: 'usenet',
     }));
   };
-  // Every account may set its own indexer and play its results through
-  // TorBox; native NNTP (which streams through this server) stays admin-only.
-  app.get('/account/usenet', requireLogin, renderUsenetPage);
+  app.get('/account/usenet', requireAdmin, renderUsenetPage);
   app.get('/admin/usenet', requireAdmin, renderUsenetPage);
 
-  const saveUsenetPage = async (req, res) => {
+  const saveUsenetPage = (req, res) => {
     const b = req.body || {};
-    const admin = req.user.role === 'admin';
-    const back = admin ? '/admin/usenet' : '/account/usenet';
     try {
-      const searchUrl = security.cleanHttpUrl(b.diySearchUrl, { label: 'Search URL' });
-      if (!admin && searchUrl) await security.assertPublicUrl(searchUrl, { label: 'Search URL' });
-      const patch = {
+      users.updateUserConfig(req.user.id, {
         diySearchKind: String(b.diySearchKind || '') === 'prowlarr' ? 'prowlarr' : 'newznab',
         diySearchName: String(b.diySearchName || '').trim().slice(0, 80),
-        diySearchUrl: searchUrl,
+        diySearchUrl: security.cleanHttpUrl(b.diySearchUrl, { label: 'Search URL' }),
         diySearchApiKey: String(b.diySearchApiKey || ''),
-        torboxUsenetCheckCount: Math.max(0, Math.min(20, parseInt(String(b.torboxUsenetCheckCount ?? '5'), 10) || 0)),
-      };
-      if (admin) {
-        Object.assign(patch, {
-          usenetPlayback: ['nntp', 'torbox', 'both'].includes(b.usenetPlayback) ? b.usenetPlayback : 'nntp',
-          nntpHost: String(b.nntpHost || '').trim(),
-          nntpPort: Math.min(65535, Math.max(1, parseInt(String(b.nntpPort || '563'), 10) || 563)),
-          nntpTls: b.nntpTls === 'on' || b.nntpTls === '1' || b.nntpTls === 'true',
-          nntpUsername: String(b.nntpUsername || '').trim(),
-          nntpPassword: String(b.nntpPassword || ''),
-          nntpConnections: Math.min(50, Math.max(1,
-            parseInt(String(b.nntpConnections || '20'), 10) || 20)),
-        });
-      }
-      users.updateUserConfig(req.user.id, patch);
-      res.redirect(back + '?flash=' + encodeURIComponent('Usenet settings saved.'));
+        nntpHost: String(b.nntpHost || '').trim(),
+        nntpPort: Math.min(65535, Math.max(1, parseInt(String(b.nntpPort || '563'), 10) || 563)),
+        nntpTls: b.nntpTls === 'on' || b.nntpTls === '1' || b.nntpTls === 'true',
+        nntpUsername: String(b.nntpUsername || '').trim(),
+        nntpPassword: String(b.nntpPassword || ''),
+        nntpConnections: Math.min(50, Math.max(1,
+          parseInt(String(b.nntpConnections || '20'), 10) || 20)),
+      });
+      res.redirect('/admin/usenet?flash=' + encodeURIComponent('Usenet settings saved.'));
     } catch (err) {
-      res.redirect(back + '?flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(err)));
+      res.redirect('/admin/usenet?flash=' + encodeURIComponent('Save failed: ' + security.safeErrorMessage(err)));
     }
   };
-  app.post('/account/usenet/save', requireLogin, saveUsenetPage);
+  app.post('/account/usenet/save', requireAdmin, saveUsenetPage);
   app.post('/admin/usenet/save', requireAdmin, saveUsenetPage);
 
   app.post('/admin/usenet/engine', requireAdmin, (req, res) => {
@@ -696,10 +682,11 @@ function createApp() {
         easynewsPassword: String(b.easynewsPassword || ''),
         // Configure owns the master DIY switch. Backend-specific settings stay
         // isolated to /account/usenet and are preserved when the master is off.
-        // Any account may switch built-in Usenet on; lib/diy-access limits
-        // non-admins to TorBox playback and public addresses.
-        diyUsenetEnabled: (b.diyUsenetEnabled === 'on'
+        diyUsenetEnabled: req.user.role === 'admin' && (b.diyUsenetEnabled === 'on'
           || b.diyUsenetEnabled === '1' || b.diyUsenetEnabled === 'true'),
+        // TorBox Usenet's own switch, only from a form that shows its card.
+        ...(b.torboxUsenetCard === '1' ? { torboxUsenetEnabled: b.torboxUsenetEnabled === 'on'
+          || b.torboxUsenetEnabled === '1' || b.torboxUsenetEnabled === 'true' } : {}),
         catalogs: finalCats,
         catalogsNone,
         // Served and shown are different choices, so they are stored
@@ -726,20 +713,18 @@ function createApp() {
     }
   });
 
-  app.post('/account/test-diy-search', requireLogin, async (req, res) => {
+  app.post('/account/test-diy-search', requireAdmin, async (req, res) => {
     const b = req.body || {};
     const query = String(b.diySearchTestQuery || 'UFC').trim().slice(0, 200) || 'UFC';
-    let lastError = '';
     try {
       const result = await usenetIndexer.search([query], {
-        publicOnly: req.user.role !== 'admin',
         enabled: true,
         kind: String(b.diySearchKind || '') === 'prowlarr' ? 'prowlarr' : 'newznab',
         name: String(b.diySearchName || '').trim(),
         url: String(b.diySearchUrl || '').trim(),
         apiKey: String(b.diySearchApiKey || ''),
-      }, { log: (line) => { if (/one variant/.test(line)) lastError = line.replace(/^.*—\s*/, ''); } });
-      if (!result.ok) throw new Error(lastError || result.error || 'search failed');
+      });
+      if (!result.ok) throw new Error(result.error || 'search failed');
       res.redirect('/account/usenet?flash=' + encodeURIComponent(
         'Native Usenet search connected: ' + result.results.length + ' result(s) for "' + query + '"'));
     } catch (error) {
@@ -764,6 +749,50 @@ function createApp() {
       res.redirect('/account/usenet?flash=' + encodeURIComponent(
         'Native NNTP connection failed: ' + security.safeErrorMessage(error)));
     }
+  });
+
+  // --- TorBox Usenet: a separate pipeline, for every account ----------
+  // Its own indexer and NZB check count; lib/torbox-usenet-pipeline plays
+  // results through the account's TorBox. An account without admin rights may
+  // only use an indexer on a public address.
+  const torboxUsenetPage = require('./lib/account-torbox-usenet-page');
+  const tbuBack = (res, message) => res.redirect(303, '/account/torbox-usenet?flash=' + encodeURIComponent(message));
+  const tbuIndexerFromForm = (req) => ({
+    enabled: true,
+    kind: String(req.body.tbuSearchKind || '') === 'prowlarr' ? 'prowlarr' : 'newznab',
+    name: String(req.body.tbuSearchName || '').trim().slice(0, 80),
+    url: security.cleanHttpUrl(req.body.tbuSearchUrl, { label: 'Indexer URL' }),
+    apiKey: String(req.body.tbuSearchApiKey || '').trim(),
+    publicOnly: req.user.role !== 'admin',
+  });
+  app.get('/account/torbox-usenet', requireLogin, (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(tablerChrome.tablerPage('TorBox Usenet', torboxUsenetPage.renderBody({
+      cfg: req.user.config || {}, isAdmin: req.user.role === 'admin', flash: String(req.query.flash || '').slice(0, 300),
+    }), { user: req.user, currentSection: 'configure' }));
+  });
+  app.post('/account/torbox-usenet/save', requireLogin, async (req, res) => {
+    try {
+      const indexer = tbuIndexerFromForm(req);
+      if (indexer.publicOnly && indexer.url) await security.assertPublicUrl(indexer.url, { label: 'Indexer URL' });
+      users.updateUserConfig(req.user.id, {
+        torboxUsenetEnabled: req.body.torboxUsenetEnabled === 'on',
+        tbuSearchKind: indexer.kind, tbuSearchName: indexer.name, tbuSearchUrl: indexer.url, tbuSearchApiKey: indexer.apiKey,
+        torboxUsenetCheckCount: require('./lib/torbox-usenet-pipeline').checkCount({ torboxUsenetCheckCount: req.body.torboxUsenetCheckCount }),
+      });
+      tbuBack(res, 'TorBox Usenet settings saved.');
+    } catch (error) { tbuBack(res, 'Save failed: ' + security.safeErrorMessage(error)); }
+  });
+  app.post('/account/torbox-usenet/test', requireLogin, async (req, res) => {
+    const query = String(req.body.tbuTestQuery || 'UFC').trim().slice(0, 200) || 'UFC';
+    let lastError = '';
+    try {
+      const result = await usenetIndexer.search([query], tbuIndexerFromForm(req), {
+        log: (line) => { if (/one variant/.test(line)) lastError = line.replace(/^.*—\s*/, ''); },
+      });
+      if (!result.ok) throw new Error(lastError || result.error || 'search failed');
+      tbuBack(res, 'Indexer connected: ' + result.results.length + ' result(s) for "' + query + '". Save to keep these settings.');
+    } catch (error) { tbuBack(res, 'Test search failed: ' + security.safeErrorMessage(error)); }
   });
 
   app.post('/account/regenerate-token', requireLogin, (req, res) => {

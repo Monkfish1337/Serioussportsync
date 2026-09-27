@@ -1,7 +1,7 @@
 'use strict';
 
-// Built-in Usenet played through TorBox: SSS finds the NZB with the account's
-// own indexer, hands the NZB file to the account's TorBox, and the player is
+// TorBox Usenet, a pipeline of its own: SSS finds the NZB with the indexer the
+// account set for it, hands the NZB file to the account's TorBox, and the player is
 // redirected to TorBox's CDN. The server moves NZB files only, never video.
 
 const fs = require('fs');
@@ -45,7 +45,7 @@ function fakeTorbox({ cachedHashes = [], ownedList = [], readyAfter = 1 } = {}) 
   return { calls, fetchImpl };
 }
 
-const config = { diyUsenetEnabled: true, usenetPlayback: 'torbox', torboxApiKey: 'TB-KEY', torboxUsenetCheckCount: 5 };
+const config = { torboxUsenetEnabled: true, tbuSearchUrl: 'https://indexer.example', tbuSearchApiKey: 'INDEXER-SECRET', torboxApiKey: 'TB-KEY', torboxUsenetCheckCount: 5 };
 const urlCtx = { origin: 'https://sss.example', userId: 'user-1', apiToken: 'tok' };
 const candidate = { title: 'MLB.2026.09.23.Twins.Giants.720p.WEB', nzbUrl: INDEXER_NZB, size: 3e9, indexer: 'NZBGeek' };
 
@@ -110,13 +110,15 @@ test('a job still downloading keeps the player waiting instead of failing', asyn
   assert.equal(await pipeline.resolve({ eventId: 'mlb:2', token, creds: config, userId: 'someone-else', log: () => {}, deps }).then((r) => r.error), 'candidate-wrong-user');
 });
 
-test('the pipeline stays off unless built-in Usenet plays through TorBox with a key', () => {
+test('the pipeline is its own: its switch, its indexer and a TorBox key, nothing from built-in Usenet', () => {
   assert.equal(pipeline.enabled(config), true);
-  assert.equal(pipeline.enabled({ ...config, usenetPlayback: 'nntp' }), false);
-  assert.equal(pipeline.enabled({ ...config, usenetPlayback: 'both' }), true);
+  assert.equal(pipeline.enabled({ ...config, torboxUsenetEnabled: false }), false);
+  assert.equal(pipeline.enabled({ ...config, tbuSearchUrl: '' }), false, 'needs its own indexer');
   assert.equal(pipeline.enabled({ ...config, torboxApiKey: '' }), false);
   assert.equal(pipeline.enabled({ ...config, torboxEnabled: false }), false);
-  assert.equal(pipeline.enabled({ ...config, diyUsenetEnabled: false }), false);
+  const builtIn = { diyUsenetEnabled: true, diySearchUrl: 'https://other.example', diySearchApiKey: 'k', torboxApiKey: 'TB-KEY' };
+  assert.equal(pipeline.enabled(builtIn), false, 'built-in Usenet settings do not switch it on');
+  assert.equal(pipeline.indexerConfig({ ...config, _publicNetworkOnly: true }).publicOnly, true);
   assert.equal(pipeline.checkCount({}), 5);
   assert.equal(pipeline.checkCount({ torboxUsenetCheckCount: 50 }), 20);
   assert.equal(pipeline.checkCount({ torboxUsenetCheckCount: '0' }), 0);
