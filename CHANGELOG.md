@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.3.0 — 2026-09-28
 
 - `npm test` runs every suite CI runs (unit, Nuvio collections, account page,
   recovery). A `.gitattributes` file keeps text files LF on every platform, so
