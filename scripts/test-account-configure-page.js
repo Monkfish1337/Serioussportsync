@@ -144,7 +144,7 @@ function listen(app) {
     const serverHtml = await serverPage.text();
     assert.ok(serverHtml.includes('src="/assets/table-sort.js"'));
     assert.ok(!serverHtml.includes('Metadata API keys') && !serverHtml.includes('Create a new user') && !serverHtml.includes('Refresh catalogs now'));
-    assert.ok(serverHtml.indexOf('server-time-zone') < serverHtml.indexOf('<h3 class="card-title">Discovery pipelines'), 'time zone appears above source settings');
+    assert.ok(serverHtml.indexOf('server-time-zone') < serverHtml.indexOf('<h3>Discovery sources</h3>'), 'time zone appears above source settings');
     assert.ok(serverHtml.includes('href="/admin/prowlarr-discovery"'), 'discovery has its own sidebar link');
     const saveZone = await fetch(base + '/admin/time-zone', {method:'POST',redirect:'manual',headers:{Cookie:cookie,'Content-Type':'application/x-www-form-urlencoded'},body:'timeZone=Europe%2FLondon'});
     assert.strictEqual(saveZone.status,303);

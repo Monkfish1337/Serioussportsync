@@ -72,7 +72,7 @@ test('a promotion whose events are all in the past is a distinct state', () => {
 
 test('a healthy promotion leads with the number that matters', () => {
   const cell = adminPromotions.eventCell({ total: 84, upcoming: 12, newest: '2026-12-12' });
-  assert.match(cell, /12<\/strong> upcoming/);
+  assert.match(cell, /12<\/b> upcoming/);
   assert.match(cell, /84 stored/);
   assert.ok(!/No events|Nothing upcoming/.test(cell));
 });
@@ -107,26 +107,16 @@ test('the table carries an Events column', () => {
 test('materialized My Teams catalogs stay out of the promotion workspace', () => {
   const html = adminPromotions.renderBody({ events: [] });
   assert.match(html, /Team catalogs are managed in Configure/);
-  assert.doesNotMatch(html, /id=nfl-ari/);
-  assert.match(html, /id=nfl/);
+  assert.doesNotMatch(html, />nfl-ari · /);
+  assert.match(html, />nfl · /);
 });
 
-test('the table opts out of middle alignment, and the rule it opts into exists', () => {
-  // A table cell inherits vertical-align: middle from the table, so dropping
-  // Tabler's .table-vcenter changes nothing on its own — the replacement has to
-  // be defined. Rows here are a primary line over a secondary one, and middle
-  // alignment floated the one-line cells (the kind badge, the poster shape, the
-  // catalog count) to the centre of a three-line row while the multi-line cells
-  // started at the top. The Events column made it worse by adding a third line.
+test('rows align to the top', () => {
+  // Rows are a primary line over secondary ones, and cells differ in height.
+  // Middle alignment floated one-line cells to the centre of a three-line row.
   const html = adminPromotions.renderBody({ events: [] });
-  const table = (html.match(/<table[^>]*>/) || [''])[0];
-  assert.match(table, /align-top/);
-  assert.ok(!/table-vcenter/.test(table));
-
-  const { compatCss } = require('../lib/ui/compat');
-  const css = typeof compatCss === 'function' ? compatCss() : compatCss;
-  assert.match(String(css), /\.table\.align-top td[^}]*vertical-align: top/,
-    'the class the markup asks for must actually be styled');
+  assert.match(html, /<table class="tbl pr-table">/);
+  assert.match(html, /\.pr-table td\{vertical-align:top\}/);
 });
 
 test('the events actually reach the table', () => {
@@ -158,31 +148,20 @@ test('a wide table scrolls instead of pushing the page sideways', () => {
 });
 
 test('the table fits the card instead of relying on the scrollbar', () => {
-  // Scrolling was the previous fix and it did not answer the complaint.
-  // Measured in a headless browser at a 1440px viewport: the table wanted
-  // 1386px inside a 1018px card, of which the action buttons were 690px on one
-  // nowrap line. It scrolled — but the scrollbar sits beneath a 34-row table
-  // where nobody finds it, so Refresh and Edit just read as chopped off.
-  //
-  // Poster and Catalogs came out as columns (both are one short value, both
-  // now sit on the name cell's secondary line) and the buttons wrap. That is
-  // 1018px of content in a 1018px card.
+  // Measured at 1440px, the old table wanted 1386px inside a 1018px card, 690px
+  // of it one line of buttons. Since issue #72 a row shows one button and folds
+  // the rest under "More", so the columns fit and nothing reads as cut off.
   const html = adminPromotions.renderBody({ events: [] });
-  const table = html.slice(html.indexOf('<table class="table card-table align-top">'));
+  const table = html.slice(html.indexOf('<table class="tbl pr-table">'));
   const head = (table.match(/<thead>[\s\S]*?<\/thead>/) || [''])[0];
   assert.ok(head, 'the promotions table must be findable');
   assert.ok(!/<th>Poster<\/th>/.test(head), 'poster shape is one word; it does not need a column');
   assert.ok(!/<th>Catalogs<\/th>/.test(head), 'a catalog count cannot say whether a promotion works');
-  assert.equal((head.match(/<th[ >]/g) || []).length, 6, 'six columns fit; eight did not');
+  assert.equal((head.match(/<th[ >]/g) || []).length, 5, 'five columns');
   assert.match(html, / catalogs?<\/span>/, 'the count still has to be readable somewhere');
-
-  assert.ok(!/<td class="text-nowrap">/.test(html), 'the action buttons must be allowed to wrap');
-  assert.match(html, /<td class="promo-actions">/);
-
-  const { compatCss } = require('../lib/ui/compat');
-  const css = String(typeof compatCss === 'function' ? compatCss() : compatCss);
-  assert.match(css, /td\.promo-actions \{[^}]*white-space: normal/);
-  assert.match(css, /td\.promo-actions \{[^}]*width: 250px/);
+  assert.match(html, /<td class="promo-actions"><div class="pr-actions">[^]*?<details class="pr-more"><summary>More<\/summary>/,
+    'row actions beyond the first are folded');
+  assert.match(html, /td\.promo-actions\{width:250px;white-space:normal\}/);
 });
 
 // ---------------------------------------------------------------------------

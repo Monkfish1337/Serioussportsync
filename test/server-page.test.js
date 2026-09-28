@@ -146,12 +146,21 @@ test('the stream path reads the setting instead of the constant', () => {
 test('the Server page offers every one of them', () => {
   const source = require('fs').readFileSync(
     require('path').join(__dirname, '..', 'addon.js'), 'utf8');
-  assert.match(source, /title: 'Discovery timing'/);
+  // The page is built in lib/admin-server.js since issue #72; the save is in addon.js.
+  const html = require('../lib/admin-server').renderBody({ username: 'admin' });
+  assert.match(html, /Discovery timing/);
   for (const field of ['pipelineBudgetMs', 'discoveryBudgetMs', 'prowlarrMaxQueries',
-    'prowlarrQueryTimeoutMs', 'indexBuildBudgetMs', 'easynewsMaxQueries',
+    'prowlarrQueryTimeoutMs', 'prowlarrLiveBudgetMs', 'indexBuildBudgetMs', 'easynewsMaxQueries',
     'easynewsQueryTimeoutMs', 'fastResponseGraceMs']) {
-    assert.ok(source.includes('name="' + field + '"'), field + ' needs an input');
+    assert.ok(html.includes('name="' + field + '"'), field + ' needs an input');
     assert.ok(source.includes(field + ': b.' + field), field + ' must reach the save');
+  }
+  // Every other field the sources form posted before the rebuild.
+  for (const field of ['sourceToggles', 'companionEnabled', 'companionUrl', 'companionAuthToken', 'bitmagnetEnabled',
+    'bitmagnetUrl', 'bitmagnetLimit', 'bitmagnetVideoOnly', 'prowlarrEnabled', 'prowlarrLiveSearchPresent',
+    'prowlarrLiveSearchEnabled', 'prowlarrUrl', 'prowlarrApiKey', 'sportVideoEnabled', 'sportVideoAutoScan',
+    'sportVideoIntervalHours', 'sportVideoMaxDetailsPerScan', 'sportVideoArchivePages', 'sportVideoCategories', 'skin', 'timeZone']) {
+    assert.ok(html.includes('name="' + field + '"'), field + ' went missing');
   }
 });
 

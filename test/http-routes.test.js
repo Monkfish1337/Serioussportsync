@@ -482,7 +482,7 @@ test('promotions can be refreshed in a chosen set', async () => {
   assert.ok(user.id);
 
   const html = await (await get('/admin/promotions', { headers: { cookie } })).text();
-  assert.match(html, /class="form-check-input m-0 promotion-select"/,
+  assert.match(html, /class="promotion-select"/,
     'expected a per-promotion checkbox');
   assert.match(html, /action="\/admin\/promotions\/refresh-selected"/,
     'expected the bulk refresh form');
