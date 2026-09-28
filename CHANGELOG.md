@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- New fallback artwork for every built-in promotion and weekly show, plus the
+  Discovered tiles: the promotion's name on a plain card, with portrait and
+  square versions where the tile is that shape. It replaces TheSportsDB league
+  banners and badges from 2014-2020 and the old logo cards. Events that had an
+  old default saved at ingest now show the new one; this covered 128 MotoGP
+  events still showing the 2015 banner. Without PUBLIC_URL the cards are served
+  from the repository, so no tile is blank (#69).
+
 ## 1.3.2 — 2026-09-28
 
 - The TorBox cache audit added in 1.3.1 sent TorBox the stored, encrypted
