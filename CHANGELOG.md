@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- The admin sidebar is grouped by job (Health, Sources, Content, System), its
+  items are buttons with icons, and it collapses to icons only; the choice is
+  remembered per browser. "User Management" is now "Users" (#73).
+- Promotions and Server are rebuilt in the native admin style. Promotions is
+  one scrollable list: each row shows the promotion, its source and its
+  events, with one visible button and the rest under "More". Server opens with
+  the time zone, then the four discovery sources, each folded with its state
+  on the summary line, then timing and appearance. The create/edit wizard
+  keeps its layout with the new colours (#72).
 - Discovery has been rebuilt in the native admin style, across all five tabs
   (Overview, Events, Prowlarr, Sport-Video, Bitmagnet). Each tab opens with
   its status and key numbers, then actions, with history and settings folded
