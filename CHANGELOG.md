@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- New fallback artwork for F1, MotoGP, UFC, ONE, Boxing, WWE (plus Raw,
+  SmackDown and NXT), AEW (plus Dynamite and Collision) and MLB, drawn in the
+  same style as the Discovered tiles. They replace TheSportsDB league banners
+  and badges from 2014-2020 and the plain logo cards. Events that had an old
+  default saved at ingest now show the new one; this covered 128 MotoGP events
+  still showing the 2015 banner. Without PUBLIC_URL the cards are served from
+  the repository, so no tile is blank (#69).
+
 ## 1.3.2 — 2026-09-28
 
 - The TorBox cache audit added in 1.3.1 sent TorBox the stored, encrypted
