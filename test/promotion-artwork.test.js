@@ -35,7 +35,7 @@ test('every built-in promotion falls back to its own bundled card, never a TheSp
   }
   assert.match(byId('boxing').defaults.poster, /promo-boxing-poster\.png$/, 'portrait tiles get a portrait card');
   for (const id of ['mlb', 'nfl', 'nba', 'nhl', 'ucl', 'epl']) {
-    assert.match(byId(id).defaults.poster, new RegExp('promo-' + id + '-square\.png$'), 'square tiles get a square card');
+    assert.match(byId(id).defaults.poster, new RegExp('promo-' + id + '-square\\.png$'), 'square tiles get a square card');
   }
 });
 
