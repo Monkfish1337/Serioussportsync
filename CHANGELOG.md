@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `npm test` runs every suite CI runs (unit, Nuvio collections, account page,
+  recovery). A `.gitattributes` file keeps text files LF on every platform, so
+  Windows checkouts match the repository (#67).
 - **Check TorBox Usenet** on its settings page runs a read-only round trip
   with the saved settings and shows each step: TorBox key, Usenet access (a
   refused key suggests checking the plan includes Usenet), search source,

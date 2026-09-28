@@ -392,8 +392,9 @@ Build the local checkout with the development override:
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 ~~~
 
-Run the unit suite with `npm run test:unit`. It uses the Node test runner and
-needs no services; the suite is expected to pass on Windows as well as Linux.
+Run `npm test` before pushing: it runs the unit suite (`npm run test:unit`, the
+Node test runner, no services needed, passes on Windows and Linux) and the three
+script checks CI also runs (`test:nuvio`, `test:account`, `test:recovery`).
 
 For a bespoke built-in promotion, add a self-contained definition to
 <code>lib/promotions.js</code>. Simple metadata-backed sports should normally be
