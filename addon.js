@@ -1440,6 +1440,10 @@ function createApp() {
           {providers:['torrent'],identityKinds:['torrent']});}
         catch(error) {data.coverageError=security.safeErrorMessage(error);}
         data.relevant=(title,event)=>promotions.getByEventId(event.id)?.isRelevantStreamTitle(title,event).ok===true;
+        // Playable coverage (#65): which saved torrents TorBox has confirmed.
+        const prowlarrQueue=require('./lib/prowlarr-discovery').getDefault();
+        data.queueHashes=event=>prowlarrQueue.candidates(event).map(c=>c.infoHash);
+        data.torboxStates=hashes=>availabilityStore.getDefault().torboxStates(hashes);
         data.coverage=coverage.coverage(data,now);
       }
       if(tab==='prowlarr') data.body=require('./lib/admin-prowlarr-discovery').render(data.queue);

@@ -341,6 +341,18 @@ test('a queued promotion missing games offers Search now, sent as a form that re
   assert.match(html, /Searching MOTOGP now/);
 });
 
+// Issue #65: saved is not playable.
+test('a league whose saved releases are mostly not cached on TorBox is flagged', () => {
+  const result = run({ coverage: () => ({ total: 20, matched: 18, missing: 2, playable: { cached: 3, notCached: 12, unchecked: 3 },
+    promotions: [{ id: 'motogp', total: 20, matched: 18, missing: 2, reasons: {}, cached: 3, notCached: 12, unchecked: 3 }] }) });
+  const low = titled(result, /MotoGP: only 3 of 15 checked games are cached on TorBox/);
+  assert.equal(low.stage, 'coverage');
+  assert.ok(low.evidence.includes('12 checked and not cached'));
+  assert.ok(stage(result, 'coverage').vitals.some(([k, v]) => k === 'Cached on TorBox' && v === '3 of 18 (3 not checked)'));
+  const few = run({ coverage: () => ({ total: 4, matched: 4, missing: 0, promotions: [{ id: 'motogp', total: 4, matched: 4, missing: 0, reasons: {}, cached: 0, notCached: 3, unchecked: 1 }] }) });
+  assert.ok(!titled(few, /cached on TorBox/), 'fewer than five checked games decide nothing');
+});
+
 // Issue #68, from the live server on 2026-09-25: Prowlarr 2.6.5 rejected every
 // 720pier torrent file; searches worked, so it looked like an expired cookie.
 test('a Prowlarr version known to break an indexer in use is flagged', () => {

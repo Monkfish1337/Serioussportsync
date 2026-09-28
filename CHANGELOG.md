@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Playable coverage.** Discovery → Overview and Diagnosis show how many
+  games with a saved release TorBox has confirmed as cached in the last 48
+  hours (any account), alongside those checked and not cached and those not
+  checked yet. Diagnosis warns when fewer than half of a league's checked games
+  are cached (#65).
 - Diagnosis shows Prowlarr's version and warns, as a problem, when it is one
   known to break an indexer in use: Prowlarr 2.6.x rejects 720pier's torrent
   files, so searches work but every download fails. The warning says to roll
