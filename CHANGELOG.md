@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Each indexer's searches are ordered by what has worked on it: patterns that
+  found the right release come first (best success rate first), patterns
+  without enough data next in the usual order, and patterns that never found
+  anything last. For the Prowlarr queue this is per indexer, so team-name
+  searches lead on 720pier. Admin demotions still win (#70).
+
 ## 1.3.2 — 2026-09-28
 
 - The TorBox cache audit added in 1.3.1 sent TorBox the stored, encrypted
