@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- When one Prowlarr queue search returns a whole series (a team search on
+  720pier), SSS now fetches one torrent per game still missing a release, up
+  to six, instead of the three best-seeded, which were often copies of one
+  game. Downloads still count against each indexer's daily budget (#71).
 - Each indexer's searches are ordered by what has worked on it: patterns that
   found the right release come first (best success rate first), patterns
   without enough data next in the usual order, and patterns that never found
