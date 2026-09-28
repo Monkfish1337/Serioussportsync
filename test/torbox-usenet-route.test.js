@@ -121,7 +121,10 @@ test('any account saves its own TorBox Usenet indexer; a local-network indexer i
   assert.deepEqual(JSON.parse(saved.tbuNewznabIndexers), [{ name: 'One', url: 'https://1.1.1.1', apiKey: 'k1' }, { name: 'Two', url: 'https://8.8.8.8', apiKey: 'k2' }]);
   assert.equal(saved.torboxUsenetCheckCount, 3);
   const raw = JSON.parse(fs.readFileSync(process.env.USERS_FILE, 'utf8')).users.find((u) => u.id === user.id).config.tbuNewznabIndexers;
-  assert.doesNotMatch(raw, /k1|k2|1\.1\.1\.1/, 'the indexer list is encrypted on disk');
+  // Ciphertext is random base64, which can contain "k1" by chance, so check
+  // for the encryption prefix and plaintext base64 can never contain.
+  assert.match(raw, /^enc:/, 'the indexer list is encrypted on disk');
+  assert.doesNotMatch(raw, /https?:\/\/|"apiKey"|"url"/, 'no plaintext of the indexer list on disk');
 
   const lanRow = new URLSearchParams({ tbuSearchKind: 'newznab' });
   lanRow.append('nzIndexerName', 'Home'); lanRow.append('nzIndexerUrl', 'http://10.0.0.5'); lanRow.append('nzIndexerApiKey', 'k');
