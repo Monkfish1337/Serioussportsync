@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.3.1 — 2026-09-28
+
+Fixes from checking 1.3.0 on a live server.
+
+- **"Cached on TorBox" is now measured.** A background job asks TorBox,
+  read-only, about saved releases nobody has opened yet: every 30 minutes, up
+  to 200 not checked in 48 hours, with an administrator's TorBox key. On 1.3.0
+  140 of 167 saved events had never been checked. A failed check records
+  nothing. The answers also speed up playback for that key.
+- **Only indexers that really ignore dates are marked.** An indexer is marked
+  only when a date-only search returns releases dated other days. RuTracker
+  honours dates but answered a day with no posts with undated old releases,
+  and was marked by mistake; marks from 1.3.0 are cleared once and re-learned.
+- **Check TorBox Usenet reads your TorBox plan.** Listing Usenet downloads
+  works on every plan, so 1.3.0 could pass without one. A new step reads the
+  plan and stops unless it includes Usenet downloads (Pro).
+
 ## 1.3.0 — 2026-09-28
 
 - `npm test` runs every suite CI runs (unit, Nuvio collections, account page,

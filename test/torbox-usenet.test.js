@@ -40,6 +40,7 @@ function fakeTorbox({ cachedHashes = [], ownedList = [], readyAfter = 1 } = {}) 
     }
     if (u.pathname.endsWith('/usenet/mylist')) return reply(200, { data: ownedList });
     if (u.pathname.endsWith('/usenet/requestdl')) return reply(200, { data: CDN });
+    if (u.pathname.endsWith('/user/me')) return reply(200, { data: { plan: 2 } });
     return reply(404, {});
   };
   return { calls, fetchImpl };
@@ -158,9 +159,9 @@ test('Check TorBox Usenet walks every step and adds nothing to TorBox', async ()
   const out = await pipeline.check({ userConfig: config, query: 'Twins Giants', deps: { fetchImpl: tb.fetchImpl,
     search: async () => ({ ok: true, results: [candidate] }), downloadNzb: async () => NZB } });
   assert.equal(out.ok, true);
-  assert.deepEqual(out.steps.map((s) => [s.name, s.ok]), [['TorBox key', true], ['TorBox Usenet access', true], ['Search source', true],
+  assert.deepEqual(out.steps.map((s) => [s.name, s.ok]), [['TorBox key', true], ['TorBox Usenet access', true], ['TorBox plan', true], ['Search source', true],
     ['Search', true], ['Download the NZB', true], ['TorBox cache check', true]]);
-  assert.match(out.steps[5].detail, /does not have this release yet/);
+  assert.match(out.steps[6].detail, /does not have this release yet/);
   assert.ok(!tb.calls.some((c) => /createusenetdownload|requestdl/.test(c.url)), 'nothing is added to TorBox');
   for (const call of tb.calls) assert.doesNotMatch(call.url + call.body, /INDEXER-SECRET/);
 });
@@ -177,4 +178,25 @@ test('Check TorBox Usenet stops at the first failing step and says why', async (
   assert.match(empty.steps.at(-1).detail, /No results for "nothing"/);
   const noKey = await pipeline.check({ userConfig: { ...config, torboxApiKey: '' } });
   assert.deepEqual(noKey.steps.map((s) => [s.name, s.ok]), [['TorBox key', false]]);
+});
+
+// Found on v1.3.0: a non-Pro account passed "TorBox Usenet access", because
+// listing Usenet downloads works on any plan. Only Pro can download them.
+test('Check TorBox Usenet stops when the TorBox plan has no Usenet downloads', async () => {
+  const out = await pipeline.check({ userConfig: config, deps: { fetchImpl: fakeTorbox().fetchImpl,
+    getPlan: async () => ({ ok: true, plan: 1, name: 'Essential', usenet: false }) } });
+  assert.equal(out.ok, false);
+  assert.deepEqual(out.steps.map((s) => [s.name, s.ok]), [['TorBox key', true], ['TorBox Usenet access', true], ['TorBox plan', false]]);
+  assert.match(out.steps[2].detail, /Your plan is Essential/);
+  const unreadable = await pipeline.check({ userConfig: config, deps: { fetchImpl: fakeTorbox().fetchImpl,
+    getPlan: async () => ({ ok: false, error: 'http-error' }), search: async () => ({ ok: true, results: [] }) } });
+  assert.equal(unreadable.steps[2].name, 'TorBox plan');
+  assert.equal(unreadable.steps[2].ok, true, 'an unreadable plan does not block the check');
+});
+
+test('getPlan reads the plan from TorBox', async () => {
+  const torboxUsenet = require('../lib/sources/torbox-usenet');
+  const answer = (plan) => async () => ({ ok: true, status: 200, json: async () => ({ data: { plan } }) });
+  assert.deepEqual(await torboxUsenet.getPlan('k', { fetchImpl: answer(2) }), { ok: true, plan: 2, name: 'Pro', usenet: true });
+  assert.equal((await torboxUsenet.getPlan('k', { fetchImpl: answer(0) })).usenet, false);
 });
