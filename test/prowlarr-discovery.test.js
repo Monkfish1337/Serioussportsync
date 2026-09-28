@@ -607,3 +607,25 @@ test('the queue reports the Prowlarr version it reads with the indexer list',asy
     assert.equal(queue.status().prowlarrVersion,'2.6.5.5623');
   } finally {queue.close();}
 });
+
+// Found on v1.3.0: RuTracker honours dates but answered "NHL 2026.09.26" with
+// undated old playoff releases, and was wrongly marked as ignoring dates.
+test('undated loose matches do not mark an indexer as ignoring dates; v1.3.0 flags are cleared once',async()=>{
+  const loose=Array.from({length:50},(_,i)=>({title:'NHL 25/26 / Final - Game 4 / Hurricanes @ Golden Knights '+i}));
+  const {deps}=setup({events:()=>[{id:'mlb:1',name:'Twins vs Giants',date:'2026-09-11'}],
+    search:async(_q,opts)=>{await opts.onRawResults(loose);return {ok:true,partial:false,results:[]};}});
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'sss-traits-')),file=path.join(dir,'queue.sqlite');
+  let queue=discovery.createQueue(file,deps);
+  try {
+    await queue.run();
+    assert.equal(queue.status().indexers[0].ignoresDates,false);
+    queue.close();
+    const Database=require('better-sqlite3');
+    let raw=new Database(file);
+    raw.prepare('INSERT INTO indexer_traits(scope,indexer,ignores_dates_at) SELECT scope,indexer,? FROM limits LIMIT 1 ON CONFLICT(scope,indexer) DO UPDATE SET ignores_dates_at=excluded.ignores_dates_at').run(deps.now());
+    raw.prepare("DELETE FROM migrations WHERE name='ignores-dates-v2'").run();
+    raw.close();
+    queue=discovery.createQueue(file,deps);
+    assert.equal(queue.status().indexers[0].ignoresDates,false,'flags set under the old rule are cleared');
+  } finally {queue.close();fs.rmSync(dir,{recursive:true,force:true,maxRetries:5,retryDelay:100});}
+});

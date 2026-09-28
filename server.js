@@ -110,6 +110,8 @@ function scheduleBackgroundWork(currentCount) {
   });
   sportVideo.startScheduler();
   require('./lib/prowlarr-discovery').start();
+  // Measures "Cached on TorBox" for saved releases (lib/torbox-cache-audit).
+  if (availabilityIndex) require('./lib/torbox-cache-audit').start();
 
 }
 
