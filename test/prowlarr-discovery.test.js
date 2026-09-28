@@ -597,3 +597,13 @@ test('Search now never repeats the same query on the same indexer',async()=>{
     assert.equal(pairs.filter(p=>p.endsWith('MLB 2026.09.11')).length,1,'the shared date-only query runs once');
   } finally {queue.close();}
 });
+
+test('the queue reports the Prowlarr version it reads with the indexer list',async()=>{
+  const {deps}=setup({version:async()=>'2.6.5.5623',search:async()=>({ok:true,partial:false,results:[]})});
+  const queue=discovery.createQueue(':memory:',deps);
+  try {
+    assert.equal(queue.status().prowlarrVersion,'','unknown before the first read');
+    await queue.run();
+    assert.equal(queue.status().prowlarrVersion,'2.6.5.5623');
+  } finally {queue.close();}
+});

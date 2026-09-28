@@ -61,3 +61,45 @@ test('missing reasons preserve recorded failure and mark incomplete database evi
   assert.match(coverage({...base,queue},now).rows[0].reason,/Indexer failure/);
   assert.match(coverage({...base,coverageError:'unavailable'},now).rows[0].reason,/Coverage incomplete/);
 });
+
+// Issue #65: a saved hash is not playback. Diamondbacks @ Rockies (23 Sept)
+// was saved from 720pier and not cached on TorBox.
+test('playable coverage splits saved events into cached, not cached and not checked',()=>{
+  const h=(c)=>c.repeat(40);
+  const states=new Map([[h('a'),'cached'],[h('b'),'not-cached']]);
+  let asked=[];
+  const result=coverage({...base,
+    queue:{...base.queue,eventStates:[{id:'mlb:1',matched:true,seeded:true,state:'Matched'}]},
+    queueHashes:(event)=>event.id==='mlb:1' ? [h('a')] : [],
+    releases:[{infoHash:h('b'),matches:[{eventId:'mlb:2'}]}],
+    indexTitles:[{eventId:'mlb:3',title:'Usable',usable:1,hash:h('c')}],
+    torboxStates:(hashes)=>{asked=hashes;return states;}},now);
+  assert.deepEqual(asked.sort(),[h('a'),h('b'),h('c')],'every saved hash is asked about once');
+  assert.deepEqual(result.rows.map(e=>[e.id,e.torbox]),[['mlb:1','cached'],['mlb:2','not-cached'],['mlb:3','unchecked'],['mlb:4',null]]);
+  assert.deepEqual(result.playable,{cached:1,notCached:1,unchecked:1});
+  const group=result.promotions[0];
+  assert.deepEqual([group.matched,group.cached,group.notCached,group.unchecked],[3,1,1,1]);
+});
+
+test('without TorBox data, coverage behaves as before',()=>{
+  const result=coverage({...base,releases:[{infoHash:'a'.repeat(40),matches:[{eventId:'mlb:1'}]}]},now);
+  assert.equal(result.playable,null);
+  assert.equal(result.rows[0].torbox,null);
+});
+
+test('TorBox states come from any account and only count recent checks',()=>{
+  const {createAvailabilityIndex}=require('../lib/availability-index');
+  let clock=now;
+  const index=createAvailabilityIndex({file:':memory:',secret:'coverage-test-secret-000000000000000000000000',now:()=>clock});
+  try {
+    const c=(x)=>({infoHash:x.repeat(40),title:'MLB '+x});
+    index.observe({provider:'torbox',scope:'account-1',state:'cached',candidate:c('a')});
+    index.observe({provider:'torbox',scope:'account-2',state:'unavailable',candidate:c('b')});
+    index.observe({provider:'torbox',scope:'account-1',state:'cached',candidate:c('d'),observedAt:now-72*3600000});
+    const states=index.torboxStates(['a','b','c','d'].map(x=>x.repeat(40)));
+    assert.equal(states.get('a'.repeat(40)),'cached');
+    assert.equal(states.get('b'.repeat(40)),'not-cached');
+    assert.equal(states.has('c'.repeat(40)),false,'never checked');
+    assert.equal(states.has('d'.repeat(40)),false,'checked too long ago');
+  } finally {index.close();}
+});
