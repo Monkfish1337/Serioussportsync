@@ -155,3 +155,54 @@ test('too few searches decide nothing, and a demoted pattern stays last',()=>{
   assert.deepEqual(db.context('prowlarr · 720pier',promo,event,'queue').filter(planned),planned,'an admin demotion beats a good record');
   db.close();
 });
+
+// Found on the live server after #70 shipped: patterns carry team names, so
+// every matchup was its own pattern and none of 720pier's 40 MLB patterns
+// reached five searches. Ordering now learns from the query's shape.
+test('what worked for other matchups orders a new one',()=>{
+  const now=Date.parse('2026-09-28T12:00:00Z');
+  const db=review.createReview(':memory:',()=>now);
+  const promo={id:'mlb',isRelevantStreamTitle:(title)=>({ok:/ @ /.test(title)})};
+  const games=[['Cincinnati Reds','Atlanta Braves'],['Texas Rangers','Minnesota Twins'],['Detroit Tigers','Pittsburgh Pirates'],
+    ['Seattle Mariners','Los Angeles Angels'],['Miami Marlins','Atlanta Braves'],['Kansas City Royals','Cleveland Guardians']];
+  games.forEach(([away,home],i)=>{
+    const event={id:'mlb:'+i,name:away+' vs '+home,date:'2026-09-2'+i};
+    const ctx=db.context('prowlarr · 720pier',promo,event,'queue');
+    const short=(team)=>team.split(' ').pop();
+    ctx.record('MLB 2026.09.2'+i,'success',[{title:'MLB 2026 other game'}],100);
+    ctx.record(short(away)+' '+short(home)+' 2026.09.2'+i,'success',[{title:'MLB 2026 / RS / '+away+' @ '+home}],100);
+  });
+  const event={id:'mlb:new',name:'Minnesota Twins vs San Francisco Giants',date:'2026-09-28'};
+  const planned=['MLB 2026.09.28','Minnesota Twins vs San Francisco Giants 2026.09.28','Twins Giants 2026.09.28'];
+  assert.deepEqual(db.context('prowlarr · 720pier',promo,event,'queue').filter(planned),
+    ['Twins Giants 2026.09.28','Minnesota Twins vs San Francisco Giants 2026.09.28','MLB 2026.09.28'],
+    'short names proven on six other games lead; the date-only search that never matched goes last');
+  db.close();
+});
+
+test('query shapes replace the event names, and older samples are backfilled once',()=>{
+  assert.equal(review.shape('Twins Giants 2026.09.23','Minnesota Twins vs San Francisco Giants'),'{short} {short} {date}');
+  assert.equal(review.shape('St. Louis Cardinals @ Milwaukee Brewers 20.09.2026','St. Louis Cardinals at Milwaukee Brewers'),'{team} @ {team} {date}');
+  assert.equal(review.shape('MLB 2026.09.23',''),'mlb {date}');
+  assert.equal(review.shape('UFC 330','UFC 330'),'{event}');
+  const fs=require('fs'),os=require('os'),path=require('path');
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'sss-shape-')),file=path.join(dir,'q.sqlite');
+  const now=Date.parse('2026-09-28T12:00:00Z');
+  let db=review.createReview(file,()=>now);
+  const promo={id:'mlb',isRelevantStreamTitle:()=>({ok:true})};
+  for (let i=0;i<6;i++) db.context('prowlarr · 720pier',promo,{id:'mlb:'+i,name:'Reds vs Braves '+i,date:'2026-09-20'},'queue')
+    .record('Reds Braves 2026.09.2'+i,'success',[{title:'x'}],100);
+  db.close();
+  const Database=require('better-sqlite3');
+  const raw=new Database(file);raw.prepare('UPDATE samples SET shape=NULL').run();raw.close();
+  const asked=[];
+  db=review.createReview(file,()=>now,{eventName:(id)=>{asked.push(id);return 'Cincinnati Reds vs Atlanta Braves';}});
+  try {
+    const event={id:'mlb:new',name:'Chicago Cubs vs St. Louis Cardinals',date:'2026-09-28'};
+    assert.deepEqual(db.context('prowlarr · 720pier',promo,event,'queue').filter(['MLB 2026.09.28','Cubs Cardinals 2026.09.28']),
+      ['Cubs Cardinals 2026.09.28','MLB 2026.09.28'],'backfilled samples count');
+    assert.equal(asked.length,6);
+    db.context('prowlarr · 720pier',promo,event,'queue').filter(['x']);
+    assert.equal(asked.length,6,'the backfill runs once');
+  } finally {db.close();fs.rmSync(dir,{recursive:true,force:true,maxRetries:5,retryDelay:100});}
+});

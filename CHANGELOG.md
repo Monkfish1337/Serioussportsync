@@ -7,6 +7,10 @@
   without enough data next in the usual order, and patterns that never found
   anything last. For the Prowlarr queue this is per indexer, so team-name
   searches lead on 720pier. Admin demotions still win (#70).
+  Searches are compared by shape rather than by their exact text ("Twins
+  Giants" and "Reds Braves" count as the same short-names search), so what
+  works on one game carries over to the next. Existing history is converted
+  once on start-up.
 - New fallback artwork for every built-in promotion and weekly show, plus the
   Discovered tiles: the promotion's name on a plain card, with portrait and
   square versions where the tile is that shape. It replaces TheSportsDB league
