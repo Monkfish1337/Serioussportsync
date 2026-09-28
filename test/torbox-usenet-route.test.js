@@ -132,3 +132,22 @@ test('any account saves its own TorBox Usenet indexer; a local-network indexer i
   assert.equal(saved.diyUsenetEnabled, false, 'built-in Usenet is untouched');
   assert.equal(saved.diySearchUrl, '');
 });
+
+test('Check TorBox Usenet shows each step on the page', async () => {
+  await users.createUser({ username: 'checker', password: 'correct-horse-battery-staple', role: 'user' });
+  const login = await fetch(base + '/login', { method: 'POST', redirect: 'manual', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ username: 'checker', password: 'correct-horse-battery-staple' }) });
+  const cookie = (login.headers.get('set-cookie') || '').split(';')[0];
+  users.updateUserConfig(users.findByUsername('checker').id, { torboxApiKey: 'TB-KEY', torboxUsenetEnabled: true });
+  const original = torboxUsenet.testConnection;
+  torboxUsenet.testConnection = async () => ({ ok: false, status: 403, error: 'invalid-key' });
+  try {
+    const page = await fetch(base + '/account/torbox-usenet/check', { method: 'POST', headers: { cookie, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ tbuTestQuery: 'UFC' }) });
+    assert.equal(page.status, 200);
+    const html = await page.text();
+    assert.match(html, /Check result/);
+    assert.match(html, /TorBox Usenet access/);
+    assert.match(html, /plan includes Usenet/);
+  } finally { torboxUsenet.testConnection = original; }
+});
