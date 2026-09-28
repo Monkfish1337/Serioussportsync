@@ -9,8 +9,8 @@ const base={tab:'events',selected:null,promotions:[{id:'mlb',name:'MLB'},{id:'nf
 test('Discovery merges source provenance into one event row without claiming playback availability',()=>{
   const html=render(base);
   assert.equal(html.split('Pirates vs Cubs').length-1,1);
-  assert.match(html,/Prowlarr, Sport-Video/);
-  assert.match(html,/does not guarantee playable links/);
+  assert.match(html,/>Prowlarr<\/span> <span[^>]*>Sport-Video</);
+  assert.match(html,/still needs each account's TorBox check/);
 });
 test('Discovery promotion filter excludes other events and escapes flash text',()=>{
   const html=render({...base,promotion:'nfl',flash:'<script>unsafe</script>'});
@@ -20,12 +20,12 @@ test('Discovery promotion filter excludes other events and escapes flash text',(
 test('saved Prowlarr coverage remains visible when the event leaves the active queue',()=>{
   const html=render({...base,releases:[],queue:{eventStates:[],matchedEvents:[{id:'mlb:1'}]}});
   assert.match(html,/Pirates vs Cubs/);
-  assert.match(html,/<td>Prowlarr<\/td>/);
+  assert.match(html,/<td><span class="chip plain" data-tone="info">Prowlarr<\/span><\/td>/);
 });
 test('source promotion selection preserves empty selections and Overview is removed',()=>{
   const empty=render({...base,tab:'preparation',selection:{source:'bitmagnet',ids:[]}});
   assert.doesNotMatch(empty,/ checked/);
-  assert.match(empty,/0 selected/);
+  assert.match(empty,/0 of 2 selected/);
   assert.match(empty,/\/admin\/discovery\/bitmagnet\/promotions/);
   assert.match(render({...base,tab:'preparation',selection:{source:'bitmagnet',ids:null}}),/ checked/);
   assert.match(render({...base,tab:'overview'}),/>Overview</);

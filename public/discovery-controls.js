@@ -1,7 +1,10 @@
 'use strict';
 (() => {
   const root=document.getElementById('discovery-content');if(!root) return;
+  // Pages rebuilt with native folds (issue #72) already group their sections;
+  // only headings and forms outside a <details> are folded here.
   for(const h of [...root.querySelectorAll('h3')]) {
+    if(h.closest('details')) continue;
     if(!['Event discovery status','Prioritise a missing game','Next retries','Successfully matched events'].includes(h.textContent.trim())) continue;
     const fold=document.createElement('details'),summary=document.createElement('summary');
     fold.className='card my-3';summary.className='card-header';summary.textContent=h.textContent;h.before(fold);fold.append(summary);
@@ -10,7 +13,7 @@
     h.remove();
   }
   const form=root.querySelector('form[action="/admin/prowlarr-discovery"]');
-  if(form) {
+  if(form && !form.closest('details')) {
     const fold=document.createElement('details'),summary=document.createElement('summary');fold.className='card my-3';summary.className='card-header';
     summary.textContent='Prowlarr settings · '+(form.querySelector('[name="enabled"]').checked?'Enabled':'Disabled');form.before(fold);fold.append(summary,form);form.classList.add('card-body');
     form.addEventListener('invalid',()=>{fold.open=true;},true);
@@ -24,6 +27,16 @@
   }
   for(const table of root.querySelectorAll('table')) {
     const body=table.tBodies[0];if(!body || body.rows.length<=15) continue;
+    // Native tables scroll inside their box instead of paging (issue #72);
+    // long ones get a filter, unless they bring their own (Sport-Video).
+    if(table.classList.contains('tbl')) {
+      if(body.id==='sv-rows') continue;
+      const search=document.createElement('input');search.className='t';search.type='search';search.placeholder='Filter this list';search.setAttribute('aria-label','Filter table');
+      const bar=document.createElement('div');bar.style.cssText='padding:10px 18px;border-bottom:1px solid var(--line)';bar.append(search);
+      (table.closest('.tbl-wrap') || table).before(bar);
+      search.addEventListener('input',()=>{const q=search.value.toLowerCase();for(const row of body.rows) row.hidden=!row.textContent.toLowerCase().includes(q);});
+      continue;
+    }
     const controls=document.createElement('div');controls.className='d-flex gap-2 flex-wrap align-items-center p-2';
     const search=document.createElement('input');search.className='form-control';search.style.maxWidth='260px';search.placeholder='Filter this table';search.setAttribute('aria-label','Filter table');
     const previous=document.createElement('button'),next=document.createElement('button'),count=document.createElement('span');
