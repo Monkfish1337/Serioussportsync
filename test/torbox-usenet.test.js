@@ -151,3 +151,30 @@ test('accounts limited to public addresses cannot reach the local network', asyn
   await assert.rejects(nntp.downloadNzb('https://indexer.example/api?t=get&id=1', { publicOnly: true, lookup, fetchImpl }), /public internet address/);
   assert.equal(fetched, 1, 'a redirect into the LAN is refused before it is followed');
 });
+
+// Issue #66: a read-only round trip testers can run on their own account.
+test('Check TorBox Usenet walks every step and adds nothing to TorBox', async () => {
+  const tb = fakeTorbox();
+  const out = await pipeline.check({ userConfig: config, query: 'Twins Giants', deps: { fetchImpl: tb.fetchImpl,
+    search: async () => ({ ok: true, results: [candidate] }), downloadNzb: async () => NZB } });
+  assert.equal(out.ok, true);
+  assert.deepEqual(out.steps.map((s) => [s.name, s.ok]), [['TorBox key', true], ['TorBox Usenet access', true], ['Search source', true],
+    ['Search', true], ['Download the NZB', true], ['TorBox cache check', true]]);
+  assert.match(out.steps[5].detail, /does not have this release yet/);
+  assert.ok(!tb.calls.some((c) => /createusenetdownload|requestdl/.test(c.url)), 'nothing is added to TorBox');
+  for (const call of tb.calls) assert.doesNotMatch(call.url + call.body, /INDEXER-SECRET/);
+});
+
+test('Check TorBox Usenet stops at the first failing step and says why', async () => {
+  const refused = await pipeline.check({ userConfig: config, deps: {
+    fetchImpl: async () => ({ ok: false, status: 403, json: async () => ({}) }) } });
+  assert.equal(refused.ok, false);
+  assert.deepEqual(refused.steps.map((s) => s.name), ['TorBox key', 'TorBox Usenet access']);
+  assert.match(refused.steps[1].detail, /plan includes Usenet/);
+  const empty = await pipeline.check({ userConfig: config, query: 'nothing', deps: { fetchImpl: fakeTorbox().fetchImpl,
+    search: async () => ({ ok: true, results: [] }) } });
+  assert.equal(empty.steps.at(-1).name, 'Search');
+  assert.match(empty.steps.at(-1).detail, /No results for "nothing"/);
+  const noKey = await pipeline.check({ userConfig: { ...config, torboxApiKey: '' } });
+  assert.deepEqual(noKey.steps.map((s) => [s.name, s.ok]), [['TorBox key', false]]);
+});

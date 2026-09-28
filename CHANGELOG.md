@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Check TorBox Usenet** on its settings page runs a read-only round trip
+  with the saved settings and shows each step: TorBox key, Usenet access (a
+  refused key suggests checking the plan includes Usenet), search source,
+  search, NZB download and TorBox's cache check. Nothing is added to TorBox (#66).
 - **Playable coverage.** Discovery → Overview and Diagnosis show how many
   games with a saved release TorBox has confirmed as cached in the last 48
   hours (any account), alongside those checked and not cached and those not
