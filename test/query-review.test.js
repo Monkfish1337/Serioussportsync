@@ -119,3 +119,39 @@ test('team catalogs name their league as review parent', () => {
   assert.equal(built.reviewParent, 'epl');
   assert.equal(promotions.createGenericPromotion({id:'my-custom', name:'X', source:'tsdb', leagueId:'1'}).reviewParent, null);
 });
+
+// Issue #70: each indexer's queries are ordered by what has worked there.
+// 720pier ignores dates but finds team-name searches.
+test('queries are ordered by how often each pattern found the right release on that indexer',()=>{
+  let now=Date.parse('2026-09-25T12:00:00Z');
+  const db=review.createReview(':memory:',()=>now);
+  const promo={id:'mlb',isRelevantStreamTitle:(title)=>({ok:/Twins/.test(title)})};
+  const event={id:'mlb:1',name:'Minnesota Twins vs San Francisco Giants',date:'2026-09-23'};
+  const pier=db.context('prowlarr · 720pier',promo,event,'queue');
+  for (let i=0;i<6;i++) {
+    pier.record('MLB 2026.09.2'+i,'success',[{title:'NHL 2026-2027 / PS / Game '+i}],100);
+    pier.record('Twins Giants 2026.09.2'+i,'success',[{title:'MLB 2026 / RS / Minnesota Twins @ San Francisco Giants '+i}],100);
+  }
+  const planned=['MLB 2026.09.23','Twins Giants 2026.09.23','Minnesota Twins @ San Francisco Giants 2026.09.23'];
+  assert.deepEqual(db.context('prowlarr · 720pier',promo,event,'queue').filter(planned),
+    ['Twins Giants 2026.09.23','Minnesota Twins @ San Francisco Giants 2026.09.23','MLB 2026.09.23'],
+    'proven first, untried next, never-matching last');
+  assert.deepEqual(db.context('prowlarr · RuTracker.org',promo,event,'queue').filter(planned),planned,'another indexer keeps the planner order');
+  db.close();
+});
+
+test('too few searches decide nothing, and a demoted pattern stays last',()=>{
+  const now=Date.parse('2026-09-25T12:00:00Z');
+  const db=review.createReview(':memory:',()=>now);
+  const promo={id:'mlb',isRelevantStreamTitle:(title)=>({ok:/Twins/.test(title)})};
+  const event={id:'mlb:1',name:'Minnesota Twins vs San Francisco Giants',date:'2026-09-23'};
+  const ctx=db.context('prowlarr · 720pier',promo,event,'queue');
+  for (let i=0;i<3;i++) ctx.record('MLB 2026.09.2'+i,'success',[{title:'unrelated'}],100);
+  const planned=['MLB 2026.09.23','Twins Giants 2026.09.23'];
+  assert.deepEqual(db.context('prowlarr · 720pier',promo,event,'queue').filter(planned),planned,'three searches are not enough to judge');
+  for (let i=0;i<6;i++) ctx.record('Twins Giants 2026.09.2'+i,'success',[{title:'Twins @ Giants'}],100);
+  const key=db.rows('mlb').find((r)=>r.pattern==='twins giants {date}').key;
+  db.setPolicy('mlb',key,'demoted');
+  assert.deepEqual(db.context('prowlarr · 720pier',promo,event,'queue').filter(planned),planned,'an admin demotion beats a good record');
+  db.close();
+});
