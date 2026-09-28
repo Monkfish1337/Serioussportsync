@@ -629,3 +629,45 @@ test('undated loose matches do not mark an indexer as ignoring dates; v1.3.0 fla
     assert.equal(queue.status().indexers[0].ignoresDates,false,'flags set under the old rule are cleared');
   } finally {queue.close();fs.rmSync(dir,{recursive:true,force:true,maxRetries:5,retryDelay:100});}
 });
+
+// Issue #71: a team search on 720pier returns a whole series, but only the
+// three best-seeded torrents were fetched, often several copies of one game.
+test('a series search fetches one torrent per missing game, up to six',async()=>{
+  const settings=require('../lib/settings'),source=require('../lib/sources/prowlarr'),{Response}=require('node-fetch');
+  const original=settings.getProwlarr;
+  settings.getProwlarr=()=>({url:'http://prowlarr.invalid',apiKey:'fixture'});
+  const games=['20.09','21.09','22.09','23.09','24.09'];
+  const rows=[];
+  games.forEach((day,g)=>{for (let copy=0;copy<2;copy++) rows.push({title:'MLB 2026 / RS / '+day+'.2026 / Twins @ Giants copy '+copy,
+    downloadUrl:'/download/'+g+'-'+copy,seeders:g===0?50-copy:10-g-copy,indexer:'720pier'});});
+  const fetched=[];
+  const fetchImpl=async url=>{
+    if (url.includes('/api/v1/search?')) return new Response(JSON.stringify(rows));
+    const id=url.split('/download/')[1];fetched.push(id);
+    return new Response(null,{status:302,headers:{location:'magnet:?xt=urn:btih:'+String(fetched.length).repeat(40).slice(0,40)}});
+  };
+  const spread=r=>/(\d\d\.\d\d)\.2026/.exec(r.title)[1];
+  try {
+    await source.multiSearch(['Twins Giants'],{detailed:true,indexerId:36,fetchImpl,hydrationLimit:3,hydrationSeriesLimit:6,hydrationSpread:spread,hydrationConcurrency:1});
+    assert.deepEqual(fetched,['0-0','1-0','2-0','3-0','4-0'],'five games, one each, best-seeded first; the second copy of the busiest game is not fetched');
+    fetched.length=0;
+    await source.multiSearch(['Twins Giants'],{detailed:true,indexerId:36,fetchImpl,hydrationLimit:3,hydrationSeriesLimit:6,
+      hydrationSpread:r=>games.slice(0,2).includes(spread(r))?spread(r):'',hydrationConcurrency:1});
+    assert.equal(fetched.length,3,'two games are within the usual limit of three');
+    fetched.length=0;
+    await source.multiSearch(['Twins Giants'],{detailed:true,indexerId:36,fetchImpl,hydrationLimit:3,hydrationConcurrency:1});
+    assert.deepEqual(fetched,['0-0','0-1','1-0'],'without a spread, the top three by seeders as before');
+  } finally {settings.getProwlarr=original;}
+});
+
+test('the queue spreads downloads across the games still missing a release',async()=>{
+  let opts;
+  const {deps}=setup({search:async(_q,o)=>{opts=o;return {ok:true,partial:false,results:[]};}});
+  const queue=discovery.createQueue(':memory:',deps);
+  try {
+    await queue.run();
+    assert.equal(opts.hydrationSeriesLimit,6);
+    assert.equal(opts.hydrationSpread({title:'MLB Mariners vs Rangers 1080p'}),'mlb:2');
+    assert.equal(opts.hydrationSpread({title:'unrelated'}),'');
+  } finally {queue.close();}
+});
