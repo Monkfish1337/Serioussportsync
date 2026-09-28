@@ -5,6 +5,12 @@
 // 167 saved events had never been checked.
 
 process.env.SESSION_SECRET ||= 'torbox-audit-test-secret-00000000000000000000000000';
+// Every file this test can touch lives in a temporary folder, set before any
+// module reads its path (lib/users resolves USERS_FILE when first loaded).
+const fs = require('fs'), os = require('os'), path = require('path');
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sss-audit-'));
+process.env.USERS_FILE = path.join(dir, 'users.json');
+process.env.AVAILABILITY_DB_FILE = path.join(dir, 'availability.sqlite');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const audit = require('../lib/torbox-cache-audit');
@@ -48,3 +54,23 @@ test('without an admin TorBox key nothing is checked', async () => {
   assert.deepEqual(out, { skipped: 'no-admin-torbox-key' });
   assert.equal(called, false);
 });
+
+// Found on v1.3.1: the audit read accounts with listUsers(), which returns
+// keys still encrypted, so TorBox refused every batch.
+test('the audit uses the decrypted TorBox key, and says why a batch failed', async () => {
+  const users = require('../lib/users');
+  const created = await users.createUser({ username: 'admin', password: 'correct-horse-battery-staple', role: 'admin' });
+  users.updateUserConfig(created.id, { torboxApiKey: 'REAL-TB-KEY' });
+  assert.match(JSON.parse(fs.readFileSync(process.env.USERS_FILE, 'utf8')).users[0].config.torboxApiKey, /^enc:/, 'stored encrypted');
+  const index = createAvailabilityIndex({ file: ':memory:', secret: process.env.SESSION_SECRET });
+  const keys = [];
+  const logs = [];
+  try {
+    await audit.runOnce({ index: () => index, coverage: rows, log: (m) => logs.push(m),
+      checkCachedBatch: async (hashes, key, log) => { keys.push(key); log('  torbox: checkcached HTTP 401'); return new Set(); } });
+    assert.deepEqual(keys, ['REAL-TB-KEY'], 'the decrypted key, not the stored ciphertext');
+    assert.ok(logs.some((m) => /failed \(torbox: checkcached HTTP 401\)/.test(m)), 'the failure names the reason');
+  } finally { index.close(); }
+});
+
+test.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));

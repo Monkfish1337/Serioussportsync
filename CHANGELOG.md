@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.2 — 2026-09-28
+
+- The TorBox cache audit added in 1.3.1 sent TorBox the stored, encrypted
+  form of the admin's key, so every check was refused and nothing was
+  recorded (as designed for a failure). It now uses the decrypted key, and a
+  failed batch logs TorBox's reason.
+
 ## 1.3.1 — 2026-09-28
 
 Fixes from checking 1.3.0 on a live server.
