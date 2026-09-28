@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Discovery has been rebuilt in the native admin style, across all five tabs
+  (Overview, Events, Prowlarr, Sport-Video, Bitmagnet). Each tab opens with
+  its status and key numbers, then actions, with history and settings folded
+  and a summary line showing what each fold holds. Long lists scroll inside a
+  box instead of running down the page, and descriptions are one line. The
+  Prowlarr tab went from almost four screens to under two. The Database page
+  shares the Bitmagnet layout (#72, part 1).
 - When one Prowlarr queue search returns a whole series (a team search on
   720pier), SSS now fetches one torrent per game still missing a release, up
   to six, instead of the three best-seeded, which were often copies of one

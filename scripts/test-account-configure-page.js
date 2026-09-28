@@ -99,12 +99,12 @@ function listen(app) {
     await post('/admin/access-policy',{enabled:'1',expiryDays:'14'},cookie);
     const metadataHtml=await (await fetch(base+'/admin/metadata',{headers:{Cookie:cookie}})).text();
     const discoveryHtml=await (await fetch(base+'/admin/prowlarr-discovery',{headers:{Cookie:cookie}})).text();
-    assert.ok(discoveryHtml.includes('Catch-up progress') && discoveryHtml.includes('Event discovery status'));
+    assert.ok(discoveryHtml.includes('Search now') && discoveryHtml.includes('Missing games'));
     for (const tab of ['overview','events','prowlarr','preparation']) {
       const response=await fetch(base+'/admin/discovery?tab='+tab,{headers:{Cookie:cookie}});
       assert.strictEqual(response.status,200);
       const html=await response.text();
-      if(tab==='overview') assert.ok(html.includes('Coverage by promotion') && html.includes('Missing torrent identities'));
+      if(tab==='overview') assert.ok(html.includes('Coverage by promotion') && html.includes('Missing a release'));
     }
     assert.strictEqual((await fetch(base+'/admin/discovery',{headers:{Cookie:regularCookie}})).status,403);
     assert.strictEqual((await fetch(base+'/assets/discovery-controls.js')).status,200);
