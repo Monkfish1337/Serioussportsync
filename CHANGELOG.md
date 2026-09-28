@@ -6,6 +6,16 @@
   with the saved settings and shows each step: TorBox key, Usenet access (a
   refused key suggests checking the plan includes Usenet), search source,
   search, NZB download and TorBox's cache check. Nothing is added to TorBox (#66).
+- **Playable coverage.** Discovery → Overview and Diagnosis show how many
+  games with a saved release TorBox has confirmed as cached in the last 48
+  hours (any account), alongside those checked and not cached and those not
+  checked yet. Diagnosis warns when fewer than half of a league's checked games
+  are cached (#65).
+- Diagnosis shows Prowlarr's version and warns, as a problem, when it is one
+  known to break an indexer in use: Prowlarr 2.6.x rejects 720pier's torrent
+  files, so searches work but every download fails. The warning says to roll
+  back to 2.5.2 and only appears while that indexer's downloads are failing, so
+  a fixed release does not keep warning (#68).
 - The Prowlarr queue learns which indexers ignore dates. When a date-only
   search such as `MLB 2026.09.23` returns five or more results and none carry
   that date, the indexer gets no date-only searches for 30 days; its turns go

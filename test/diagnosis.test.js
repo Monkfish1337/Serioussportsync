@@ -340,3 +340,34 @@ test('a queued promotion missing games offers Search now, sent as a form that re
   assert.match(html, /<form method="POST" action="\/admin\/prowlarr-discovery\/search-now" class="dx-post"><input type="hidden" name="back" value="\/admin\/diagnosis#stage-coverage"><input type="hidden" name="promotion" value="motogp"><button class="btn sm primary">Search MotoGP now<\/button>/);
   assert.match(html, /Searching MOTOGP now/);
 });
+
+// Issue #65: saved is not playable.
+test('a league whose saved releases are mostly not cached on TorBox is flagged', () => {
+  const result = run({ coverage: () => ({ total: 20, matched: 18, missing: 2, playable: { cached: 3, notCached: 12, unchecked: 3 },
+    promotions: [{ id: 'motogp', total: 20, matched: 18, missing: 2, reasons: {}, cached: 3, notCached: 12, unchecked: 3 }] }) });
+  const low = titled(result, /MotoGP: only 3 of 15 checked games are cached on TorBox/);
+  assert.equal(low.stage, 'coverage');
+  assert.ok(low.evidence.includes('12 checked and not cached'));
+  assert.ok(stage(result, 'coverage').vitals.some(([k, v]) => k === 'Cached on TorBox' && v === '3 of 18 (3 not checked)'));
+  const few = run({ coverage: () => ({ total: 4, matched: 4, missing: 0, promotions: [{ id: 'motogp', total: 4, matched: 4, missing: 0, reasons: {}, cached: 0, notCached: 3, unchecked: 1 }] }) });
+  assert.ok(!titled(few, /cached on TorBox/), 'fewer than five checked games decide nothing');
+});
+
+// Issue #68, from the live server on 2026-09-25: Prowlarr 2.6.5 rejected every
+// 720pier torrent file; searches worked, so it looked like an expired cookie.
+test('a Prowlarr version known to break an indexer in use is flagged', () => {
+  const queue = (version) => () => ({ prowlarrVersion: version, eventStates: [],
+    indexers: [{ name: '720pier', successes: 199, failures: 0 }, { name: 'RuTracker.org', successes: 43, failures: 0 }] });
+  const failing = () => ({ opens: [], plays: [], downloads: { '720pier': { [day(0)]: { ok: 0, failed: 9, lastFailAt: NOW - 3600000, lastStatus: 'HTTP 500' } } } });
+  const bad = run({ queueStatus: queue('2.6.5.5623'), journal: failing });
+  const f = titled(bad, /^Prowlarr 2\.6\.5\.5623 cannot download from 720pier$/);
+  assert.equal(f.severity, 'critical');
+  assert.equal(f.stage, 'sources');
+  assert.match(f.steps[0], /Roll Prowlarr back to 2\.5\.2/);
+  assert.ok(stage(bad, 'sources').vitals.some(([k, v]) => k === 'Prowlarr' && v === 'version 2.6.5.5623'));
+  assert.ok(!titled(run({ queueStatus: queue('2.5.2.5491'), journal: failing }), /cannot download from/), 'a good version is not flagged');
+  const working = () => ({ opens: [], plays: [], downloads: { '720pier': { [day(0)]: { ok: 4, failed: 1 } } } });
+  assert.ok(!titled(run({ queueStatus: queue('2.6.9'), journal: working }), /cannot download from/), 'a fixed 2.6.x whose downloads work is not flagged');
+  assert.ok(!titled(run({ queueStatus: () => ({ prowlarrVersion: '2.6.5', eventStates: [], indexers: [{ name: 'Knaben', successes: 1, failures: 0 }] }), journal: failing }),
+    /cannot download from/), 'only while the affected indexer is in use');
+});
