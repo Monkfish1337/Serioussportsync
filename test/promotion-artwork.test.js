@@ -18,7 +18,7 @@ const promotions = require('../lib/promotions');
 const transform = require('../lib/transform');
 
 const BUILT_IN = ['f1', 'motogp', 'ufc', 'one', 'boxing', 'wwe', 'wwe-raw', 'wwe-smackdown', 'wwe-nxt',
-  'aew', 'aew-dynamite', 'aew-collision', 'mlb'];
+  'aew', 'aew-dynamite', 'aew-collision', 'mlb', 'nfl', 'nba', 'nhl', 'ucl', 'epl', 'motd'];
 const byId = (id) => promotions.all.find((p) => p.id === id);
 
 test('every built-in promotion falls back to its own bundled card, never a TheSportsDB league image', () => {
@@ -34,7 +34,9 @@ test('every built-in promotion falls back to its own bundled card, never a TheSp
     seen.add(poster);
   }
   assert.match(byId('boxing').defaults.poster, /promo-boxing-poster\.png$/, 'portrait tiles get a portrait card');
-  assert.match(byId('mlb').defaults.poster, /promo-mlb-square\.png$/, 'square tiles get a square card');
+  for (const id of ['mlb', 'nfl', 'nba', 'nhl', 'ucl', 'epl']) {
+    assert.match(byId(id).defaults.poster, new RegExp('promo-' + id + '-square\.png$'), 'square tiles get a square card');
+  }
 });
 
 test('a stored league image or old bundled card is served as the current default', () => {
