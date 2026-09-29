@@ -53,6 +53,7 @@ function sources(overrides) {
       { verdict: 'fail', promotionName: 'MLB', eventName: 'Cubs at Mets', problems: ['no rows, although SSS holds a release for this event'], warnings: [] },
     ] }],
     sportVideoStatus: () => ({ lastError: '' }),
+    accountHealth: () => [],
     sportVideoReleases: () => [],
     users: () => [{ username: 'monkeh', role: 'admin', config: { diyUsenetEnabled: true, torboxApiKey: 'tb' } }],
     usenetStatus: () => ({ enabled: true, discovery: true, playback: false, ready: false }),

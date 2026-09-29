@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Per-account pipeline health: when TorBox refuses an account's key, or
+  Easynews its login, during a real search, the account's Configure page
+  shows "Key refused" or "Login refused" on that service with when it
+  happened, and Diagnosis → Playback names the account. It clears on the
+  next working search or when the key is changed (#76).
 - Alerts: Server → Alerts sends Diagnosis problems to a Discord, Slack or
   plain JSON webhook, once each, and says when they clear. It checks every
   30 minutes, can be limited to critical problems, and can send a daily
