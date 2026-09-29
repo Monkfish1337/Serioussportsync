@@ -1185,6 +1185,20 @@ function createApp() {
     try { settings.setDisplayTimeZone((req.body || {}).timeZone); res.redirect(303,'/admin?flash='+encodeURIComponent('Display time zone saved.')); }
     catch (err) { res.redirect(303,'/admin?flash='+encodeURIComponent(err.message)); }
   });
+  // Alerts (issue #75). The webhook URL carries a token, so it is stored
+  // encrypted and never echoed in a flash or log.
+  const saveAlerts = (b) => settings.setAlerts({ webhookUrl: b.webhookUrl, format: b.format, immediate: b.immediate === '1',
+    minSeverity: b.minSeverity, dailySummary: b.dailySummary === '1', dailyHour: b.dailyHour });
+  app.post('/admin/alerts', requireAdmin, (req, res) => {
+    try { saveAlerts(req.body || {}); res.redirect(303, '/admin?flash=' + encodeURIComponent('Alerts saved.')); }
+    catch (err) { res.redirect(303, '/admin?flash=' + encodeURIComponent(err.message)); }
+  });
+  // Saves what is in the form first, so the test uses the URL just typed.
+  app.post('/admin/alerts/test', requireAdmin, async (req, res) => {
+    try { saveAlerts(req.body || {}); } catch (err) { return res.redirect(303, '/admin?flash=' + encodeURIComponent(err.message)); }
+    const out = await require('./lib/alerts').test({ origin: publicOriginFromReq(req) });
+    res.redirect(303, '/admin?flash=' + encodeURIComponent(out.ok ? 'Saved, and a test alert was sent.' : 'Saved, but the test alert failed: ' + out.error));
+  });
   app.post('/admin/appearance', requireAdmin, (req, res) => {
     try {
       const applied = settings.setAppearance({ skin: (req.body || {}).skin });

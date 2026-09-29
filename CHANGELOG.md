@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Alerts: Server → Alerts sends Diagnosis problems to a Discord, Slack or
+  plain JSON webhook, once each, and says when they clear. It checks every
+  30 minutes, can be limited to critical problems, and can send a daily
+  summary at a chosen hour. "Save and send test" proves the webhook works. The
+  webhook URL is stored encrypted (#75).
 - The admin sidebar is grouped by job (Health, Sources, Content, System), its
   items are buttons with icons, and it collapses to icons only; the choice is
   remembered per browser. "User Management" is now "Users" (#73).
