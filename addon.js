@@ -395,6 +395,7 @@ function createApp() {
     res.send(configurePage.render({
       user: req.user,
       isAdmin: req.user.role === 'admin',
+      health: require('./lib/account-health').problems(req.user.username),
       isFirstRun: !cfg.catalogDefaultsVersion && !String(cfg.torboxApiKey || '').trim(),
       // First runs start on the Overview; a returning visit goes straight
       // to Services, since it came to change something.
@@ -672,6 +673,14 @@ function createApp() {
       // the keys we name here, so legacy fields remain on disk but are no
       // longer touched by the UI. The schema still includes them in users.js
       // so existing records continue deserialising cleanly.
+      // A changed key or login replaces what was known about it (issue #76).
+      {
+        const before = req.user.config || {};
+        const health = require('./lib/account-health');
+        if (String(b.torboxApiKey || '').trim() !== String(before.torboxApiKey || '').trim()) { health.reset(req.user.username, 'torbox'); health.reset(req.user.username, 'torbox-usenet'); }
+        if (String(b.easynewsUsername || '').trim() !== String(before.easynewsUsername || '').trim()
+          || String(b.easynewsPassword || '') !== String(before.easynewsPassword || '')) health.reset(req.user.username, 'easynews');
+      }
       users.updateUserConfig(req.user.id, {
         torboxEnabled: b.torboxEnabled === 'on'
           || b.torboxEnabled === '1' || b.torboxEnabled === 'true',

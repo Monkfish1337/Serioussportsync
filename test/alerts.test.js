@@ -31,7 +31,7 @@ function quiet(overrides) {
     promotions: () => [], events: () => [], overrides: () => [], sanitizeWeekly: () => [], reviewRows: () => [],
     refreshStatus: () => ({ finishedAt: new Date(NOW - H).toISOString(), lastFullRefreshAt: new Date(NOW - H).toISOString(), promotions: [] }),
     queueStatus: () => ({ indexers: [{ name: '720pier', successes: 169, failures: 0, next_at: 0 }], eventStates: [], matchedEvents: [] }),
-    clientReports: () => [], sportVideoStatus: () => ({}), sportVideoReleases: () => [],
+    clientReports: () => [], sportVideoStatus: () => ({}), sportVideoReleases: () => [], accountHealth: () => [],
     users: () => [{ username: 'admin', role: 'admin', config: { torboxApiKey: 'tb' } }], usenetStatus: () => ({ enabled: false }),
     logs: () => [], availabilityIndex: () => ({ eventReleaseTitles: () => [], storedForEvent: () => [] }),
     coverage: () => null, queueHashes: () => [], torboxStates: () => new Map(),
