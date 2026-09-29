@@ -7,6 +7,12 @@
   30 minutes, can be limited to critical problems, and can send a daily
   summary at a chosen hour. "Save and send test" proves the webhook works. The
   webhook URL is stored encrypted (#75).
+- Diagnosis flags a source that quietly stops listing games. Each refresh
+  records how many events a source listed for the next seven days; when that
+  collapses against about a day earlier (to 40% or less, from at least four),
+  Schedule shows "stopped listing" or "far fewer" with the recent counts.
+  Stored events stay listed when a feed drops them, so nothing else noticed
+  (#74).
 - The admin sidebar is grouped by job (Health, Sources, Content, System), its
   items are buttons with icons, and it collapses to icons only; the choice is
   remembered per browser. "User Management" is now "Users" (#73).

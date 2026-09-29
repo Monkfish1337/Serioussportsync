@@ -371,3 +371,41 @@ test('a Prowlarr version known to break an indexer in use is flagged', () => {
   assert.ok(!titled(run({ queueStatus: () => ({ prowlarrVersion: '2.6.5', eventStates: [], indexers: [{ name: 'Knaben', successes: 1, failures: 0 }] }), journal: failing }),
     /cannot download from/), 'only while the affected indexer is in use');
 });
+
+// Issue #74: a feed that quietly stops listing games. Refreshes merge, so the
+// stored events stay and nothing else notices; each refresh now records how
+// many events the source listed for the next week.
+test('a source that stops listing upcoming games is flagged within a day', () => {
+  const at = (hours) => new Date(NOW - hours * H).toISOString();
+  const status = (history) => () => ({ finishedAt: at(1), lastFullRefreshAt: at(1),
+    promotions: [{ id: 'nhl', status: 'ok', history }] });
+  const drop = (history) => run({ refreshStatus: status(history) }).findings.find((f) => f.id === 'drop:nhl');
+
+  const stopped = drop([{ at: at(31), upcoming7: 40 }, { at: at(25), upcoming7: 41 }, { at: at(7), upcoming7: 38 }, { at: at(1), upcoming7: 0 }]);
+  assert.ok(stopped, 'a feed going from 41 to 0 is flagged');
+  assert.equal(stopped.stage, 'schedule');
+  assert.equal(stopped.severity, 'critical');
+  assert.match(stopped.title, /NHL stopped listing upcoming events/);
+  assert.match(stopped.detail, /now lists 0 events for the next 7 days; 25h ago it listed 41\./);
+
+  const fewer = drop([{ at: at(25), upcoming7: 30 }, { at: at(1), upcoming7: 9 }]);
+  assert.equal(fewer && fewer.severity, 'warning', 'a large partial drop is a warning');
+
+  assert.equal(drop([{ at: at(25), upcoming7: 30 }, { at: at(1), upcoming7: 20 }]), undefined, 'a season winding down is not a drop');
+  assert.equal(drop([{ at: at(25), upcoming7: 2 }, { at: at(1), upcoming7: 0 }]), undefined, 'leagues that list only one or two are left alone');
+  assert.equal(drop([{ at: at(5), upcoming7: 30 }, { at: at(1), upcoming7: 0 }]), undefined, 'needs a refresh from about a day before');
+});
+
+test('refresh status keeps a short history of upcoming counts per promotion', () => {
+  const refreshStatus = require('../lib/refresh-status');
+  const file = refreshStatus.file();
+  try { fs.unlinkSync(file); } catch (_) {}
+  for (let i = 0; i < 25; i++) {
+    refreshStatus.record({ finishedAt: new Date(NOW + i * H).toISOString(), scope: 'all', promotions: [{ id: 'nhl', status: 'ok', upcoming7: i }] });
+  }
+  refreshStatus.record({ finishedAt: new Date(NOW + 26 * H).toISOString(), scope: 'nhl', promotions: [{ id: 'nhl', status: 'failed', reason: 'timeout' }] });
+  const entry = refreshStatus.load().promotions.find((p) => p.id === 'nhl');
+  assert.equal(entry.history.length, 20, 'capped');
+  assert.equal(entry.history[entry.history.length - 1].upcoming7, 24, 'a failed refresh adds nothing to the history');
+  assert.equal(entry.status, 'failed');
+});
