@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.4.0 — 2026-09-29
 
 - Per-account pipeline health: when TorBox refuses an account's key, or
   Easynews its login, during a real search, the account's Configure page
