@@ -112,6 +112,8 @@ function scheduleBackgroundWork(currentCount) {
   require('./lib/prowlarr-discovery').start();
   // Measures "Cached on TorBox" for saved releases (lib/torbox-cache-audit).
   if (availabilityIndex) require('./lib/torbox-cache-audit').start();
+  // Sends Diagnosis problems to the admin's webhook (lib/alerts); idle until one is set.
+  require('./lib/alerts').start();
 
 }
 

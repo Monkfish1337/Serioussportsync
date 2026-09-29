@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Alerts: Server → Alerts sends Diagnosis problems to a Discord, Slack or
+  plain JSON webhook, once each, and says when they clear. It checks every
+  30 minutes, can be limited to critical problems, and can send a daily
+  summary at a chosen hour. "Save and send test" proves the webhook works. The
+  webhook URL is stored encrypted (#75).
 - Diagnosis flags a source that quietly stops listing games. Each refresh
   records how many events a source listed for the next seven days; when that
   collapses against about a day earlier (to 40% or less, from at least four),
