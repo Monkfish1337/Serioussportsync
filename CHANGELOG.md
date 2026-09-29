@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- WWE NXT, Raw and SmackDown episodes show on their air day even before
+  TheSportsDB lists them. TheSportsDB adds an NXT episode only after it airs,
+  so today's episode had no event and its releases nothing to match. Each
+  refresh now adds a placeholder ("WWE NXT #857") for any episode from two days
+  ago to a week ahead that is not listed, and swaps it for the real one when
+  TheSportsDB catches up ([Discussions #59](https://github.com/Monkfish1337/Serioussportsync/discussions/59)).
+
 ## 1.4.0 — 2026-09-29
 
 - Per-account pipeline health: when TorBox refuses an account's key, or

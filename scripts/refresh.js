@@ -4,6 +4,7 @@
 const tsdb = require('../lib/sources/thesportsdb');
 const tsdbKnownEvents = require('../lib/tsdb-known-events');
 const transform = require('../lib/transform');
+const weeklySchedule = require('../lib/weekly-schedule');
 const store = require('../lib/store');
 const promotions = require('../lib/promotions');
 const config = require('../config');
@@ -531,7 +532,8 @@ async function runRefresh(options) {
       let mismatch = false;
       if (expectedSourceType === 'thesportsdb') {
         if (cachedSourceType && cachedSourceType !== 'thesportsdb'
-            && !(p.aewScheduleShow && cachedSourceType === 'aew')) mismatch = true;
+            && !(p.aewScheduleShow && cachedSourceType === 'aew')
+            && !(p.weeklyAirDay !== undefined && cachedSourceType === weeklySchedule.TYPE)) mismatch = true;
         if (!cachedSourceType) {
           const sourcePart = ev.id.slice(ev.id.indexOf(':') + 1);
           if (!/^\d+$/.test(sourcePart)) mismatch = true; // slug ID under a TSDB promotion = stale
@@ -623,6 +625,16 @@ async function runRefresh(options) {
     const weekAhead = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
     const upcoming7 = promotionEvents.filter((e) => e.date >= today && e.date < weekAhead).length;
     outcomes.push({ id: p.id, status: 'ok', fetched: raw.length, added, updated, skipped, upcoming7 });
+    // WWE weekly shows: placeholders for episodes TheSportsDB has not listed
+    // yet, dropped once it does (lib/weekly-schedule.js, Discussions #59).
+    if (p.weeklyAirDay !== undefined) {
+      const replaced = weeklySchedule.dropPlaceholders(byId, p, Date.now());
+      for (let i = promotionEvents.length - 1; i >= 0; i--) if (!byId.has(promotionEvents[i].id)) promotionEvents.splice(i, 1);
+      const own = Array.from(byId.values()).filter((e) => e.promotion === p.id);
+      const added = weeklySchedule.placeholders(own, p, Date.now()).map((r) => transform.fromWiki(r, p)).filter(Boolean);
+      for (const ev of added) { byId.set(ev.id, ev); promotionEvents.push(ev); }
+      if (added.length || replaced) log('  ' + p.id + ': +' + added.length + ' placeholder episode(s), -' + replaced + ' replaced or expired');
+    }
     if (p.aewScheduleShow) {
       const dupes = dropSupplementalDuplicates(byId, p);
       if (dupes) {
