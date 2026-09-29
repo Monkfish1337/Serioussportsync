@@ -218,3 +218,30 @@ test('the bundled images are offered in both artwork pickers', () => {
     assert.ok(block.includes('/assets/collection-unmatched.png'), file + ' needs Unmatched');
   }
 });
+
+// Discussions #116: folders could only be reordered by editing the JSON.
+test('folders can be reordered, and the export follows the new order', () => {
+  settings.save(settings.defaults());
+  const before = settings.load().folders.map((folder) => folder.id);
+  assert.ok(before.length >= 3);
+  const wanted = [before[2], before[0]];
+  const saved = settings.reorderFolders(wanted.join(','));
+  const after = saved.folders.map((folder) => folder.id);
+  assert.deepEqual(after.slice(0, 2), wanted, 'the listed folders come first, in order');
+  assert.deepEqual(after.slice(2), before.filter((id) => !wanted.includes(id)), 'the rest keep their places after them');
+  assert.deepEqual(settings.reorderFolders(['unknown', before[1]]).folders.map((f) => f.id)[0], before[1], 'unknown ids are ignored');
+  assert.equal(settings.load().folders.length, before.length, 'nothing is dropped');
+  const exported = collections.buildNuvioCollections({ origin: 'https://sss.test', user: { id: 'u', apiToken: 't', config: {} } });
+  const titles = settings.load().folders.filter((folder) => folder.promotions.length).map((folder) => folder.title);
+  assert.deepEqual(JSON.stringify(exported).indexOf(titles[0]) < JSON.stringify(exported).indexOf(titles[1]), true);
+});
+
+test('the folder order list is drag-and-drop with arrow buttons, on both editors', () => {
+  const state = settings.load();
+  const html = admin.folderOrder(state.folders);
+  assert.equal((html.match(/<li class="fo-row" draggable="true"/g) || []).length, state.folders.length);
+  assert.match(html, /aria-label="Move [^"]+ up">↑</);
+  assert.match(html, /\/admin\/nuvio-collections\/folders\/order/);
+  assert.equal(admin.folderOrder(state.folders.slice(0, 1)), '', 'one folder has nothing to order');
+  assert.match(admin.renderBody({}), /id="folder-order"/);
+});

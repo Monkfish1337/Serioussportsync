@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Nuvio collection folders can be reordered: Collections and Configure →
+  Collections have a Folder order list you drag, or move with the arrow
+  buttons, and it saves as you go. Nuvio shows the folders in that order
+  ([Discussions #116](https://github.com/Monkfish1337/Serioussportsync/discussions/116)).
+
 ## 1.4.0 — 2026-09-29
 
 - Per-account pipeline health: when TorBox refuses an account's key, or
