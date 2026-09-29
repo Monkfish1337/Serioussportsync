@@ -616,7 +616,13 @@ async function runRefresh(options) {
       promotionEvents.push(norm);
     }
     log('  ' + p.id + ': +' + added + ' new, ~' + updated + ' updated, -' + skipped + ' outside scope');
-    outcomes.push({ id: p.id, status: 'ok', fetched: raw.length, added, updated, skipped });
+    // How many events the source listed for the next seven days. Diagnosis
+    // compares it with earlier refreshes to spot a feed that quietly stops
+    // listing games (issue #74): stored events stay put when that happens.
+    const today = new Date().toISOString().slice(0, 10);
+    const weekAhead = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    const upcoming7 = promotionEvents.filter((e) => e.date >= today && e.date < weekAhead).length;
+    outcomes.push({ id: p.id, status: 'ok', fetched: raw.length, added, updated, skipped, upcoming7 });
     if (p.aewScheduleShow) {
       const dupes = dropSupplementalDuplicates(byId, p);
       if (dupes) {
