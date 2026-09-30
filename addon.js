@@ -2029,6 +2029,15 @@ function createApp() {
 
   app.post('/admin/nuvio-collections/folders/create', requireAdmin, (req, res) => saveNuvioFolder(req, res, null));
   app.post('/admin/nuvio-collections/folders/:id/save', requireAdmin, (req, res) => saveNuvioFolder(req, res, req.params.id));
+  // Folder order, from the drag-and-drop list (Discussions #116).
+  app.post('/admin/nuvio-collections/folders/order', requireAdmin, (req, res) => {
+    try {
+      nuvioCollectionSettings.reorderFolders(String((req.body || {}).order || ''));
+      collectionsResult(req, res, { ok: true, message: 'Folder order saved.' });
+    } catch (err) {
+      collectionsResult(req, res, { ok: false, message: 'Folder order not saved: ' + err.message });
+    }
+  });
   app.post('/admin/nuvio-collections/folders/:id/delete', requireAdmin, (req, res) => {
     const removed = nuvioCollectionSettings.removeFolder(String(req.params.id || ''));
     collectionsResult(req, res, removed

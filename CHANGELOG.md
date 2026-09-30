@@ -8,6 +8,10 @@
   refresh now adds a placeholder ("WWE NXT #857") for any episode from two days
   ago to a week ahead that is not listed, and swaps it for the real one when
   TheSportsDB catches up ([Discussions #59](https://github.com/Monkfish1337/Serioussportsync/discussions/59)).
+- Nuvio collection folders can be reordered: Collections and Configure →
+  Collections have a Folder order list you drag, or move with the arrow
+  buttons, and it saves as you go. Nuvio shows the folders in that order
+  ([Discussions #116](https://github.com/Monkfish1337/Serioussportsync/discussions/116)).
 
 ## 1.4.0 — 2026-09-29
 
