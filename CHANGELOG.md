@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Fixed black tiles in Nuvio for some TheSportsDB events (WWE NXT #856, AEW
+  Collision #162 and #163, and a few UFC, Boxing and WWE events). TheSportsDB
+  gave their images on www.thesportsdb.com, which does not serve images; SSS
+  now uses its image CDN (r2.thesportsdb.com) for them, including events
+  already stored.
+
 ## 1.4.1 — 2026-09-30
 
 - WWE NXT, Raw and SmackDown episodes show on their air day even before
