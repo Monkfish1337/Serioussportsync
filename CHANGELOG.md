@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.4.1 — 2026-09-30
 
 - WWE NXT, Raw and SmackDown episodes show on their air day even before
   TheSportsDB lists them. TheSportsDB adds an NXT episode only after it airs,
