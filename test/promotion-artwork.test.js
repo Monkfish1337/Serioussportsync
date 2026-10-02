@@ -71,3 +71,19 @@ test('without PUBLIC_URL the cards are served from the repository, so no tile is
   { cwd: path.join(__dirname, '..'), env: Object.assign({}, process.env, { PUBLIC_URL: '' }), encoding: 'utf8' });
   assert.equal(out.trim(), 'https://raw.githubusercontent.com/Monkfish1337/Serioussportsync/main/public/promo-motogp.png');
 });
+
+// Reported from Nuvio: WWE NXT #856 and AEW Collision #162/#163 drew black.
+// TheSportsDB gave their images on www.thesportsdb.com/images/…, which does
+// not serve images; the same path on r2.thesportsdb.com does.
+test('TheSportsDB images on the www host are served from its image CDN', () => {
+  const nxt = byId('wwe-nxt');
+  const www = 'https://www.thesportsdb.com/images/media/event/thumb/fd5vn91790142898.jpg';
+  const r2 = 'https://r2.thesportsdb.com/images/media/event/thumb/fd5vn91790142898.jpg';
+  const stored = { id: nxt.idPrefix + ':2607549', name: 'WWE NXT #856', date: '2026-09-22', poster: www, thumb: www, fanart: www };
+  assert.equal(transform.toCatalogMeta(stored).poster, r2, 'events stored before the fix');
+  assert.equal(transform.toDetailMeta(stored).background, r2);
+  const fresh = transform.fromTsdb({ idEvent: '2607549', strEvent: 'NXT #856', dateEvent: '2026-09-22', strThumb: www, strFanart: www }, nxt);
+  assert.equal(fresh.poster, r2, 'and new ones as they come in');
+  assert.equal(fresh.thumb, r2);
+  assert.equal(transform.toCatalogMeta({ id: nxt.idPrefix + ':1', name: 'x', date: '2026-09-22', poster: r2 }).poster, r2, 'r2 is left alone');
+});
