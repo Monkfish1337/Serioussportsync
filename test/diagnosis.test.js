@@ -303,19 +303,22 @@ test('the overview reads as a journey: stages, Start here, fixes and hiding', ()
 });
 
 test('the journal records opens, plays and downloads, and keeps seven days', () => {
+  // Journal retention is based on the real clock; keep this fixture relative
+  // to that clock so it does not expire as the rest of this file's 2026 cases age.
+  const now = Date.now();
   journal._reset(path.join(dir, 'journal.json'));
-  journal.recordOpen({ at: NOW, eventId: 'mlb:1', user: 'monkeh', ms: 1234.4, rows: 5, pipelines: { torbox: 5 } });
-  journal.recordOpen({ at: NOW - 8 * 86400000, eventId: 'mlb:old', ms: 1, rows: 0 });
-  journal.recordPlay({ at: NOW, eventId: 'mlb:1', user: 'monkeh', provider: 'TB', outcome: 'ok', ms: 800 });
-  journal.recordDownload('720pier', false, 'HTTP 500', NOW);
-  journal.recordDownload('720pier', true, '', NOW);
+  journal.recordOpen({ at: now, eventId: 'mlb:1', user: 'monkeh', ms: 1234.4, rows: 5, pipelines: { torbox: 5 } });
+  journal.recordOpen({ at: now - 8 * 86400000, eventId: 'mlb:old', ms: 1, rows: 0 });
+  journal.recordPlay({ at: now, eventId: 'mlb:1', user: 'monkeh', provider: 'TB', outcome: 'ok', ms: 800 });
+  journal.recordDownload('720pier', false, 'HTTP 500', now);
+  journal.recordDownload('720pier', true, '', now);
   journal.flush();
   journal._reset(path.join(dir, 'journal.json'));
   const saved = journal.snapshot();
   assert.deepEqual(saved.opens.map((o) => o.eventId), ['mlb:1'], 'older than seven days is dropped');
   assert.equal(saved.opens[0].ms, 1234);
   assert.equal(saved.plays[0].outcome, 'ok');
-  const today = saved.downloads['720pier'][new Date(NOW).toISOString().slice(0, 10)];
+  const today = saved.downloads['720pier'][new Date(now).toISOString().slice(0, 10)];
   assert.equal(today.ok, 1);
   assert.equal(today.failed, 1);
   assert.equal(today.lastStatus, 'HTTP 500');

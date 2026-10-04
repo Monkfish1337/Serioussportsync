@@ -117,9 +117,15 @@ jobs:
       - name: Show container logs on failure
         if: failure()
         continue-on-error: true
-        run: docker compose -f docker-compose.yml -f compose.ci.yml logs --no-color
+        run: |
+          if [ -f compose.ci.yml ]; then
+            docker compose -f docker-compose.yml -f compose.ci.yml logs --no-color
+          fi
 
       - name: Stop test stack
         if: always()
         continue-on-error: true
-        run: docker compose -f docker-compose.yml -f compose.ci.yml down --volumes --remove-orphans
+        run: |
+          if [ -f compose.ci.yml ]; then
+            docker compose -f docker-compose.yml -f compose.ci.yml down --volumes --remove-orphans
+          fi
