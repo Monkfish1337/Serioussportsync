@@ -148,6 +148,59 @@ test('serves an exact HTTP byte range assembled from yEnc articles', async () =>
   } finally { await close(server); }
 });
 
+test('overlapping ranges reuse decoded articles without crossing NNTP credentials', async () => {
+  const descriptor = {
+    id: 'repeat-range-cache-test', filename: 'main.mkv', size: 8, chunkSize: 4,
+    segments: [{ messageId: 'first' }, { messageId: 'second' }],
+    firstPart: { data: Buffer.from('ABCD'), begin: 0, endExclusive: 4, totalSize: 8 },
+  };
+  let downloads = 0;
+  const options = { connect: async () => ({
+    body: async () => { downloads++; return encodedPart(Buffer.from('EFGH'), 4, 8, 'main.mkv'); },
+    close() {}, destroy() {},
+  }) };
+  const firstProvider = { host: 'news.example', port: 563, tls: true, username: 'one' };
+  const secondProvider = { ...firstProvider, username: 'two' };
+  assert.equal((await playback.readNntpFileRange(descriptor, 4, 4, firstProvider, options)).toString(), 'EFGH');
+  assert.equal((await playback.readNntpFileRange(descriptor, 5, 3, firstProvider, options)).toString(), 'FGH');
+  assert.equal(downloads, 1, 'the repeated HTTP range should not download its NNTP article twice');
+  await playback.readNntpFileRange(descriptor, 4, 4, secondProvider, options);
+  assert.equal(downloads, 2, 'a different NNTP account must not read from another account cache');
+});
+
+test('concurrent overlapping ranges share one article and survive one cancelled reader', async () => {
+  const descriptor = {
+    id: 'shared-range-test', filename: 'main.mkv', size: 8, chunkSize: 4,
+    segments: [{ messageId: 'first' }, { messageId: 'second' }],
+    firstPart: { data: Buffer.from('ABCD'), begin: 0, endExclusive: 4, totalSize: 8 },
+  };
+  let downloads = 0;
+  let releaseBody;
+  let started;
+  const bodyStarted = new Promise(resolve => { started = resolve; });
+  const options = { connect: async () => ({
+    body: async () => {
+      downloads++;
+      started();
+      return new Promise(resolve => { releaseBody = resolve; });
+    },
+    close() {}, destroy() { throw new Error('shared NNTP session was destroyed'); },
+  }) };
+  const config = { host: 'news.example', port: 563, tls: true, username: 'shared' };
+  const firstController = new AbortController();
+  const secondController = new AbortController();
+  const first = playback.readNntpFileRange(descriptor, 4, 4, config,
+    {...options, signal: firstController.signal});
+  await bodyStarted;
+  const second = playback.readNntpFileRange(descriptor, 5, 3, config,
+    {...options, signal: secondController.signal});
+  firstController.abort();
+  await assert.rejects(first, /cancelled/);
+  releaseBody(encodedPart(Buffer.from('EFGH'), 4, 8, 'main.mkv'));
+  assert.equal((await second).toString(), 'FGH');
+  assert.equal(downloads, 1);
+});
+
 test('writes the first article while later read-ahead articles are still downloading', async () => {
   const { EventEmitter } = require('events');
   const descriptor = {
